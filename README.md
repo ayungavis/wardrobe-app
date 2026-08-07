@@ -70,7 +70,7 @@ make run
 | `make run`      | Build + install + launch on the booted simulator                                              |
 | `make validate` | format → lint → test → build. **Must pass before every PR.**                                  |
 
-CI (GitHub Actions) runs the same targets: `make lint`, `make test`, `make build`.
+CI (GitHub Actions) runs the same targets: `make lint`, `make test`, `make build`. Every push to `main` also auto-deploys to TestFlight — see [`docs/testflight-setup.md`](docs/testflight-setup.md) for the one-time credential setup.
 
 ## Technical notes
 

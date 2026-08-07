@@ -30,9 +30,15 @@ targets:
         # PRD §20: MVP targets iPhone portrait only.
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+        # CI overrides CURRENT_PROJECT_VERSION with the run number for TestFlight.
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
     info:
       path: WardrobeApp/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
           - en
           - id
