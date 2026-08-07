@@ -13,3 +13,6 @@ DerivedData/
 # SwiftPM
 .build/
 .swiftpm/
+
+# Per-developer signing override (see Config/Debug.xcconfig)
+Local.xcconfig

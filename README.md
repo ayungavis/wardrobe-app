@@ -39,18 +39,15 @@ make generate
 open app/WardrobeApp/WardrobeApp.xcodeproj
 ```
 
-**Signing (first build in Xcode):** the generated project has no development team. Either select your team once in _Signing & Capabilities_, or set it permanently in `app/WardrobeApp/project.yml`:
+**Signing:** the simulator needs no signing — you can build and run immediately. To run on a **physical device**, set your personal team once in a gitignored file (survives `make generate`, never committed):
 
-```yaml
-targets:
-  WardrobeApp:
-    settings:
-      base:
-        DEVELOPMENT_TEAM: YOUR_TEAM_ID # Xcode ▸ Settings ▸ Accounts
-        CODE_SIGN_STYLE: Automatic
+```bash
+# app/WardrobeApp/WardrobeApp/Config/Local.xcconfig  (find your team ID in Xcode ▸ Settings ▸ Accounts)
+echo 'DEVELOPMENT_TEAM = YOUR_TEAM_ID' > app/WardrobeApp/WardrobeApp/Config/Local.xcconfig
+make generate
 ```
 
-then re-run `make generate`. ⚠️ Never edit the `.xcodeproj` directly — XcodeGen overwrites it; `project.yml` is the only source of truth.
+The Release configuration is signed manually with the CI team (`QHL64K2LPL`) for TestFlight — don't touch it. ⚠️ Never edit the `.xcodeproj` directly — XcodeGen overwrites it; `project.yml` is the only source of truth.
 
 Run without Xcode (uses the booted simulator):
 
