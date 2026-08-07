@@ -25,4 +25,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
+      - run: make generate
+      - name: Resolve packages (retry on flaky release downloads)
+        run: |
+          cd app/WardrobeApp
+          for i in 1 2 3; do
+            xcodebuild -project WardrobeApp.xcodeproj -scheme WardrobeApp \
+              -resolvePackageDependencies && exit 0
+            echo "resolve attempt $i failed; retrying in 20s"
+            sleep 20
+          done
+          exit 1
       - run: make build DEST='generic/platform=iOS Simulator'
