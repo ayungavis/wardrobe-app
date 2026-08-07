@@ -1,0 +1,53 @@
+name: WardrobeApp
+options:
+  bundleIdPrefix: com.ayungavis
+  deploymentTarget:
+    iOS: "26.0"
+
+configFiles:
+  Debug: WardrobeApp/Config/Debug.xcconfig
+  Release: WardrobeApp/Config/Release.xcconfig
+
+packages:
+  WardrobeKit:
+    path: WardrobeKit
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: "8.0.0"
+
+targets:
+  WardrobeApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: WardrobeApp
+        excludes:
+          - "Config/**"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ayungavis.WardrobeApp
+        SWIFT_VERSION: "6.0"
+        # PRD §20: MVP targets iPhone portrait only.
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    info:
+      path: WardrobeApp/Info.plist
+      properties:
+        CFBundleLocalizations:
+          - en
+          - id
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        SentryDSN: $(SENTRY_DSN)
+        SentryEnvironment: $(SENTRY_ENVIRONMENT)
+        APIBaseURL: $(API_BASE_URL)
+    dependencies:
+      - package: WardrobeKit
+        product: WardrobeKit
+      - package: WardrobeKit
+        product: DesignSystem
+      - package: Sentry
+        product: Sentry
+    scheme:
+      testTargets: []

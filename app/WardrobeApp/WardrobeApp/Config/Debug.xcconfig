@@ -1,0 +1,5 @@
+// Development environment values. No secrets here — DSN is not a secret,
+// real secrets belong in Keychain / CI secret storage.
+API_BASE_URL = http:/$()/localhost:8080
+SENTRY_DSN =
+SENTRY_ENVIRONMENT = development

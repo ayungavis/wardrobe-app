@@ -1,0 +1,28 @@
+# Requires a macOS runner with Xcode 26+ (iOS 26 SDK).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install swiftlint
+      - run: make lint
+
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: make build DEST='generic/platform=iOS Simulator'

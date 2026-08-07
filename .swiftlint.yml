@@ -1,0 +1,17 @@
+included:
+  - app
+
+excluded:
+  - app/WardrobeApp/WardrobeKit/.build
+
+disabled_rules:
+  # Trailing commas keep multi-line diffs small; TODOs are tracked against PRD FR-ids.
+  - trailing_comma
+  - todo
+
+line_length:
+  warning: 130
+  ignores_comments: true
+
+identifier_name:
+  min_length: 2
