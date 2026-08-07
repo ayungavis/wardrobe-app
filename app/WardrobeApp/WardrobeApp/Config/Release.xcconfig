@@ -1,4 +1,4 @@
 // Production environment values. Fill SENTRY_DSN before the first release build.
 API_BASE_URL = https:/$()/api.wardrobe.example.com
-SENTRY_DSN =
+SENTRY_DSN = "https://20d03438cf41ffe30a30fa9c28f6f19a@o447656.ingest.us.sentry.io/4511867550171136"
 SENTRY_ENVIRONMENT = production
