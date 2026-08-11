@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import WardrobeKit
@@ -127,6 +128,36 @@ struct CaptureFlowViewModelTests {
 
         #expect(camera.isFlashOn)
         #expect(sut.isFlashOn)
+    }
+
+    // MARK: Zoom & focus
+
+    @Test func setZoomMirrorsClampedServiceValue() {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let sut = makeSUT(camera: camera)
+
+        sut.setZoom(2.5)
+        #expect(sut.zoomFactor == 2.5)
+
+        sut.setZoom(99) // clamped by the service ceiling
+        #expect(sut.zoomFactor == CameraZoom.maxFactor)
+        #expect(camera.zoomFactor == CameraZoom.maxFactor)
+
+        sut.setZoom(0.1) // clamped by the floor
+        #expect(sut.zoomFactor == CameraZoom.minFactor)
+    }
+
+    @Test func focusForwardsPointToService() {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let sut = makeSUT(camera: camera)
+        let point = CGPoint(x: 0.25, y: 0.75)
+
+        sut.focus(at: point)
+
+        #expect(camera.focusPoints == [point])
+        #expect(sut.focusPoint == point)
     }
 
     // MARK: Capture — straight to editor (FR-016, story-style)

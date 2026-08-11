@@ -146,25 +146,29 @@ private struct CameraStageView: View {
     let viewModel: CaptureFlowViewModel
     let onClose: () -> Void
 
+    @State private var viewfinderSize: CGSize = .zero
+    @State private var zoomStartValue: CGFloat?
+    @State private var focusIndicator: FocusIndicator?
+
+    /// A tap-to-focus square, identified so a new tap restarts the fade.
+    private struct FocusIndicator: Equatable, Identifiable {
+        let id = UUID()
+        let point: CGPoint
+    }
+
     var body: some View {
         ZStack {
             AppColor.mediaBackground.ignoresSafeArea()
 
-            if let session = viewModel.previewSession {
-                #if os(iOS)
-                    CameraPreviewView(session: session)
-                        .ignoresSafeArea()
-                #endif
-            } else {
-                // Simulator / sample camera: no live feed.
-                VStack(spacing: Spacing.md) {
-                    Image(systemName: "camera.viewfinder")
-                        .font(.system(size: 72))
-                    Text("capture.camera.samplePlaceholder", bundle: .module)
-                        .font(AppFont.caption)
+            viewfinder
+                .onGeometryChange(for: CGSize.self) { proxy in
+                    proxy.size
+                } action: { newSize in
+                    viewfinderSize = newSize
                 }
-                .foregroundStyle(AppColor.onMedia.opacity(0.6))
-            }
+                .gesture(focusTapGesture)
+                .simultaneousGesture(zoomGesture)
+                .overlay { focusSquare }
 
             VStack {
                 HStack {
@@ -215,6 +219,68 @@ private struct CameraStageView: View {
         .onDisappear {
             viewModel.cameraDisappeared()
         }
+    }
+
+    @ViewBuilder
+    private var viewfinder: some View {
+        if let session = viewModel.previewSession {
+            #if os(iOS)
+                CameraPreviewView(session: session)
+                    .ignoresSafeArea()
+            #endif
+        } else {
+            // Simulator / sample camera: no live feed.
+            VStack(spacing: Spacing.md) {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 72))
+                Text("capture.camera.samplePlaceholder", bundle: .module)
+                    .font(AppFont.caption)
+            }
+            .foregroundStyle(AppColor.onMedia.opacity(0.6))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// Story-style tap-to-focus square that fades out on its own.
+    @ViewBuilder
+    private var focusSquare: some View {
+        if let focusIndicator, viewfinderSize != .zero {
+            RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(AppColor.onMedia, lineWidth: 1.5)
+                .frame(width: 72, height: 72)
+                .position(
+                    x: focusIndicator.point.x * viewfinderSize.width,
+                    y: focusIndicator.point.y * viewfinderSize.height
+                )
+                .allowsHitTesting(false)
+                .task(id: focusIndicator.id) {
+                    try? await Task.sleep(for: .seconds(1.2))
+                    self.focusIndicator = nil
+                }
+        }
+    }
+
+    private var focusTapGesture: some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                guard viewfinderSize != .zero else { return }
+                let point = CGPoint(
+                    x: min(1, max(0, value.location.x / viewfinderSize.width)),
+                    y: min(1, max(0, value.location.y / viewfinderSize.height))
+                )
+                viewModel.focus(at: point)
+                focusIndicator = FocusIndicator(point: point)
+            }
+    }
+
+    private var zoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let start = zoomStartValue ?? viewModel.zoomFactor
+                zoomStartValue = start
+                viewModel.setZoom(start * value.magnification)
+            }
+            .onEnded { _ in zoomStartValue = nil }
     }
 }
 

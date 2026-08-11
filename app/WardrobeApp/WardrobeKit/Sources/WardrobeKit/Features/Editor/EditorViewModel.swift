@@ -12,6 +12,9 @@ public final class EditorViewModel {
 
     public private(set) var originalData: Loadable<Data> = .idle
     public private(set) var previewImage: CGImage?
+    /// Derived from `previewImage` + the committed crop. Stored (not computed)
+    /// so moving an overlay never re-crops the image on the render path.
+    public private(set) var croppedPreviewImage: CGImage?
     public private(set) var draft: EditDraft
     public private(set) var activeTool: Tool?
     public private(set) var exportState: Loadable<ExportedPhoto> = .idle
@@ -67,6 +70,7 @@ public final class EditorViewModel {
                 }.value
                 try Task.checkCancellation()
                 previewImage = preview
+                updateCroppedPreview()
                 originalData = .loaded(data)
             } catch is CancellationError {
                 // Ignore cancellation.
@@ -77,17 +81,24 @@ public final class EditorViewModel {
         }
     }
 
-    /// Preview with the committed crop applied (cheap — `cropping` shares pixels).
-    public var croppedPreviewImage: CGImage? {
-        guard let previewImage else { return nil }
-        guard let crop = draft.crop else { return previewImage }
+    /// Recomputes the cropped preview. Called only when its inputs change —
+    /// after the photo loads and after a crop is committed.
+    private func updateCroppedPreview() {
+        guard let previewImage else {
+            croppedPreviewImage = nil
+            return
+        }
+        guard let crop = draft.crop else {
+            croppedPreviewImage = previewImage
+            return
+        }
         let rect = CGRect(
             x: crop.rect.origin.x * CGFloat(previewImage.width),
             y: crop.rect.origin.y * CGFloat(previewImage.height),
             width: crop.rect.width * CGFloat(previewImage.width),
             height: crop.rect.height * CGFloat(previewImage.height)
         ).integral
-        return previewImage.cropping(to: rect) ?? previewImage
+        croppedPreviewImage = previewImage.cropping(to: rect) ?? previewImage
     }
 
     // MARK: Tools (FR-019: cancel restores last committed state)
@@ -118,6 +129,7 @@ public final class EditorViewModel {
         switch activeTool {
         case let .crop(spec):
             draft.crop = spec
+            updateCroppedPreview()
         case let .text(item, _):
             let trimmed = item.content.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
@@ -162,6 +174,11 @@ public final class EditorViewModel {
         draft.texts[index].scale = min(3, max(0.5, scale))
     }
 
+    public func rotateText(id: UUID, to degrees: Double) {
+        guard let index = draft.texts.firstIndex(where: { $0.id == id }) else { return }
+        draft.texts[index].rotationDegrees = degrees
+    }
+
     public func removeText(id: UUID) {
         draft.texts.removeAll { $0.id == id }
         persistDraft()
@@ -183,6 +200,11 @@ public final class EditorViewModel {
     public func scaleSticker(id: UUID, to scale: CGFloat) {
         guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
         draft.stickers[index].scale = min(4, max(0.5, scale))
+    }
+
+    public func rotateSticker(id: UUID, to degrees: Double) {
+        guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
+        draft.stickers[index].rotationDegrees = degrees
     }
 
     public func removeSticker(id: UUID) {

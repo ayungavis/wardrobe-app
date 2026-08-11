@@ -1,63 +1,33 @@
 import DesignSystem
 import SwiftUI
 
-/// A committed text item on the canvas — story-style direct manipulation:
-/// tap to edit content, drag to move, pinch to resize.
+/// A committed text item on the canvas — tap to edit content; drag, pinch and
+/// rotate handled by `ManipulatableOverlay`.
 struct CommittedTextView: View {
     let item: TextItem
     let canvasSize: CGSize
     let onTap: () -> Void
     let onMove: (CGPoint) -> Void
     let onScale: (CGFloat) -> Void
+    let onRotate: (Double) -> Void
     let onDragActive: (Bool) -> Void
     let onManipulationEnd: () -> Void
 
-    @State private var dragStartPosition: CGPoint?
-    @State private var scaleStartValue: CGFloat?
-
     var body: some View {
-        TextItemLabel(item: item, fontSize: TextRendering.fontSize(for: item, in: canvasSize))
-            .position(
-                x: item.position.x * canvasSize.width,
-                y: item.position.y * canvasSize.height
-            )
-            .onTapGesture(perform: onTap)
-            .gesture(dragGesture)
-            .simultaneousGesture(magnifyGesture)
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                guard canvasSize != .zero else { return }
-                let start = dragStartPosition ?? item.position
-                if dragStartPosition == nil {
-                    onDragActive(true)
-                }
-                dragStartPosition = start
-                onMove(CGPoint(
-                    x: start.x + value.translation.width / canvasSize.width,
-                    y: start.y + value.translation.height / canvasSize.height
-                ))
-            }
-            .onEnded { _ in
-                dragStartPosition = nil
-                onDragActive(false)
-                onManipulationEnd()
-            }
-    }
-
-    private var magnifyGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let start = scaleStartValue ?? item.scale
-                scaleStartValue = start
-                onScale(start * value.magnification)
-            }
-            .onEnded { _ in
-                scaleStartValue = nil
-                onManipulationEnd()
-            }
+        ManipulatableOverlay(
+            position: item.position,
+            scale: item.scale,
+            rotationDegrees: item.rotationDegrees,
+            canvasSize: canvasSize,
+            onTap: onTap,
+            onMove: onMove,
+            onScale: onScale,
+            onRotate: onRotate,
+            onDragActive: onDragActive,
+            onManipulationEnd: onManipulationEnd
+        ) {
+            TextItemLabel(item: item, fontSize: TextRendering.fontSize(for: item, in: canvasSize))
+        }
     }
 }
 

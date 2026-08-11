@@ -18,6 +18,9 @@ public final class CaptureFlowViewModel {
     public private(set) var isCapturing = false
     /// Mirrored from the camera service so the view observes changes.
     public private(set) var isFlashOn = false
+    public private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+    /// Latest tap-to-focus point in unit preview space, for the indicator.
+    public private(set) var focusPoint: CGPoint?
 
     private let camera: CameraService
     private let store: ActiveChallengeStore
@@ -134,6 +137,18 @@ public final class CaptureFlowViewModel {
     public func toggleFlash() {
         camera.toggleFlash()
         isFlashOn = camera.isFlashOn
+    }
+
+    /// Pinch-to-zoom. The service clamps; we mirror what it accepted.
+    public func setZoom(_ factor: CGFloat) {
+        camera.setZoom(factor)
+        zoomFactor = camera.zoomFactor
+    }
+
+    /// Tap-to-focus. `point` is in unit preview space (0...1).
+    public func focus(at point: CGPoint) {
+        camera.focus(at: point)
+        focusPoint = point
     }
 
     /// Ordering matters: file write first, then persist photoID, then editor.

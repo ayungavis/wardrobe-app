@@ -200,6 +200,57 @@ struct EditorViewModelTests {
         #expect(store.stored?.draft.stickers.isEmpty == true)
     }
 
+    // MARK: Rotation (story-style two-finger rotate)
+
+    @Test func rotateTextAndStickerPersistOnFinish() throws {
+        let store = InMemoryActiveChallengeStore()
+        let text = TextItem(content: "hi")
+        let sticker = StickerItem(emoji: "✨")
+        let sut = try makeSUT(store: store, draft: EditDraft(texts: [text], stickers: [sticker]))
+
+        sut.rotateText(id: text.id, to: 42)
+        sut.rotateSticker(id: sticker.id, to: -30)
+        #expect(sut.draft.texts[0].rotationDegrees == 42)
+        #expect(sut.draft.stickers[0].rotationDegrees == -30)
+        #expect(store.stored?.draft.texts.first?.rotationDegrees == 0) // not persisted mid-gesture
+
+        sut.finishDirectManipulation()
+        #expect(store.stored?.draft.texts.first?.rotationDegrees == 42)
+        #expect(store.stored?.draft.stickers.first?.rotationDegrees == -30)
+    }
+
+    @Test func rotateUnknownIDIsNoOp() throws {
+        let sut = try makeSUT(draft: EditDraft(texts: [TextItem(content: "hi")], stickers: [StickerItem(emoji: "✨")]))
+        let before = sut.draft
+
+        sut.rotateText(id: UUID(), to: 90)
+        sut.rotateSticker(id: UUID(), to: 90)
+
+        #expect(sut.draft == before)
+    }
+
+    // MARK: Derived preview cache (perf guard)
+
+    @Test func croppedPreviewOnlyRecomputesWhenCropChanges() async throws {
+        let text = TextItem(content: "hi")
+        let sut = try makeSUT(draft: EditDraft(texts: [text]))
+        sut.load()
+        await sut.loadTask?.value
+
+        let afterLoad = try #require(sut.croppedPreviewImage)
+        #expect(afterLoad.width == 100) // full preview, no crop yet
+
+        sut.moveText(id: text.id, to: CGPoint(x: 0.2, y: 0.2))
+        sut.finishDirectManipulation()
+        #expect(sut.croppedPreviewImage === afterLoad) // untouched by overlay edits
+
+        sut.beginCrop()
+        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
+        sut.commitTool()
+        let afterCrop = try #require(sut.croppedPreviewImage)
+        #expect(afterCrop.width == 50) // recomputed exactly once, on crop commit
+    }
+
     // MARK: Direct save (save pill)
 
     @Test func saveDirectlyRendersAndSaves() async throws {
@@ -242,7 +293,19 @@ struct EditorViewModelTests {
         #expect(draft.texts.count == 1)
         #expect(draft.texts[0].colorName == TextColor.white.rawValue)
         #expect(draft.texts[0].hasBackground == false)
+        #expect(draft.texts[0].rotationDegrees == 0)
         #expect(draft.stickers.isEmpty)
+    }
+
+    @Test func draftWithPreRotationStickerDecodesWithZeroRotation() throws {
+        let legacy = Data("""
+        {"stickers":[{"id":"22222222-3333-4444-5555-666666666666","emoji":"🔥","position":[0.5,0.5],"scale":1}]}
+        """.utf8)
+
+        let draft = try JSONDecoder().decode(EditDraft.self, from: legacy)
+
+        #expect(draft.stickers.count == 1)
+        #expect(draft.stickers[0].rotationDegrees == 0)
     }
 
     @Test func originalBytesNeverChangeAfterCommits() throws {

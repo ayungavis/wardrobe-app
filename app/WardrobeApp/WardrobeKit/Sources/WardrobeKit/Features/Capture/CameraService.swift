@@ -18,14 +18,31 @@ public protocol CameraService: AnyObject {
     /// Non-nil only for a real device camera; drives the live preview layer.
     var previewSession: AVCaptureSession? { get }
     var isFlashOn: Bool { get }
+    /// Current optical/digital zoom; 1 is the unzoomed framing.
+    var zoomFactor: CGFloat { get }
     func requestPermission() async -> CameraPermission
     func startSession() async throws
     func stopSession()
     /// Switches between back and front camera. No-op where unsupported.
     func toggleCamera() async throws
     func toggleFlash()
+    /// Clamped by the implementation to what the device supports.
+    func setZoom(_ factor: CGFloat)
+    /// Focus + expose on a point in unit preview space (0...1).
+    func focus(at point: CGPoint)
     /// Returns JPEG data. Throws `AppError.captureFailed`.
     func capturePhoto() async throws -> Data
+}
+
+/// Shared zoom ceiling — plenty for framing an outfit, and keeps the sample
+/// service and the real device in step.
+enum CameraZoom {
+    static let minFactor: CGFloat = 1
+    static let maxFactor: CGFloat = 5
+
+    static func clamp(_ factor: CGFloat, deviceMax: CGFloat = maxFactor) -> CGFloat {
+        min(min(maxFactor, deviceMax), max(minFactor, factor))
+    }
 }
 
 /// Camera stand-in for the simulator, macOS, previews, and tests — generates
@@ -52,12 +69,23 @@ public final class SampleCameraService: CameraService {
     }
 
     public private(set) var isFlashOn = false
+    public private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+    /// Last focus request — no hardware to drive, but keeps the flow honest.
+    public private(set) var lastFocusPoint: CGPoint?
 
     public func startSession() async throws {}
     public func stopSession() {}
     public func toggleCamera() async throws {}
     public func toggleFlash() {
         isFlashOn.toggle()
+    }
+
+    public func setZoom(_ factor: CGFloat) {
+        zoomFactor = CameraZoom.clamp(factor)
+    }
+
+    public func focus(at point: CGPoint) {
+        lastFocusPoint = point
     }
 
     public func capturePhoto() async throws -> Data {

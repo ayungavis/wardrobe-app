@@ -79,6 +79,7 @@
             session.commitConfiguration()
             currentInput = newInput
             position = newPosition
+            zoomFactor = CameraZoom.minFactor // the new device starts unzoomed
         }
 
         private static func makeInput(position: AVCaptureDevice.Position) -> AVCaptureDeviceInput? {
@@ -95,6 +96,44 @@
 
         public func toggleFlash() {
             isFlashOn.toggle()
+        }
+
+        public private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+
+        public func setZoom(_ factor: CGFloat) {
+            guard let device = currentInput?.device else { return }
+            let clamped = CameraZoom.clamp(factor, deviceMax: device.maxAvailableVideoZoomFactor)
+            configure(device) { $0.videoZoomFactor = clamped }
+            zoomFactor = clamped
+        }
+
+        // ponytail: no `captureDevicePointConverted` — close enough under
+        // resizeAspectFill; convert via the preview layer if precision bites.
+
+        /// `point` is normalized preview space; AVFoundation wants the same
+        /// 0...1 device space.
+        public func focus(at point: CGPoint) {
+            guard let device = currentInput?.device else { return }
+            configure(device) { device in
+                if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
+                    device.focusPointOfInterest = point
+                    device.focusMode = .autoFocus
+                }
+                if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.autoExpose) {
+                    device.exposurePointOfInterest = point
+                    device.exposureMode = .autoExpose
+                }
+            }
+        }
+
+        private func configure(_ device: AVCaptureDevice, _ body: (AVCaptureDevice) -> Void) {
+            do {
+                try device.lockForConfiguration()
+                defer { device.unlockForConfiguration() }
+                body(device)
+            } catch {
+                Log.report(error, logger: Log.ui) // non-fatal: framing stays as-is
+            }
         }
 
         public func capturePhoto() async throws -> Data {

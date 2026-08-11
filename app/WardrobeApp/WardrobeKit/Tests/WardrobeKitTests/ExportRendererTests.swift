@@ -76,8 +76,18 @@ struct ExportRendererTests {
     @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 200, height: 200)
         let draft = EditDraft(
-            texts: [TextItem(content: "OOTD", colorName: TextColor.pink.rawValue, hasBackground: true)],
-            stickers: [StickerItem(emoji: "🔥", position: CGPoint(x: 0.3, y: 0.7), scale: 2)]
+            texts: [TextItem(
+                content: "OOTD",
+                rotationDegrees: -12,
+                colorName: TextColor.pink.rawValue,
+                hasBackground: true
+            )],
+            stickers: [StickerItem(
+                emoji: "🔥",
+                position: CGPoint(x: 0.3, y: 0.7),
+                scale: 2,
+                rotationDegrees: 30
+            )]
         )
 
         let exported = try ExportRenderer.render(original: original, draft: draft)

@@ -53,9 +53,19 @@ final class FakeCameraService: CameraService {
     private(set) var stopCount = 0
     private(set) var toggleCount = 0
     private(set) var isFlashOn = false
+    private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+    private(set) var focusPoints: [CGPoint] = []
 
     func toggleFlash() {
         isFlashOn.toggle()
+    }
+
+    func setZoom(_ factor: CGFloat) {
+        zoomFactor = CameraZoom.clamp(factor)
+    }
+
+    func focus(at point: CGPoint) {
+        focusPoints.append(point)
     }
 
     var previewSession: AVCaptureSession? {

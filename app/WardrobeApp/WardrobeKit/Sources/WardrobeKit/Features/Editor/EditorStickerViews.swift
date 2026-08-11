@@ -35,59 +35,30 @@ struct StickerPickerSheet: View {
     }
 }
 
-/// A committed sticker on the canvas — drag to move, pinch to resize.
+/// A committed sticker on the canvas — drag, pinch and rotate handled by
+/// `ManipulatableOverlay`.
 struct CommittedStickerView: View {
     let item: StickerItem
     let canvasSize: CGSize
     let onMove: (CGPoint) -> Void
     let onScale: (CGFloat) -> Void
+    let onRotate: (Double) -> Void
     let onDragActive: (Bool) -> Void
     let onManipulationEnd: () -> Void
 
-    @State private var dragStartPosition: CGPoint?
-    @State private var scaleStartValue: CGFloat?
-
     var body: some View {
-        StickerLabel(item: item, fontSize: TextRendering.stickerFontSize(for: item, in: canvasSize))
-            .position(
-                x: item.position.x * canvasSize.width,
-                y: item.position.y * canvasSize.height
-            )
-            .gesture(dragGesture)
-            .simultaneousGesture(magnifyGesture)
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                guard canvasSize != .zero else { return }
-                let start = dragStartPosition ?? item.position
-                if dragStartPosition == nil {
-                    onDragActive(true)
-                }
-                dragStartPosition = start
-                onMove(CGPoint(
-                    x: start.x + value.translation.width / canvasSize.width,
-                    y: start.y + value.translation.height / canvasSize.height
-                ))
-            }
-            .onEnded { _ in
-                dragStartPosition = nil
-                onDragActive(false)
-                onManipulationEnd()
-            }
-    }
-
-    private var magnifyGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let start = scaleStartValue ?? item.scale
-                scaleStartValue = start
-                onScale(start * value.magnification)
-            }
-            .onEnded { _ in
-                scaleStartValue = nil
-                onManipulationEnd()
-            }
+        ManipulatableOverlay(
+            position: item.position,
+            scale: item.scale,
+            rotationDegrees: item.rotationDegrees,
+            canvasSize: canvasSize,
+            onMove: onMove,
+            onScale: onScale,
+            onRotate: onRotate,
+            onDragActive: onDragActive,
+            onManipulationEnd: onManipulationEnd
+        ) {
+            StickerLabel(item: item, fontSize: TextRendering.stickerFontSize(for: item, in: canvasSize))
+        }
     }
 }

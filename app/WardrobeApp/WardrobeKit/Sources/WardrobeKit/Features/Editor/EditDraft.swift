@@ -69,6 +69,7 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
     /// Center position in unit image space (0...1).
     public var position: CGPoint
     public var scale: CGFloat
+    public var rotationDegrees: Double
     public var colorName: String
     public var hasBackground: Bool
 
@@ -81,6 +82,7 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
         content: String,
         position: CGPoint = CGPoint(x: 0.5, y: 0.5),
         scale: CGFloat = 1,
+        rotationDegrees: Double = 0,
         colorName: String = TextColor.white.rawValue,
         hasBackground: Bool = false
     ) {
@@ -88,6 +90,7 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
         self.content = content
         self.position = position
         self.scale = scale
+        self.rotationDegrees = rotationDegrees
         self.colorName = colorName
         self.hasBackground = hasBackground
     }
@@ -98,10 +101,11 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
         content = try container.decode(String.self, forKey: .content)
         position = try container.decode(CGPoint.self, forKey: .position)
         scale = try container.decode(CGFloat.self, forKey: .scale)
+        rotationDegrees = try container.decodeIfPresent(Double.self, forKey: .rotationDegrees) ?? 0
         colorName = try container.decodeIfPresent(String.self, forKey: .colorName) ?? TextColor.white.rawValue
         hasBackground = try container.decodeIfPresent(Bool.self, forKey: .hasBackground) ?? false
     }
-    // ponytail: no rotation/custom fonts; add fields when the design asks.
+    // ponytail: no custom fonts; add the field when the design asks.
 }
 
 /// Emoji sticker overlay (PRD FR-019 sticker set).
@@ -111,16 +115,28 @@ public struct StickerItem: Codable, Equatable, Sendable, Identifiable {
     /// Center position in unit image space (0...1).
     public var position: CGPoint
     public var scale: CGFloat
+    public var rotationDegrees: Double
 
     public init(
         id: UUID = UUID(),
         emoji: String,
         position: CGPoint = CGPoint(x: 0.5, y: 0.5),
-        scale: CGFloat = 1
+        scale: CGFloat = 1,
+        rotationDegrees: Double = 0
     ) {
         self.id = id
         self.emoji = emoji
         self.position = position
         self.scale = scale
+        self.rotationDegrees = rotationDegrees
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        emoji = try container.decode(String.self, forKey: .emoji)
+        position = try container.decode(CGPoint.self, forKey: .position)
+        scale = try container.decode(CGFloat.self, forKey: .scale)
+        rotationDegrees = try container.decodeIfPresent(Double.self, forKey: .rotationDegrees) ?? 0
     }
 }
