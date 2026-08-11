@@ -54,6 +54,8 @@ targets:
         SentryDSN: $(SENTRY_DSN)
         SentryEnvironment: $(SENTRY_ENVIRONMENT)
         APIBaseURL: $(API_BASE_URL)
+        NSCameraUsageDescription: The camera is used to photograph your outfit for the daily challenge. Photos stay on your device until you choose to share them.
+        NSPhotoLibraryAddUsageDescription: Lets you save your edited outfit photo to your photo library.
     dependencies:
       - package: WardrobeKit
         product: WardrobeKit

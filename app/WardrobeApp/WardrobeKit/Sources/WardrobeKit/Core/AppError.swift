@@ -5,6 +5,10 @@ import Foundation
 public enum AppError: Error, Equatable, Sendable {
     case network
     case unexpected
+    case cameraUnavailable
+    case captureFailed
+    case exportFailed
+    case photoSaveFailed
 
     /// Localized message safe to show in UI.
     public var userMessage: String {
@@ -13,6 +17,14 @@ public enum AppError: Error, Equatable, Sendable {
             String(localized: "error.network", bundle: .module)
         case .unexpected:
             String(localized: "error.unexpected", bundle: .module)
+        case .cameraUnavailable:
+            String(localized: "error.cameraUnavailable", bundle: .module)
+        case .captureFailed:
+            String(localized: "error.captureFailed", bundle: .module)
+        case .exportFailed:
+            String(localized: "error.exportFailed", bundle: .module)
+        case .photoSaveFailed:
+            String(localized: "error.photoSaveFailed", bundle: .module)
         }
     }
 
