@@ -8,4 +8,9 @@ public enum AppColor {
     public static let textPrimary = Color("textPrimary", bundle: .module)
     public static let textSecondary = Color("textSecondary", bundle: .module)
     public static let accent = Color("accent", bundle: .module)
+
+    // Media surfaces (camera/editor) commit to a dark look regardless of the
+    // system appearance — like every story-style editor.
+    public static let mediaBackground = Color("mediaBackground", bundle: .module)
+    public static let onMedia = Color("onMedia", bundle: .module)
 }

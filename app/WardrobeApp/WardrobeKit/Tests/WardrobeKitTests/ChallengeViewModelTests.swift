@@ -20,9 +20,25 @@ actor ControlledChallengeRepository: ChallengeRepository {
 
 @MainActor
 struct ChallengeViewModelTests {
+    private func makeSUT(
+        repository: ChallengeRepository = ControlledChallengeRepository(),
+        store: ActiveChallengeStore = InMemoryActiveChallengeStore(),
+        completedStore: CompletedChallengeStore = InMemoryCompletedChallengeStore(),
+        photoStore: PhotoStore = SpyPhotoStore()
+    ) -> ChallengeViewModel {
+        ChallengeViewModel(
+            repository: repository,
+            store: store,
+            completedStore: completedStore,
+            photoStore: photoStore
+        )
+    }
+
+    // MARK: Deck loading
+
     @Test func loadSuccessSetsLoadedDeck() async {
         let repository = ControlledChallengeRepository()
-        let sut = ChallengeViewModel(repository: repository)
+        let sut = makeSUT(repository: repository)
         let cards = [ChallengeCard(prompt: "Wear something red.")]
 
         sut.load()
@@ -36,7 +52,7 @@ struct ChallengeViewModelTests {
 
     @Test func loadFailureSetsTypedError() async {
         let repository = ControlledChallengeRepository()
-        let sut = ChallengeViewModel(repository: repository)
+        let sut = makeSUT(repository: repository)
 
         sut.load()
         await repository.resolveNext(with: .failure(URLError(.notConnectedToInternet)))
@@ -47,7 +63,7 @@ struct ChallengeViewModelTests {
 
     @Test func reloadCancelsStaleRequest() async {
         let repository = ControlledChallengeRepository()
-        let sut = ChallengeViewModel(repository: repository)
+        let sut = makeSUT(repository: repository)
         let stale = [ChallengeCard(prompt: "stale")]
         let latest = [ChallengeCard(prompt: "latest")]
 
@@ -63,17 +79,129 @@ struct ChallengeViewModelTests {
         #expect(sut.deck == .loaded(latest))
     }
 
-    @Test func onAppearOnlyLoadsFromIdle() async {
-        let repository = ControlledChallengeRepository()
-        let sut = ChallengeViewModel(repository: repository)
+    // MARK: Accept (FR-011)
+
+    @Test func acceptPersistsActiveChallengeAndPresentsFlow() {
+        let store = InMemoryActiveChallengeStore()
+        let sut = makeSUT(store: store)
+        let card = ChallengeCard(prompt: "x")
+
+        sut.accept(card)
+
+        #expect(sut.activeChallenge?.card == card)
+        #expect(store.stored?.card == card)
+        #expect(sut.isCaptureFlowPresented)
+    }
+
+    @Test func acceptSameCardIsIdempotent() {
+        let store = InMemoryActiveChallengeStore()
+        let sut = makeSUT(store: store)
+        let card = ChallengeCard(prompt: "x")
+
+        sut.accept(card)
+        let first = store.stored
+        sut.isCaptureFlowPresented = false
+
+        sut.accept(card)
+
+        #expect(store.stored == first)
+        #expect(sut.isCaptureFlowPresented)
+    }
+
+    // MARK: Daily limit (FR-012)
+
+    @Test func onAppearFlagsTodaysCompletionAndBlocksAccept() {
+        let completedStore = InMemoryCompletedChallengeStore()
+        completedStore.stored = [makeCompletion(at: Date())]
+        let store = InMemoryActiveChallengeStore()
+        let sut = makeSUT(store: store, completedStore: completedStore)
 
         sut.onAppear()
-        #expect(sut.deck == .loading)
+        sut.accept(ChallengeCard(prompt: "x"))
 
-        await repository.resolveNext(with: .success([]))
-        await sut.loadTask?.value
+        #expect(sut.hasCompletedToday)
+        #expect(sut.activeChallenge == nil)
+        #expect(store.stored == nil)
+        #expect(!sut.isCaptureFlowPresented)
+    }
+
+    @Test func yesterdaysCompletionReopensTheDeck() {
+        let completedStore = InMemoryCompletedChallengeStore()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        completedStore.stored = [makeCompletion(at: yesterday)]
+        let sut = makeSUT(completedStore: completedStore)
 
         sut.onAppear()
-        #expect(sut.deck == .loaded([]))
+        sut.accept(ChallengeCard(prompt: "x"))
+
+        #expect(!sut.hasCompletedToday)
+        #expect(sut.activeChallenge != nil)
+    }
+
+    private func makeCompletion(at date: Date) -> CompletedChallenge {
+        CompletedChallenge(
+            card: ChallengeCard(prompt: "done"),
+            photoID: UUID().uuidString,
+            draft: EditDraft(),
+            completedAt: date
+        )
+    }
+
+    @Test func acceptAnotherCardIsIgnoredWhileActive() {
+        let store = InMemoryActiveChallengeStore()
+        let sut = makeSUT(store: store)
+        let first = ChallengeCard(prompt: "first")
+
+        sut.accept(first)
+        sut.isCaptureFlowPresented = false
+        sut.accept(ChallengeCard(prompt: "second"))
+
+        #expect(sut.activeChallenge?.card == first)
+        #expect(!sut.isCaptureFlowPresented)
+    }
+
+    @Test func onAppearLoadsPersistedActiveChallenge() {
+        let store = InMemoryActiveChallengeStore()
+        store.stored = ActiveChallenge(card: ChallengeCard(prompt: "persisted"), acceptedAt: .distantPast)
+        let sut = makeSUT(store: store)
+
+        sut.onAppear()
+
+        #expect(sut.activeChallenge?.card.prompt == "persisted")
+    }
+
+    // MARK: Abandon (FR-017)
+
+    @Test func abandonWithoutDraftClearsImmediately() {
+        let store = InMemoryActiveChallengeStore()
+        let sut = makeSUT(store: store)
+        sut.accept(ChallengeCard(prompt: "x"))
+
+        sut.requestAbandon()
+
+        #expect(!sut.isAbandonConfirmationPresented)
+        #expect(sut.activeChallenge == nil)
+        #expect(store.stored == nil)
+    }
+
+    @Test func abandonWithDraftRequiresConfirmationThenDeletesPhoto() throws {
+        let store = InMemoryActiveChallengeStore()
+        let photoStore = SpyPhotoStore()
+        let sut = makeSUT(store: store, photoStore: photoStore)
+        sut.accept(ChallengeCard(prompt: "x"))
+
+        var active = try #require(store.stored)
+        active.photoID = "11111111-2222-3333-4444-555555555555"
+        store.stored = active
+        sut.refreshActiveChallenge()
+
+        sut.requestAbandon()
+        #expect(sut.isAbandonConfirmationPresented)
+        #expect(sut.activeChallenge != nil)
+
+        sut.abandon()
+        #expect(photoStore.deleted == ["11111111-2222-3333-4444-555555555555"])
+        #expect(sut.activeChallenge == nil)
+        #expect(store.stored == nil)
     }
 }

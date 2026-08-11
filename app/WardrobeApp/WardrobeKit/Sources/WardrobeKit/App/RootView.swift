@@ -14,7 +14,7 @@ public struct RootView: View {
         if hasCompletedOnboarding {
             TabView {
                 Tab {
-                    ChallengeView(viewModel: container.makeChallengeViewModel())
+                    ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
                 } label: {
                     Label {
                         Text("tab.challenge", bundle: .module)
