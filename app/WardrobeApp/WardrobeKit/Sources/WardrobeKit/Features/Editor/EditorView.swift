@@ -7,9 +7,13 @@ public struct EditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: EditorViewModel
     @State private var canvasSize: CGSize = .zero
+    @State private var isDiscardConfirmPresented = false
 
-    public init(viewModel: EditorViewModel) {
+    private let onDiscard: () -> Void
+
+    public init(viewModel: EditorViewModel, onDiscard: @escaping () -> Void) {
         _viewModel = State(wrappedValue: viewModel)
+        self.onDiscard = onDiscard
     }
 
     public var body: some View {
@@ -23,6 +27,28 @@ public struct EditorView: View {
         .task { viewModel.onAppear() }
         .sheet(isPresented: $viewModel.isExportPresented) {
             ExportSheetView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.isStickerPickerPresented) {
+            StickerPickerSheet { viewModel.addSticker($0) }
+        }
+        .confirmationDialog(
+            Text("editor.discard.title", bundle: .module),
+            isPresented: $isDiscardConfirmPresented,
+            titleVisibility: .visible
+        ) {
+            Button(role: .destructive, action: onDiscard) {
+                Text("editor.discard.action", bundle: .module)
+            }
+            Button {
+                dismiss() // FR-017: the draft survives; resume comes back here
+            } label: {
+                Text("editor.discard.keep", bundle: .module)
+            }
+            Button(role: .cancel) {} label: {
+                Text("common.cancel", bundle: .module)
+            }
+        } message: {
+            Text("editor.discard.message", bundle: .module)
         }
         .alert(
             Text("common.errorTitle", bundle: .module),
@@ -73,9 +99,13 @@ public struct EditorView: View {
 
             if viewModel.activeTool == nil {
                 EditorControlsOverlay(
-                    onClose: { dismiss() },
+                    isSaving: viewModel.isSaving,
+                    didSave: viewModel.didSaveToPhotos,
+                    onClose: { isDiscardConfirmPresented = true },
                     onText: { viewModel.beginNewText() },
+                    onSticker: { viewModel.isStickerPickerPresented = true },
                     onCrop: { viewModel.beginCrop() },
+                    onSave: { viewModel.saveDirectly() },
                     onSend: { viewModel.beginExport() }
                 )
             }
@@ -84,11 +114,7 @@ public struct EditorView: View {
                 TextComposerOverlay(
                     working: working,
                     isExisting: !isNew,
-                    onContentChange: { newContent in
-                        var updated = working
-                        updated.content = newContent
-                        viewModel.updateWorking(text: updated)
-                    },
+                    onUpdate: { viewModel.updateWorking(text: $0) },
                     onDelete: { viewModel.removeWorkingText() },
                     onCancel: { viewModel.cancelTool() },
                     onDone: { viewModel.commitTool() }
@@ -98,11 +124,17 @@ public struct EditorView: View {
     }
 }
 
-/// Photo canvas with committed text overlays; tapping an empty spot starts a
-/// new text there (story-style).
+/// Photo canvas with committed overlays; tapping an empty spot starts a new
+/// text there. Dragging an overlay reveals a trash zone at the bottom.
 private struct EditorCanvasView: View {
+    enum DraggedOverlay: Equatable {
+        case text(UUID)
+        case sticker(UUID)
+    }
+
     let viewModel: EditorViewModel
     @Binding var canvasSize: CGSize
+    @State private var dragging: DraggedOverlay?
 
     var body: some View {
         if let image = viewModel.croppedPreviewImage {
@@ -116,7 +148,8 @@ private struct EditorCanvasView: View {
                     canvasSize = newSize
                 }
                 .gesture(tapToAddText)
-                .overlay { committedTexts }
+                .overlay { committedOverlays }
+                .overlay(alignment: .bottom) { trashZone }
         } else {
             ProgressView()
                 .tint(AppColor.onMedia)
@@ -134,8 +167,24 @@ private struct EditorCanvasView: View {
             }
     }
 
-    private var committedTexts: some View {
+    private var committedOverlays: some View {
         ZStack {
+            ForEach(viewModel.draft.stickers) { item in
+                CommittedStickerView(
+                    item: item,
+                    canvasSize: canvasSize,
+                    onMove: { viewModel.moveSticker(id: item.id, to: $0) },
+                    onScale: { viewModel.scaleSticker(id: item.id, to: $0) },
+                    onDragActive: { active in
+                        dragging = active ? .sticker(item.id) : nil
+                        if !active {
+                            finishDrag(.sticker(item.id))
+                        }
+                    },
+                    onManipulationEnd: { viewModel.finishDirectManipulation() }
+                )
+            }
+
             ForEach(viewModel.draft.texts) { item in
                 if !isEditing(item) {
                     CommittedTextView(
@@ -144,11 +193,50 @@ private struct EditorCanvasView: View {
                         onTap: { viewModel.beginEditingText(item) },
                         onMove: { viewModel.moveText(id: item.id, to: $0) },
                         onScale: { viewModel.scaleText(id: item.id, to: $0) },
+                        onDragActive: { active in
+                            dragging = active ? .text(item.id) : nil
+                            if !active {
+                                finishDrag(.text(item.id))
+                            }
+                        },
                         onManipulationEnd: { viewModel.finishDirectManipulation() }
                     )
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var trashZone: some View {
+        if dragging != nil {
+            Image(systemName: "trash")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(AppColor.onMedia)
+                .frame(width: 56, height: 56)
+                .background(.ultraThinMaterial, in: Circle())
+                .padding(.bottom, Spacing.lg)
+                .transition(.opacity)
+        }
+    }
+
+    /// Dropping an overlay on the bottom-center trash zone deletes it.
+    private func finishDrag(_ overlay: DraggedOverlay) {
+        switch overlay {
+        case let .text(id):
+            let position = viewModel.draft.texts.first { $0.id == id }?.position
+            if let position, isInTrashZone(position) {
+                viewModel.removeText(id: id)
+            }
+        case let .sticker(id):
+            let position = viewModel.draft.stickers.first { $0.id == id }?.position
+            if let position, isInTrashZone(position) {
+                viewModel.removeSticker(id: id)
+            }
+        }
+    }
+
+    private func isInTrashZone(_ position: CGPoint) -> Bool {
+        abs(position.x - 0.5) < 0.15 && position.y > 0.85
     }
 
     private func isEditing(_ item: TextItem) -> Bool {
@@ -159,11 +247,15 @@ private struct EditorCanvasView: View {
     }
 }
 
-/// X top-left, tool rail top-right, send arrow bottom-right.
+/// X top-left, tool rail top-right, Save pill + send arrow at the bottom.
 private struct EditorControlsOverlay: View {
+    let isSaving: Bool
+    let didSave: Bool
     let onClose: () -> Void
     let onText: () -> Void
+    let onSticker: () -> Void
     let onCrop: () -> Void
+    let onSave: () -> Void
     let onSend: () -> Void
 
     var body: some View {
@@ -177,6 +269,8 @@ private struct EditorControlsOverlay: View {
                 VStack(spacing: Spacing.md) {
                     MediaCircleButton(systemName: "textformat", action: onText)
                         .accessibilityLabel(Text("editor.addText", bundle: .module))
+                    MediaCircleButton(systemName: "face.smiling", action: onSticker)
+                        .accessibilityLabel(Text("editor.tool.sticker", bundle: .module))
                     MediaCircleButton(systemName: "crop", action: onCrop)
                         .accessibilityLabel(Text("editor.tool.crop", bundle: .module))
                 }
@@ -185,18 +279,44 @@ private struct EditorControlsOverlay: View {
             Spacer()
 
             HStack {
+                savePill
                 Spacer()
-                Button(action: onSend) {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(AppColor.onMedia)
-                        .frame(width: 56, height: 56)
-                        .background(AppColor.accent, in: Circle())
-                }
-                .accessibilityLabel(Text("editor.export.title", bundle: .module))
+                sendButton
             }
         }
         .padding(Spacing.lg)
+    }
+
+    private var savePill: some View {
+        Button(action: onSave) {
+            HStack(spacing: Spacing.sm) {
+                if isSaving {
+                    ProgressView()
+                        .tint(AppColor.onMedia)
+                } else {
+                    Image(systemName: didSave ? "checkmark" : "arrow.down.to.line")
+                }
+                Text(didSave ? "editor.saved" : "editor.save", bundle: .module)
+            }
+            .font(AppFont.body.weight(.semibold))
+            .foregroundStyle(AppColor.onMedia)
+            .padding(.horizontal, Spacing.lg)
+            .frame(minHeight: 44)
+            .background(.ultraThinMaterial, in: Capsule())
+        }
+        .disabled(isSaving || didSave)
+        .accessibilityLabel(Text("editor.save", bundle: .module))
+    }
+
+    private var sendButton: some View {
+        Button(action: onSend) {
+            Image(systemName: "arrow.right")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(AppColor.onMedia)
+                .frame(width: 56, height: 56)
+                .background(AppColor.accent, in: Circle())
+        }
+        .accessibilityLabel(Text("editor.export.title", bundle: .module))
     }
 }
 
@@ -251,102 +371,5 @@ private struct LoadFailedView: View {
                 Text("common.retry", bundle: .module)
             }
         }
-    }
-}
-
-/// Pinch resizes and drag moves the crop window over the full image.
-struct CropToolView: View {
-    let image: CGImage?
-    let spec: CropSpec
-    let onChange: (CropSpec) -> Void
-
-    @State private var viewSize: CGSize = .zero
-    @State private var baseRect: CGRect?
-
-    var body: some View {
-        if let image {
-            Image(decorative: image, scale: 1)
-                .resizable()
-                .scaledToFit()
-                .onGeometryChange(for: CGSize.self) { proxy in
-                    proxy.size
-                } action: { newSize in
-                    viewSize = newSize
-                }
-                .overlay {
-                    CropWindowShape(rect: denormalized(spec.rect))
-                        .fill(AppColor.mediaBackground.opacity(0.5), style: FillStyle(eoFill: true))
-                    Rectangle()
-                        .path(in: denormalized(spec.rect))
-                        .stroke(AppColor.onMedia, lineWidth: 2)
-                }
-                .gesture(dragGesture.simultaneously(with: magnifyGesture))
-        } else {
-            ProgressView()
-                .tint(AppColor.onMedia)
-        }
-    }
-
-    private func denormalized(_ rect: CGRect) -> CGRect {
-        CGRect(
-            x: rect.origin.x * viewSize.width,
-            y: rect.origin.y * viewSize.height,
-            width: rect.width * viewSize.width,
-            height: rect.height * viewSize.height
-        )
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                guard viewSize != .zero else { return }
-                let base = baseRect ?? spec.rect
-                baseRect = base
-                var rect = base
-                rect.origin.x += value.translation.width / viewSize.width
-                rect.origin.y += value.translation.height / viewSize.height
-                onChange(CropSpec(rect: rect.clampedToUnitSpace()))
-            }
-            .onEnded { _ in baseRect = nil }
-    }
-
-    private var magnifyGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let base = baseRect ?? spec.rect
-                baseRect = base
-                let width = min(1, max(0.2, base.width / value.magnification))
-                let height = min(1, max(0.2, base.height / value.magnification))
-                let rect = CGRect(
-                    x: base.midX - width / 2,
-                    y: base.midY - height / 2,
-                    width: width,
-                    height: height
-                )
-                onChange(CropSpec(rect: rect.clampedToUnitSpace()))
-            }
-            .onEnded { _ in baseRect = nil }
-    }
-}
-
-/// Even-odd shape dimming everything outside the crop window.
-private struct CropWindowShape: Shape {
-    let rect: CGRect
-
-    func path(in bounds: CGRect) -> Path {
-        var path = Path()
-        path.addRect(bounds)
-        path.addRect(rect.intersection(bounds))
-        return path
-    }
-}
-
-private extension CGRect {
-    /// Keeps the rect inside the unit square without changing its size.
-    func clampedToUnitSpace() -> CGRect {
-        var rect = self
-        rect.origin.x = min(max(rect.origin.x, 0), 1 - width)
-        rect.origin.y = min(max(rect.origin.y, 0), 1 - height)
-        return rect
     }
 }

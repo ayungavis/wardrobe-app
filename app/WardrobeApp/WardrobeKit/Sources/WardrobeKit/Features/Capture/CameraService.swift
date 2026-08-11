@@ -17,11 +17,13 @@ public protocol CameraService: AnyObject {
     var permission: CameraPermission { get }
     /// Non-nil only for a real device camera; drives the live preview layer.
     var previewSession: AVCaptureSession? { get }
+    var isFlashOn: Bool { get }
     func requestPermission() async -> CameraPermission
     func startSession() async throws
     func stopSession()
     /// Switches between back and front camera. No-op where unsupported.
     func toggleCamera() async throws
+    func toggleFlash()
     /// Returns JPEG data. Throws `AppError.captureFailed`.
     func capturePhoto() async throws -> Data
 }
@@ -49,9 +51,14 @@ public final class SampleCameraService: CameraService {
         return permission
     }
 
+    public private(set) var isFlashOn = false
+
     public func startSession() async throws {}
     public func stopSession() {}
     public func toggleCamera() async throws {}
+    public func toggleFlash() {
+        isFlashOn.toggle()
+    }
 
     public func capturePhoto() async throws -> Data {
         try Self.makeSampleJPEG()

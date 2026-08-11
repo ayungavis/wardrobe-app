@@ -16,8 +16,10 @@ public final class EditorViewModel {
     public private(set) var activeTool: Tool?
     public private(set) var exportState: Loadable<ExportedPhoto> = .idle
     public var isExportPresented = false
+    public var isStickerPickerPresented = false
     public var alertError: AppError?
     public private(set) var didSaveToPhotos = false
+    public private(set) var isSaving = false
 
     private var challenge: ActiveChallenge
     private let store: ActiveChallengeStore
@@ -148,19 +150,44 @@ public final class EditorViewModel {
         store.save(challenge)
     }
 
-    // MARK: Direct manipulation on committed text (story-style drag/pinch)
+    // MARK: Direct manipulation on committed overlays (story-style drag/pinch)
 
     public func moveText(id: UUID, to position: CGPoint) {
         guard let index = draft.texts.firstIndex(where: { $0.id == id }) else { return }
-        draft.texts[index].position = CGPoint(
-            x: min(1, max(0, position.x)),
-            y: min(1, max(0, position.y))
-        )
+        draft.texts[index].position = position.clampedToUnit()
     }
 
     public func scaleText(id: UUID, to scale: CGFloat) {
         guard let index = draft.texts.firstIndex(where: { $0.id == id }) else { return }
         draft.texts[index].scale = min(3, max(0.5, scale))
+    }
+
+    public func removeText(id: UUID) {
+        draft.texts.removeAll { $0.id == id }
+        persistDraft()
+    }
+
+    // MARK: Stickers (PRD FR-019)
+
+    public func addSticker(_ emoji: String) {
+        draft.stickers.append(StickerItem(emoji: emoji))
+        isStickerPickerPresented = false
+        persistDraft()
+    }
+
+    public func moveSticker(id: UUID, to position: CGPoint) {
+        guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
+        draft.stickers[index].position = position.clampedToUnit()
+    }
+
+    public func scaleSticker(id: UUID, to scale: CGFloat) {
+        guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
+        draft.stickers[index].scale = min(4, max(0.5, scale))
+    }
+
+    public func removeSticker(id: UUID) {
+        draft.stickers.removeAll { $0.id == id }
+        persistDraft()
     }
 
     /// Persist once when the gesture ends — not on every frame.
@@ -205,5 +232,33 @@ public final class EditorViewModel {
                 alertError = .photoSaveFailed
             }
         }
+    }
+
+    /// Save-pill path: render + save to the library in one step, no sheet.
+    public func saveDirectly() {
+        guard case let .loaded(data) = originalData, !isSaving, !didSaveToPhotos else { return }
+        isSaving = true
+
+        let draft = draft
+        saveTask = Task {
+            defer { isSaving = false }
+            do {
+                let photo = try ExportRenderer.render(original: data, draft: draft)
+                try Task.checkCancellation()
+                try await librarySaver.save(photo)
+                didSaveToPhotos = true
+            } catch is CancellationError {
+                // Ignore cancellation.
+            } catch {
+                Log.report(error)
+                alertError = .photoSaveFailed
+            }
+        }
+    }
+}
+
+private extension CGPoint {
+    func clampedToUnit() -> CGPoint {
+        CGPoint(x: min(1, max(0, x)), y: min(1, max(0, y)))
     }
 }

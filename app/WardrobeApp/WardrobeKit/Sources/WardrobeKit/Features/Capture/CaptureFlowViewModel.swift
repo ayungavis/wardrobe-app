@@ -6,7 +6,6 @@ public enum CaptureStage: Equatable {
     case consent
     case denied
     case camera
-    case preview(Data)
     case editor
 }
 
@@ -17,6 +16,8 @@ public final class CaptureFlowViewModel {
     public private(set) var challenge: ActiveChallenge
     public var alertError: AppError?
     public private(set) var isCapturing = false
+    /// Mirrored from the camera service so the view observes changes.
+    public private(set) var isFlashOn = false
 
     private let camera: CameraService
     private let store: ActiveChallengeStore
@@ -65,7 +66,7 @@ public final class CaptureFlowViewModel {
         switch stage {
         case .consent, .denied, .camera:
             stage = Self.initialStage(challenge: challenge, permission: camera.permission)
-        case .preview, .editor:
+        case .editor:
             break
         }
     }
@@ -107,6 +108,8 @@ public final class CaptureFlowViewModel {
 
     // MARK: Capture (FR-016)
 
+    /// Story-style: a successful shutter goes straight to the editor
+    /// (the editor is the preview; discarding is the retake — FR-016).
     public func capture() {
         guard !isCapturing else { return }
         isCapturing = true
@@ -118,7 +121,7 @@ public final class CaptureFlowViewModel {
                 let data = try await camera.capturePhoto()
                 try Task.checkCancellation()
                 Log.ui.info("Capture finished in \((ContinuousClock.now - start).ms, privacy: .public)ms")
-                stage = .preview(data)
+                persistPhoto(data)
             } catch is CancellationError {
                 // Ignore cancellation.
             } catch {
@@ -128,13 +131,14 @@ public final class CaptureFlowViewModel {
         }
     }
 
-    public func retake() {
-        stage = .camera
+    public func toggleFlash() {
+        camera.toggleFlash()
+        isFlashOn = camera.isFlashOn
     }
 
     /// Ordering matters: file write first, then persist photoID, then editor.
     /// A failed write leaves nothing persisted (FR-016).
-    public func usePhoto(_ data: Data) {
+    private func persistPhoto(_ data: Data) {
         do {
             let id = try photoStore.saveOriginal(data)
             challenge.photoID = id
@@ -144,6 +148,21 @@ public final class CaptureFlowViewModel {
             Log.report(error)
             alertError = .captureFailed
         }
+    }
+
+    /// Editor X: throw the photo and its edits away, back to the camera.
+    public func discardPhoto() {
+        if let photoID = challenge.photoID {
+            do {
+                try photoStore.deleteOriginal(id: photoID)
+            } catch {
+                Log.report(error) // orphaned file is not worth blocking the retake
+            }
+        }
+        challenge.photoID = nil
+        challenge.draft = EditDraft()
+        store.save(challenge)
+        stage = .camera
     }
 }
 

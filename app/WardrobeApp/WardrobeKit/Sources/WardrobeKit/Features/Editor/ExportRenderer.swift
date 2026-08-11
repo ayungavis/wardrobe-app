@@ -46,13 +46,13 @@ public enum ExportRenderer {
             image = cropped
         }
 
-        if draft.texts.isEmpty {
+        if draft.texts.isEmpty, draft.stickers.isEmpty {
             return try encodeJPEG(image) // no compositing needed
         }
 
         let size = CGSize(width: image.width, height: image.height)
         let renderer = ImageRenderer(
-            content: ExportCompositionView(image: image, texts: draft.texts, size: size)
+            content: ExportCompositionView(image: image, texts: draft.texts, stickers: draft.stickers, size: size)
         )
         renderer.proposedSize = ProposedViewSize(size)
         guard let rendered = renderer.cgImage else { throw AppError.exportFailed }
@@ -76,12 +76,18 @@ enum TextRendering {
     static func fontSize(for item: TextItem, in size: CGSize) -> CGFloat {
         0.08 * min(size.width, size.height) * item.scale
     }
+
+    static func stickerFontSize(for item: StickerItem, in size: CGSize) -> CGFloat {
+        0.15 * min(size.width, size.height) * item.scale
+    }
 }
 
-/// Static composition rendered for export.
+/// Static composition rendered for export — uses the same label components
+/// as the editor canvas, so output matches the preview.
 struct ExportCompositionView: View {
     let image: CGImage
     let texts: [TextItem]
+    let stickers: [StickerItem]
     let size: CGSize
 
     var body: some View {
@@ -89,11 +95,13 @@ struct ExportCompositionView: View {
             Image(decorative: image, scale: 1)
                 .resizable()
 
+            ForEach(stickers) { item in
+                StickerLabel(item: item, fontSize: TextRendering.stickerFontSize(for: item, in: size))
+                    .position(x: item.position.x * size.width, y: item.position.y * size.height)
+            }
+
             ForEach(texts) { item in
-                Text(item.content)
-                    .font(.system(size: TextRendering.fontSize(for: item, in: size), weight: .bold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.4), radius: size.width * 0.005)
+                TextItemLabel(item: item, fontSize: TextRendering.fontSize(for: item, in: size))
                     .position(x: item.position.x * size.width, y: item.position.y * size.height)
             }
         }

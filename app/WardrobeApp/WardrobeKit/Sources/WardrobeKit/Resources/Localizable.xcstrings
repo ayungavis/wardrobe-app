@@ -33,6 +33,12 @@
         }
       }
     },
+    "capture.camera.flash" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Flash" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Flash" } }
+      }
+    },
     "capture.camera.samplePlaceholder" : {
       "localizations" : {
         "en" : {
@@ -157,38 +163,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Butuh akses kamera"
-          }
-        }
-      }
-    },
-    "capture.preview.retake" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retake"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ulangi"
-          }
-        }
-      }
-    },
-    "capture.preview.usePhoto" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Photo"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pakai Foto"
           }
         }
       }
@@ -433,6 +407,30 @@
         }
       }
     },
+    "editor.discard.action" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard Photo" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Buang Foto" } }
+      }
+    },
+    "editor.discard.keep" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keep Draft & Close" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Simpan Draf & Tutup" } }
+      }
+    },
+    "editor.discard.message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discarding removes the photo and all edits. Your challenge stays active." } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Membuang akan menghapus foto dan semua edit. Tantanganmu tetap aktif." } }
+      }
+    },
+    "editor.discard.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard photo?" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Buang foto?" } }
+      }
+    },
     "editor.export.title" : {
       "localizations" : {
         "en" : {
@@ -465,6 +463,12 @@
         }
       }
     },
+    "editor.save" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Simpan" } }
+      }
+    },
     "editor.saveToPhotos" : {
       "localizations" : {
         "en" : {
@@ -495,6 +499,18 @@
             "value" : "Teksmu"
           }
         }
+      }
+    },
+    "editor.text.background" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text background" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Latar teks" } }
+      }
+    },
+    "editor.tool.sticker" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stickers" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Stiker" } }
       }
     },
     "editor.tool.crop" : {

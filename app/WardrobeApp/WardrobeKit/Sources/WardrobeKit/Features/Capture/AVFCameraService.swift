@@ -11,6 +11,7 @@
         private var inFlightDelegate: PhotoCaptureDelegate?
         private var position: AVCaptureDevice.Position = .back
         private var currentInput: AVCaptureDeviceInput?
+        public private(set) var isFlashOn = false
 
         public init() {}
 
@@ -92,16 +93,25 @@
             Task.detached { session.stopRunning() }
         }
 
+        public func toggleFlash() {
+            isFlashOn.toggle()
+        }
+
         public func capturePhoto() async throws -> Data {
             guard inFlightDelegate == nil else { throw AppError.captureFailed }
             defer { inFlightDelegate = nil }
+
+            let settings = AVCapturePhotoSettings()
+            if currentInput?.device.hasFlash == true {
+                settings.flashMode = isFlashOn ? .on : .off
+            }
 
             return try await withCheckedThrowingContinuation { continuation in
                 let delegate = PhotoCaptureDelegate { result in
                     continuation.resume(with: result)
                 }
                 inFlightDelegate = delegate
-                output.capturePhoto(with: AVCapturePhotoSettings(), delegate: delegate)
+                output.capturePhoto(with: settings, delegate: delegate)
             }
         }
     }

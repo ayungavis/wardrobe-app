@@ -30,14 +30,11 @@ public struct CaptureFlowView: View {
                 DeniedStageView(onClose: { dismiss() })
             case .camera:
                 CameraStageView(viewModel: viewModel, onClose: { dismiss() })
-            case let .preview(data):
-                PreviewStageView(
-                    data: data,
-                    onRetake: { viewModel.retake() },
-                    onUse: { viewModel.usePhoto(data) }
-                )
             case .editor:
-                EditorView(viewModel: makeEditorViewModel(viewModel.challenge))
+                EditorView(
+                    viewModel: makeEditorViewModel(viewModel.challenge),
+                    onDiscard: { viewModel.discardPhoto() }
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -173,7 +170,18 @@ private struct CameraStageView: View {
                 HStack {
                     MediaCircleButton(systemName: "xmark", action: onClose)
                         .accessibilityLabel(Text("common.close", bundle: .module))
+
                     Spacer()
+
+                    MediaCircleButton(systemName: viewModel.isFlashOn ? "bolt.fill" : "bolt.slash") {
+                        viewModel.toggleFlash()
+                    }
+                    .accessibilityLabel(Text("capture.camera.flash", bundle: .module))
+
+                    Spacer()
+
+                    // Balances the X so the flash button sits centered.
+                    Color.clear.frame(width: 44, height: 44)
                 }
                 Spacer()
 
@@ -224,33 +232,5 @@ struct MediaCircleButton: View {
                 .background(.ultraThinMaterial, in: Circle())
                 .environment(\.colorScheme, .dark)
         }
-    }
-}
-
-/// FR-016: preview with retake / use photo — story-style dark.
-private struct PreviewStageView: View {
-    let data: Data
-    let onRetake: () -> Void
-    let onUse: () -> Void
-
-    var body: some View {
-        VStack(spacing: Spacing.xl) {
-            DownsampledPhotoView(data: data)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipShape(.rect(cornerRadius: 16))
-
-            HStack(spacing: Spacing.lg) {
-                Button(action: onRetake) {
-                    Text("capture.preview.retake", bundle: .module)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-
-                PrimaryButton(Text("capture.preview.usePhoto", bundle: .module), action: onUse)
-            }
-        }
-        .padding(Spacing.xl)
-        .background(AppColor.mediaBackground.ignoresSafeArea())
-        .environment(\.colorScheme, .dark)
     }
 }

@@ -52,6 +52,11 @@ final class FakeCameraService: CameraService {
     var toggleError: Error?
     private(set) var stopCount = 0
     private(set) var toggleCount = 0
+    private(set) var isFlashOn = false
+
+    func toggleFlash() {
+        isFlashOn.toggle()
+    }
 
     var previewSession: AVCaptureSession? {
         nil

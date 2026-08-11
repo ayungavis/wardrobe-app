@@ -79,63 +79,19 @@ struct CaptureFlowViewModelTests {
         #expect(sut.stage == .denied)
     }
 
-    @Test func recheckDoesNotTouchPreviewOrEditor() {
+    @Test func recheckDoesNotTouchEditor() {
         let camera = FakeCameraService()
-        camera.permission = .granted
-        let sut = makeSUT(camera: camera)
-        sut.capture()
-
         camera.permission = .denied
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
-        let editorSUT = makeSUT(challenge: challenge, camera: camera)
+        let sut = makeSUT(challenge: challenge, camera: camera)
 
-        editorSUT.recheckPermission()
-        #expect(editorSUT.stage == .editor)
+        sut.recheckPermission()
+
+        #expect(sut.stage == .editor)
     }
 
-    // MARK: Capture (FR-016)
-
-    @Test func captureSuccessGoesToPreview() async {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        let photo = Data([0xAB, 0xCD])
-        camera.captureResult = .success(photo)
-        let sut = makeSUT(camera: camera)
-
-        sut.capture()
-        await sut.captureTask?.value
-
-        #expect(sut.stage == .preview(photo))
-        #expect(!sut.isCapturing)
-    }
-
-    @Test func captureFailureStaysInCameraWithError() async {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        camera.captureResult = .failure(AppError.captureFailed)
-        let sut = makeSUT(camera: camera)
-
-        sut.capture()
-        await sut.captureTask?.value
-
-        #expect(sut.stage == .camera)
-        #expect(sut.alertError == .captureFailed)
-    }
-
-    @Test func sessionStartFailureSetsCameraUnavailable() async {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        camera.startError = AppError.cameraUnavailable
-        let sut = makeSUT(camera: camera)
-
-        sut.cameraAppeared()
-        await sut.sessionTask?.value
-
-        #expect(sut.alertError == .cameraUnavailable)
-    }
-
-    // MARK: Flip camera
+    // MARK: Flip camera & flash
 
     @Test func flipCameraTogglesService() async {
         let camera = FakeCameraService()
@@ -161,25 +117,54 @@ struct CaptureFlowViewModelTests {
         #expect(sut.alertError == nil)
     }
 
-    // MARK: Use photo ordering (FR-016, §18.5)
-
-    @Test func usePhotoWritesFileThenPersistsIDThenEditor() {
+    @Test func toggleFlashMirrorsServiceState() {
         let camera = FakeCameraService()
         camera.permission = .granted
+        let sut = makeSUT(camera: camera)
+        #expect(!sut.isFlashOn)
+
+        sut.toggleFlash()
+
+        #expect(camera.isFlashOn)
+        #expect(sut.isFlashOn)
+    }
+
+    // MARK: Capture — straight to editor (FR-016, story-style)
+
+    @Test func captureSuccessPersistsPhotoThenEditor() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let photo = Data([0xAB, 0xCD])
+        camera.captureResult = .success(photo)
         let store = InMemoryActiveChallengeStore()
         let photoStore = SpyPhotoStore()
         let sut = makeSUT(camera: camera, store: store, photoStore: photoStore)
-        let photo = Data([0x01, 0x02])
 
-        sut.usePhoto(photo)
+        sut.capture()
+        await sut.captureTask?.value
 
         let savedID = photoStore.saved.keys.first
         #expect(savedID != nil)
+        #expect(photoStore.saved.values.first == photo)
         #expect(store.stored?.photoID == savedID)
         #expect(sut.stage == .editor)
+        #expect(!sut.isCapturing)
     }
 
-    @Test func usePhotoWriteFailurePersistsNothing() {
+    @Test func captureFailureStaysInCameraWithError() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        camera.captureResult = .failure(AppError.captureFailed)
+        let sut = makeSUT(camera: camera)
+
+        sut.capture()
+        await sut.captureTask?.value
+
+        #expect(sut.stage == .camera)
+        #expect(sut.alertError == .captureFailed)
+    }
+
+    @Test func capturePhotoWriteFailurePersistsNothing() async {
         let camera = FakeCameraService()
         camera.permission = .granted
         let store = InMemoryActiveChallengeStore()
@@ -187,10 +172,46 @@ struct CaptureFlowViewModelTests {
         photoStore.saveError = AppError.unexpected
         let sut = makeSUT(camera: camera, store: store, photoStore: photoStore)
 
-        sut.usePhoto(Data([0x01]))
+        sut.capture()
+        await sut.captureTask?.value
 
         #expect(store.stored == nil)
-        #expect(sut.stage == .camera) // never left the pre-photo stages
+        #expect(sut.stage == .camera)
         #expect(sut.alertError == .captureFailed)
+    }
+
+    @Test func sessionStartFailureSetsCameraUnavailable() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        camera.startError = AppError.cameraUnavailable
+        let sut = makeSUT(camera: camera)
+
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
+
+        #expect(sut.alertError == .cameraUnavailable)
+    }
+
+    // MARK: Discard (editor X — the story-style retake)
+
+    @Test func discardPhotoDeletesFileClearsDraftAndReturnsToCamera() {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        let photoID = UUID().uuidString
+        challenge.photoID = photoID
+        challenge.draft = EditDraft(texts: [TextItem(content: "hi")])
+        let store = InMemoryActiveChallengeStore()
+        store.stored = challenge
+        let photoStore = SpyPhotoStore()
+        let sut = makeSUT(challenge: challenge, camera: camera, store: store, photoStore: photoStore)
+        #expect(sut.stage == .editor)
+
+        sut.discardPhoto()
+
+        #expect(photoStore.deleted == [photoID])
+        #expect(store.stored?.photoID == nil)
+        #expect(store.stored?.draft.isEmpty == true)
+        #expect(sut.stage == .camera)
     }
 }

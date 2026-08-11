@@ -3,8 +3,16 @@ import Foundation
 import Testing
 @testable import WardrobeKit
 
-struct NoopLibrarySaver: PhotoLibrarySaving {
-    func save(_: Data) async throws {}
+final class SpyLibrarySaver: PhotoLibrarySaving, @unchecked Sendable {
+    var saveError: Error?
+    private(set) var savedData: [Data] = []
+
+    func save(_ data: Data) async throws {
+        if let saveError {
+            throw saveError
+        }
+        savedData.append(data)
+    }
 }
 
 @MainActor
@@ -12,6 +20,7 @@ struct EditorViewModelTests {
     private func makeSUT(
         store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
         photoStore: SpyPhotoStore = SpyPhotoStore(),
+        librarySaver: SpyLibrarySaver = SpyLibrarySaver(),
         draft: EditDraft = EditDraft()
     ) throws -> EditorViewModel {
         let photoID = try photoStore.saveOriginal(SampleCameraService.makeSampleJPEG(width: 100, height: 200))
@@ -23,7 +32,7 @@ struct EditorViewModelTests {
             challenge: challenge,
             store: store,
             photoStore: photoStore,
-            librarySaver: NoopLibrarySaver()
+            librarySaver: librarySaver
         )
     }
 
@@ -149,6 +158,91 @@ struct EditorViewModelTests {
         }
         #expect(isNew)
         #expect(working.position == CGPoint(x: 0.25, y: 0.75))
+    }
+
+    // MARK: Stickers (FR-019)
+
+    @Test func addStickerAppendsCenteredAndPersists() throws {
+        let store = InMemoryActiveChallengeStore()
+        let sut = try makeSUT(store: store)
+
+        sut.isStickerPickerPresented = true
+        sut.addSticker("🔥")
+
+        #expect(sut.draft.stickers.map(\.emoji) == ["🔥"])
+        #expect(sut.draft.stickers[0].position == CGPoint(x: 0.5, y: 0.5))
+        #expect(store.stored?.draft.stickers.count == 1)
+        #expect(!sut.isStickerPickerPresented)
+    }
+
+    @Test func moveAndScaleStickerClampAndPersistOnFinish() throws {
+        let store = InMemoryActiveChallengeStore()
+        let sticker = StickerItem(emoji: "✨")
+        let sut = try makeSUT(store: store, draft: EditDraft(stickers: [sticker]))
+
+        sut.moveSticker(id: sticker.id, to: CGPoint(x: -1, y: 2))
+        sut.scaleSticker(id: sticker.id, to: 99)
+        #expect(sut.draft.stickers[0].position == CGPoint(x: 0, y: 1))
+        #expect(sut.draft.stickers[0].scale == 4)
+
+        sut.finishDirectManipulation()
+        #expect(store.stored?.draft.stickers.first?.scale == 4)
+    }
+
+    @Test func removeStickerPersists() throws {
+        let store = InMemoryActiveChallengeStore()
+        let sticker = StickerItem(emoji: "✨")
+        let sut = try makeSUT(store: store, draft: EditDraft(stickers: [sticker]))
+
+        sut.removeSticker(id: sticker.id)
+
+        #expect(sut.draft.stickers.isEmpty)
+        #expect(store.stored?.draft.stickers.isEmpty == true)
+    }
+
+    // MARK: Direct save (save pill)
+
+    @Test func saveDirectlyRendersAndSaves() async throws {
+        let librarySaver = SpyLibrarySaver()
+        let sut = try makeSUT(librarySaver: librarySaver)
+        sut.load()
+        await sut.loadTask?.value
+
+        sut.saveDirectly()
+        await sut.saveTask?.value
+
+        #expect(librarySaver.savedData.count == 1)
+        #expect(sut.didSaveToPhotos)
+        #expect(!sut.isSaving)
+    }
+
+    @Test func saveDirectlyFailureSetsError() async throws {
+        let librarySaver = SpyLibrarySaver()
+        librarySaver.saveError = AppError.photoSaveFailed
+        let sut = try makeSUT(librarySaver: librarySaver)
+        sut.load()
+        await sut.loadTask?.value
+
+        sut.saveDirectly()
+        await sut.saveTask?.value
+
+        #expect(!sut.didSaveToPhotos)
+        #expect(sut.alertError == .photoSaveFailed)
+    }
+
+    // MARK: Legacy draft decoding (fields added over time)
+
+    @Test func legacyDraftJSONDecodesWithDefaults() throws {
+        let legacy = Data("""
+        {"texts":[{"id":"11111111-2222-3333-4444-555555555555","content":"old","position":[0.5,0.5],"scale":1}]}
+        """.utf8)
+
+        let draft = try JSONDecoder().decode(EditDraft.self, from: legacy)
+
+        #expect(draft.texts.count == 1)
+        #expect(draft.texts[0].colorName == TextColor.white.rawValue)
+        #expect(draft.texts[0].hasBackground == false)
+        #expect(draft.stickers.isEmpty)
     }
 
     @Test func originalBytesNeverChangeAfterCommits() throws {
