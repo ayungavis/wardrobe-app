@@ -43,15 +43,15 @@ public final class AppContainer {
             camera: cameraService,
             store: activeChallengeStore,
             photoStore: photoStore,
-            libraryPreview: Self.defaultLibraryPreview()
+            library: Self.defaultPhotoLibrary()
         )
     }
 
-    private static func defaultLibraryPreview() -> PhotoLibraryPreviewing {
+    private static func defaultPhotoLibrary() -> PhotoLibraryBrowsing {
         #if os(iOS)
-            PHPhotoLibraryPreview()
+            PHPhotoLibraryBrowser()
         #else
-            NoopPhotoLibraryPreview()
+            NoopPhotoLibraryBrowser()
         #endif
     }
 

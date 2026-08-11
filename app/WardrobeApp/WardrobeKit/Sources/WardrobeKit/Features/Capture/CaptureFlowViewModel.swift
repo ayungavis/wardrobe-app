@@ -25,11 +25,17 @@ public final class CaptureFlowViewModel {
     public private(set) var focusPoint: CGPoint?
     /// Newest library photo for the gallery button; nil when unavailable.
     public private(set) var galleryThumbnail: CGImage?
+    public private(set) var libraryAccess: PhotoLibraryAccess = .notDetermined
+    public private(set) var recentAssets: [PhotoAsset] = []
+    public var isGalleryPresented = false
+
+    /// Grid cells load their own thumbnails straight from the browser, so a
+    /// thumbnail arriving never invalidates the whole grid.
+    public let library: PhotoLibraryBrowsing
 
     private let camera: CameraService
     private let store: ActiveChallengeStore
     private let photoStore: PhotoStore
-    private let libraryPreview: PhotoLibraryPreviewing
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
     private(set) var sessionTask: Task<Void, Never>?
@@ -42,13 +48,13 @@ public final class CaptureFlowViewModel {
         camera: CameraService,
         store: ActiveChallengeStore,
         photoStore: PhotoStore,
-        libraryPreview: PhotoLibraryPreviewing
+        library: PhotoLibraryBrowsing
     ) {
         self.challenge = challenge
         self.camera = camera
         self.store = store
         self.photoStore = photoStore
-        self.libraryPreview = libraryPreview
+        self.library = library
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
         syncCameraState()
     }
@@ -194,15 +200,51 @@ public final class CaptureFlowViewModel {
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
 
-    /// Cosmetic thumbnail for the gallery button. A denied library permission
-    /// simply leaves it nil — the system picker still works.
-    public func loadGalleryThumbnail() {
-        guard galleryThumbnail == nil else { return }
+    /// Asks for library access as the camera opens, then fills the gallery
+    /// button and grid.
+    ///
+    /// This deliberately departs from PRD §18.1 (ask at the action that needs
+    /// it): the IG-style thumbnail has to read the library before the user
+    /// touches anything, and the product owner accepted that trade.
+    public func prepareLibraryAccess() {
         thumbnailTask?.cancel()
-        thumbnailTask = Task { [libraryPreview] in
-            let thumbnail = await libraryPreview.latestPhotoThumbnail(maxPixel: 120)
+        thumbnailTask = Task { [library] in
+            var access = await library.access()
+            if access == .notDetermined {
+                access = await library.requestAccess()
+            }
             guard !Task.isCancelled else { return }
+            libraryAccess = access
+
+            guard access.canBrowse else { return }
+            let assets = await library.recentAssets(limit: Self.recentAssetLimit)
+            var thumbnail: CGImage?
+            if let newest = assets.first {
+                thumbnail = await library.thumbnail(for: newest.id, maxPixel: 120)
+            }
+            guard !Task.isCancelled else { return }
+            recentAssets = assets
             galleryThumbnail = thumbnail
+        }
+    }
+
+    // ponytail: newest 120 photos, no paging — plenty for picking an outfit
+    // shot; add paging if anyone scrolls to the bottom and complains.
+    private static let recentAssetLimit = 120
+
+    /// Tapping a grid cell imports immediately — no confirm step.
+    public func importAsset(id: String) {
+        importTask?.cancel()
+        importTask = Task { [library] in
+            let data = await library.imageData(for: id)
+            guard !Task.isCancelled else { return }
+            guard let data else {
+                Log.report(AppError.photoImportFailed)
+                alertError = .photoImportFailed
+                return
+            }
+            isGalleryPresented = false
+            await persistPickedPhoto(data)
         }
     }
 
@@ -216,20 +258,25 @@ public final class CaptureFlowViewModel {
     public func usePickedPhoto(_ data: Data) {
         importTask?.cancel()
         importTask = Task {
-            let bytes = data
-            let isDecodable = await Task.detached(priority: .userInitiated) {
-                ImageDecoding.downsampledImage(from: bytes, maxPixel: 64) != nil
-            }.value
-            guard !Task.isCancelled else { return }
-            guard isDecodable else {
-                Log.report(AppError.photoImportFailed)
-                alertError = .photoImportFailed
-                return
-            }
-            // ponytail: HEIC keeps its bytes inside a `.jpg` file — every read
-            // goes through CGImageSource, which sniffs content, not names.
-            persistPhoto(data)
+            await persistPickedPhoto(data)
         }
+    }
+
+    /// Shared by the in-app grid and the system-picker fallback.
+    private func persistPickedPhoto(_ data: Data) async {
+        let bytes = data
+        let isDecodable = await Task.detached(priority: .userInitiated) {
+            ImageDecoding.downsampledImage(from: bytes, maxPixel: 64) != nil
+        }.value
+        guard !Task.isCancelled else { return }
+        guard isDecodable else {
+            Log.report(AppError.photoImportFailed)
+            alertError = .photoImportFailed
+            return
+        }
+        // ponytail: HEIC keeps its bytes inside a `.jpg` file — every read
+        // goes through CGImageSource, which sniffs content, not names.
+        persistPhoto(data)
     }
 
     /// Editor X: throw the photo and its edits away, back to the camera.

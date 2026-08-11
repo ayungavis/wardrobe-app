@@ -45,6 +45,30 @@
         "id" : { "stringUnit" : { "state" : "translated", "value" : "Pilih dari galeri" } }
       }
     },
+    "capture.gallery.denied.message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow photo access in Settings to browse your library here. You can still pick a single photo without it." } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Izinkan akses foto di Settings untuk menelusuri galeri di sini. Kamu tetap bisa memilih satu foto tanpa itu." } }
+      }
+    },
+    "capture.gallery.denied.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Photo access needed" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Butuh akses foto" } }
+      }
+    },
+    "capture.gallery.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recents" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Terbaru" } }
+      }
+    },
+    "capture.gallery.useSystemPicker" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a photo instead" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Pilih satu foto saja" } }
+      }
+    },
     "capture.camera.zoomIn" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom in" } },

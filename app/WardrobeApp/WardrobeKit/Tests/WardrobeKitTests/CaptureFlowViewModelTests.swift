@@ -10,14 +10,14 @@ struct CaptureFlowViewModelTests {
         camera: FakeCameraService = FakeCameraService(),
         store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
         photoStore: SpyPhotoStore = SpyPhotoStore(),
-        libraryPreview: FakeLibraryPreview = FakeLibraryPreview()
+        library: FakePhotoLibrary = FakePhotoLibrary()
     ) -> CaptureFlowViewModel {
         CaptureFlowViewModel(
             challenge: challenge,
             camera: camera,
             store: store,
             photoStore: photoStore,
-            libraryPreview: libraryPreview
+            library: library
         )
     }
 

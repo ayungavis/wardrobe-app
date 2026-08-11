@@ -12,14 +12,14 @@ struct CameraControlTests {
         camera: FakeCameraService = FakeCameraService(),
         store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
         photoStore: SpyPhotoStore = SpyPhotoStore(),
-        libraryPreview: FakeLibraryPreview = FakeLibraryPreview()
+        library: FakePhotoLibrary = FakePhotoLibrary()
     ) -> CaptureFlowViewModel {
         CaptureFlowViewModel(
             challenge: challenge,
             camera: camera,
             store: store,
             photoStore: photoStore,
-            libraryPreview: libraryPreview
+            library: library
         )
     }
 
@@ -156,29 +156,96 @@ struct CameraControlTests {
         #expect(sut.alertError == .photoImportFailed)
     }
 
-    @Test func galleryThumbnailLoadsWhenLibraryAllowsIt() async throws {
+    // MARK: Library access on camera open
+
+    @Test func prepareLibraryAccessPromptsOnceThenLoadsGallery() async throws {
         let camera = FakeCameraService()
         camera.permission = .granted
-        let libraryPreview = FakeLibraryPreview()
         let jpeg = try SampleCameraService.makeSampleJPEG(width: 40, height: 40)
-        libraryPreview.thumbnail = ImageDecoding.downsampledImage(from: jpeg, maxPixel: 40)
-        let sut = makeSUT(camera: camera, libraryPreview: libraryPreview)
+        let library = FakePhotoLibrary(
+            access: .notDetermined,
+            accessAfterRequest: .authorized,
+            assets: [PhotoAsset(id: "a"), PhotoAsset(id: "b")],
+            thumbnail: ImageDecoding.downsampledImage(from: jpeg, maxPixel: 40)
+        )
+        let sut = makeSUT(camera: camera, library: library)
 
-        sut.loadGalleryThumbnail()
+        sut.prepareLibraryAccess()
         await sut.thumbnailTask?.value
 
+        #expect(await library.requestAccessCount == 1)
+        #expect(sut.libraryAccess == .authorized)
+        #expect(sut.recentAssets.map(\.id) == ["a", "b"])
         #expect(sut.galleryThumbnail != nil)
     }
 
-    @Test func galleryThumbnailStaysNilWhenLibraryDenied() async {
+    @Test func prepareLibraryAccessDoesNotPromptWhenAlreadyDecided() async {
         let camera = FakeCameraService()
         camera.permission = .granted
-        let sut = makeSUT(camera: camera, libraryPreview: FakeLibraryPreview()) // returns nil
+        let library = FakePhotoLibrary(access: .authorized, assets: [PhotoAsset(id: "a")])
+        let sut = makeSUT(camera: camera, library: library)
 
-        sut.loadGalleryThumbnail()
+        sut.prepareLibraryAccess()
         await sut.thumbnailTask?.value
 
+        #expect(await library.requestAccessCount == 0)
+        #expect(sut.recentAssets.count == 1)
+    }
+
+    @Test func deniedLibraryLeavesGalleryEmptyWithoutError() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let library = FakePhotoLibrary(
+            access: .notDetermined,
+            accessAfterRequest: .denied,
+            assets: [PhotoAsset(id: "a")]
+        )
+        let sut = makeSUT(camera: camera, library: library)
+
+        sut.prepareLibraryAccess()
+        await sut.thumbnailTask?.value
+
+        #expect(sut.libraryAccess == .denied)
+        #expect(sut.recentAssets.isEmpty)
         #expect(sut.galleryThumbnail == nil)
-        #expect(sut.alertError == nil) // a missing thumbnail is not an error
+        #expect(sut.alertError == nil) // no access is not an error
+    }
+
+    // MARK: Tap-to-import from the in-app grid
+
+    @Test func importAssetUsesTheTappedPhotoImmediately() async throws {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let picked = try SampleCameraService.makeSampleJPEG(width: 60, height: 60)
+        let library = FakePhotoLibrary(access: .authorized, assets: [PhotoAsset(id: "a")], data: picked)
+        let store = InMemoryActiveChallengeStore()
+        let photoStore = SpyPhotoStore()
+        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore, library: library)
+        sut.isGalleryPresented = true
+
+        sut.importAsset(id: "a")
+        await sut.importTask?.value
+
+        #expect(photoStore.saved.values.first == picked)
+        #expect(store.stored?.photoID == photoStore.saved.keys.first)
+        #expect(sut.stage == .editor)
+        #expect(!sut.isGalleryPresented)
+    }
+
+    @Test func importAssetWithoutDataReportsFailureAndPersistsNothing() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let library = FakePhotoLibrary(access: .authorized, assets: [PhotoAsset(id: "a")]) // no data
+        let store = InMemoryActiveChallengeStore()
+        let photoStore = SpyPhotoStore()
+        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore, library: library)
+
+        sut.importAsset(id: "a")
+        await sut.importTask?.value
+
+        #expect(photoStore.saved.isEmpty)
+        #expect(store.stored == nil)
+        #expect(sut.stage == .camera)
+        #expect(sut.alertError == .photoImportFailed)
     }
 }

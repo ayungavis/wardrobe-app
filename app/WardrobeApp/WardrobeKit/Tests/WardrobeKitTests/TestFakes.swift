@@ -18,11 +18,50 @@ final class InMemoryActiveChallengeStore: ActiveChallengeStore, @unchecked Senda
     }
 }
 
-final class FakeLibraryPreview: PhotoLibraryPreviewing, @unchecked Sendable {
-    var thumbnail: CGImage?
+/// An actor, mirroring the real browser's isolation, so tests exercise the
+/// same async boundaries.
+actor FakePhotoLibrary: PhotoLibraryBrowsing {
+    private var currentAccess: PhotoLibraryAccess
+    private var accessAfterRequest: PhotoLibraryAccess
+    private var assets: [PhotoAsset]
+    private var thumbnailImage: CGImage?
+    private var data: Data?
+    private(set) var requestAccessCount = 0
 
-    func latestPhotoThumbnail(maxPixel _: CGFloat) async -> CGImage? {
-        thumbnail
+    init(
+        access: PhotoLibraryAccess = .notDetermined,
+        accessAfterRequest: PhotoLibraryAccess = .authorized,
+        assets: [PhotoAsset] = [],
+        thumbnail: CGImage? = nil,
+        data: Data? = nil
+    ) {
+        currentAccess = access
+        self.accessAfterRequest = accessAfterRequest
+        self.assets = assets
+        thumbnailImage = thumbnail
+        self.data = data
+    }
+
+    func access() async -> PhotoLibraryAccess {
+        currentAccess
+    }
+
+    func requestAccess() async -> PhotoLibraryAccess {
+        requestAccessCount += 1
+        currentAccess = accessAfterRequest
+        return currentAccess
+    }
+
+    func recentAssets(limit: Int) async -> [PhotoAsset] {
+        currentAccess.canBrowse ? Array(assets.prefix(limit)) : []
+    }
+
+    func thumbnail(for _: String, maxPixel _: CGFloat) async -> CGImage? {
+        thumbnailImage
+    }
+
+    func imageData(for _: String) async -> Data? {
+        data
     }
 }
 

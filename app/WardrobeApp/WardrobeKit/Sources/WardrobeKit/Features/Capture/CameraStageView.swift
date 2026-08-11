@@ -1,5 +1,4 @@
 import DesignSystem
-import PhotosUI
 import SwiftUI
 
 /// FR-015/016: story-style full-screen camera — dark, big shutter ring, lens
@@ -11,7 +10,6 @@ struct CameraStageView: View {
     @State private var viewfinderSize: CGSize = .zero
     @State private var zoomStartValue: CGFloat?
     @State private var focusIndicator: FocusIndicator?
-    @State private var pickedItem: PhotosPickerItem?
 
     /// A tap-to-focus square, identified so a new tap restarts the fade.
     private struct FocusIndicator: Equatable, Identifiable {
@@ -20,7 +18,9 @@ struct CameraStageView: View {
     }
 
     var body: some View {
-        ZStack {
+        @Bindable var viewModel = viewModel
+
+        return ZStack {
             AppColor.mediaBackground.ignoresSafeArea()
 
             viewfinder
@@ -50,13 +50,19 @@ struct CameraStageView: View {
         .sensoryFeedback(.impact, trigger: viewModel.isCapturing) { _, new in new }
         .task {
             viewModel.cameraAppeared()
-            viewModel.loadGalleryThumbnail()
+            viewModel.prepareLibraryAccess()
         }
         .onDisappear {
             viewModel.cameraDisappeared()
         }
-        .onChange(of: pickedItem) { _, newItem in
-            importPickedPhoto(newItem)
+        .sheet(isPresented: $viewModel.isGalleryPresented) {
+            PhotoLibraryGridView(
+                access: viewModel.libraryAccess,
+                assets: viewModel.recentAssets,
+                library: viewModel.library,
+                onPick: { viewModel.importAsset(id: $0) },
+                onPickData: { viewModel.usePickedPhoto($0) }
+            )
         }
     }
 
@@ -95,7 +101,9 @@ struct CameraStageView: View {
             .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
 
             HStack {
-                GalleryPickerButton(thumbnail: viewModel.galleryThumbnail, selection: $pickedItem)
+                GalleryButton(thumbnail: viewModel.galleryThumbnail) {
+                    viewModel.isGalleryPresented = true
+                }
                 Spacer()
                 MediaCircleButton(systemName: "arrow.triangle.2.circlepath.camera") {
                     viewModel.flipCamera()
@@ -168,23 +176,6 @@ struct CameraStageView: View {
             }
             .onEnded { _ in zoomStartValue = nil }
     }
-
-    private func importPickedPhoto(_ item: PhotosPickerItem?) {
-        guard let item else { return }
-        Task {
-            defer { pickedItem = nil }
-            do {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    viewModel.reportImportFailure()
-                    return
-                }
-                viewModel.usePickedPhoto(data)
-            } catch {
-                Log.report(error, logger: Log.ui)
-                viewModel.reportImportFailure()
-            }
-        }
-    }
 }
 
 /// Lens presets (0.5x/1x/2x) on the back camera; a single in/out toggle on the
@@ -256,15 +247,14 @@ private struct CameraZoomControl: View {
     }
 }
 
-/// IG-style gallery entry point: the newest photo as a thumbnail when the
-/// library permission allows it, a plain icon otherwise. Picking always works
-/// — the system picker runs out of process and needs no permission.
-private struct GalleryPickerButton: View {
+/// IG-style gallery entry point: the newest photo as a thumbnail once the
+/// library permission allows it, a plain icon otherwise.
+private struct GalleryButton: View {
     let thumbnail: CGImage?
-    @Binding var selection: PhotosPickerItem?
+    let action: () -> Void
 
     var body: some View {
-        PhotosPicker(selection: $selection, matching: .images) {
+        Button(action: action) {
             Group {
                 if let thumbnail {
                     Image(decorative: thumbnail, scale: 1)
