@@ -18,8 +18,12 @@ public protocol CameraService: AnyObject {
     /// Non-nil only for a real device camera; drives the live preview layer.
     var previewSession: AVCaptureSession? { get }
     var isFlashOn: Bool { get }
-    /// Current optical/digital zoom; 1 is the unzoomed framing.
-    var zoomFactor: CGFloat { get }
+    var isUsingFrontCamera: Bool { get }
+    /// Zoom as the user sees it: 1 is the standard lens, 0.5 ultra-wide.
+    /// The service maps this onto the device's own zoom scale.
+    var displayZoomFactor: CGFloat { get }
+    /// Preset factors this device can actually reach, ascending.
+    var zoomOptions: [CGFloat] { get }
     func requestPermission() async -> CameraPermission
     func startSession() async throws
     func stopSession()
@@ -27,21 +31,22 @@ public protocol CameraService: AnyObject {
     func toggleCamera() async throws
     func toggleFlash()
     /// Clamped by the implementation to what the device supports.
-    func setZoom(_ factor: CGFloat)
+    func setDisplayZoom(_ factor: CGFloat)
     /// Focus + expose on a point in unit preview space (0...1).
     func focus(at point: CGPoint)
     /// Returns JPEG data. Throws `AppError.captureFailed`.
     func capturePhoto() async throws -> Data
 }
 
-/// Shared zoom ceiling — plenty for framing an outfit, and keeps the sample
-/// service and the real device in step.
+/// Zoom presets, in display space. `0.5` needs an ultra-wide lens, so each
+/// service filters this list down to what its device supports.
 enum CameraZoom {
-    static let minFactor: CGFloat = 1
-    static let maxFactor: CGFloat = 5
+    static let presets: [CGFloat] = [0.5, 1, 2]
+    static let standard: CGFloat = 1
 
-    static func clamp(_ factor: CGFloat, deviceMax: CGFloat = maxFactor) -> CGFloat {
-        min(min(maxFactor, deviceMax), max(minFactor, factor))
+    static func clamp(_ factor: CGFloat, to options: [CGFloat]) -> CGFloat {
+        guard let low = options.first, let high = options.last else { return factor }
+        return min(high, max(low, factor))
     }
 }
 
@@ -56,9 +61,13 @@ public final class SampleCameraService: CameraService {
 
     public init() {
         #if DEBUG
-            // UI-verification seam: skip the consent stage in scripted runs.
-            if ProcessInfo.processInfo.arguments.contains("-cameraGranted") {
+            // UI-verification seams for scripted runs.
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-cameraGranted") {
                 permission = .granted
+            }
+            if arguments.contains("-frontCamera") {
+                isUsingFrontCamera = true
             }
         #endif
     }
@@ -69,19 +78,30 @@ public final class SampleCameraService: CameraService {
     }
 
     public private(set) var isFlashOn = false
-    public private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+    public private(set) var isUsingFrontCamera = false
+    public private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
     /// Last focus request — no hardware to drive, but keeps the flow honest.
     public private(set) var lastFocusPoint: CGPoint?
 
+    /// Mirrors a typical iPhone: ultra-wide on the back, none on the front.
+    public var zoomOptions: [CGFloat] {
+        isUsingFrontCamera ? [1, 2] : CameraZoom.presets
+    }
+
     public func startSession() async throws {}
     public func stopSession() {}
-    public func toggleCamera() async throws {}
+
+    public func toggleCamera() async throws {
+        isUsingFrontCamera.toggle()
+        displayZoomFactor = CameraZoom.standard
+    }
+
     public func toggleFlash() {
         isFlashOn.toggle()
     }
 
-    public func setZoom(_ factor: CGFloat) {
-        zoomFactor = CameraZoom.clamp(factor)
+    public func setDisplayZoom(_ factor: CGFloat) {
+        displayZoomFactor = CameraZoom.clamp(factor, to: zoomOptions)
     }
 
     public func focus(at point: CGPoint) {

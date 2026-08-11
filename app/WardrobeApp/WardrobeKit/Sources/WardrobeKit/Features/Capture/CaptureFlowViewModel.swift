@@ -18,29 +18,39 @@ public final class CaptureFlowViewModel {
     public private(set) var isCapturing = false
     /// Mirrored from the camera service so the view observes changes.
     public private(set) var isFlashOn = false
-    public private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+    public private(set) var isUsingFrontCamera = false
+    public private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
+    public private(set) var zoomOptions: [CGFloat] = [CameraZoom.standard]
     /// Latest tap-to-focus point in unit preview space, for the indicator.
     public private(set) var focusPoint: CGPoint?
+    /// Newest library photo for the gallery button; nil when unavailable.
+    public private(set) var galleryThumbnail: CGImage?
 
     private let camera: CameraService
     private let store: ActiveChallengeStore
     private let photoStore: PhotoStore
+    private let libraryPreview: PhotoLibraryPreviewing
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
     private(set) var sessionTask: Task<Void, Never>?
     private(set) var flipTask: Task<Void, Never>?
+    private(set) var importTask: Task<Void, Never>?
+    private(set) var thumbnailTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
         camera: CameraService,
         store: ActiveChallengeStore,
-        photoStore: PhotoStore
+        photoStore: PhotoStore,
+        libraryPreview: PhotoLibraryPreviewing
     ) {
         self.challenge = challenge
         self.camera = camera
         self.store = store
         self.photoStore = photoStore
+        self.libraryPreview = libraryPreview
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
+        syncCameraState()
     }
 
     static func initialStage(challenge: ActiveChallenge, permission: CameraPermission) -> CaptureStage {
@@ -102,7 +112,16 @@ public final class CaptureFlowViewModel {
             } catch {
                 Log.report(error, logger: Log.ui) // non-fatal: stay on the current camera
             }
+            syncCameraState() // lens list and zoom differ per camera
         }
+    }
+
+    /// Pulls the service's current framing state into observable properties.
+    private func syncCameraState() {
+        isFlashOn = camera.isFlashOn
+        isUsingFrontCamera = camera.isUsingFrontCamera
+        zoomOptions = camera.zoomOptions
+        displayZoomFactor = camera.displayZoomFactor
     }
 
     public var previewSession: AVCaptureSession? {
@@ -139,10 +158,18 @@ public final class CaptureFlowViewModel {
         isFlashOn = camera.isFlashOn
     }
 
-    /// Pinch-to-zoom. The service clamps; we mirror what it accepted.
-    public func setZoom(_ factor: CGFloat) {
-        camera.setZoom(factor)
-        zoomFactor = camera.zoomFactor
+    /// Pinch-to-zoom and preset taps share this path; the service clamps and
+    /// we mirror whatever it accepted.
+    public func setDisplayZoom(_ factor: CGFloat) {
+        camera.setDisplayZoom(CameraZoom.clamp(factor, to: zoomOptions))
+        displayZoomFactor = camera.displayZoomFactor
+    }
+
+    /// Front camera has no lens row — one button toggles the two framings,
+    /// the way the built-in Camera app does.
+    public func toggleFrontZoom() {
+        guard let first = zoomOptions.first, let last = zoomOptions.last, first != last else { return }
+        setDisplayZoom(displayZoomFactor >= last ? first : last)
     }
 
     /// Tap-to-focus. `point` is in unit preview space (0...1).
@@ -162,6 +189,46 @@ public final class CaptureFlowViewModel {
         } catch {
             Log.report(error)
             alertError = .captureFailed
+        }
+    }
+
+    // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
+
+    /// Cosmetic thumbnail for the gallery button. A denied library permission
+    /// simply leaves it nil — the system picker still works.
+    public func loadGalleryThumbnail() {
+        guard galleryThumbnail == nil else { return }
+        thumbnailTask?.cancel()
+        thumbnailTask = Task { [libraryPreview] in
+            let thumbnail = await libraryPreview.latestPhotoThumbnail(maxPixel: 120)
+            guard !Task.isCancelled else { return }
+            galleryThumbnail = thumbnail
+        }
+    }
+
+    /// The picker itself failed to hand over any bytes.
+    public func reportImportFailure() {
+        alertError = .photoImportFailed
+    }
+
+    /// Same safe ordering as a capture: validate, write the file, persist the
+    /// id, then move on (FR-016). Undecodable data persists nothing.
+    public func usePickedPhoto(_ data: Data) {
+        importTask?.cancel()
+        importTask = Task {
+            let bytes = data
+            let isDecodable = await Task.detached(priority: .userInitiated) {
+                ImageDecoding.downsampledImage(from: bytes, maxPixel: 64) != nil
+            }.value
+            guard !Task.isCancelled else { return }
+            guard isDecodable else {
+                Log.report(AppError.photoImportFailed)
+                alertError = .photoImportFailed
+                return
+            }
+            // ponytail: HEIC keeps its bytes inside a `.jpg` file — every read
+            // goes through CGImageSource, which sniffs content, not names.
+            persistPhoto(data)
         }
     }
 

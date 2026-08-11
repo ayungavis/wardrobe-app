@@ -42,8 +42,17 @@ public final class AppContainer {
             challenge: challenge,
             camera: cameraService,
             store: activeChallengeStore,
-            photoStore: photoStore
+            photoStore: photoStore,
+            libraryPreview: Self.defaultLibraryPreview()
         )
+    }
+
+    private static func defaultLibraryPreview() -> PhotoLibraryPreviewing {
+        #if os(iOS)
+            PHPhotoLibraryPreview()
+        #else
+            NoopPhotoLibraryPreview()
+        #endif
     }
 
     public func makeEditorViewModel(challenge: ActiveChallenge) -> EditorViewModel {

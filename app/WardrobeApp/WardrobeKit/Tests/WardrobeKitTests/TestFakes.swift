@@ -18,6 +18,14 @@ final class InMemoryActiveChallengeStore: ActiveChallengeStore, @unchecked Senda
     }
 }
 
+final class FakeLibraryPreview: PhotoLibraryPreviewing, @unchecked Sendable {
+    var thumbnail: CGImage?
+
+    func latestPhotoThumbnail(maxPixel _: CGFloat) async -> CGImage? {
+        thumbnail
+    }
+}
+
 final class SpyPhotoStore: PhotoStore, @unchecked Sendable {
     var saved: [String: Data] = [:]
     var deleted: [String] = []
@@ -53,15 +61,21 @@ final class FakeCameraService: CameraService {
     private(set) var stopCount = 0
     private(set) var toggleCount = 0
     private(set) var isFlashOn = false
-    private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+    private(set) var isUsingFrontCamera = false
+    private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
     private(set) var focusPoints: [CGPoint] = []
+
+    /// Mirrors a typical iPhone: ultra-wide on the back, none on the front.
+    var zoomOptions: [CGFloat] {
+        isUsingFrontCamera ? [1, 2] : CameraZoom.presets
+    }
 
     func toggleFlash() {
         isFlashOn.toggle()
     }
 
-    func setZoom(_ factor: CGFloat) {
-        zoomFactor = CameraZoom.clamp(factor)
+    func setDisplayZoom(_ factor: CGFloat) {
+        displayZoomFactor = CameraZoom.clamp(factor, to: zoomOptions)
     }
 
     func focus(at point: CGPoint) {
@@ -92,6 +106,8 @@ final class FakeCameraService: CameraService {
             throw toggleError
         }
         toggleCount += 1
+        isUsingFrontCamera.toggle()
+        displayZoomFactor = CameraZoom.standard
     }
 
     func capturePhoto() async throws -> Data {

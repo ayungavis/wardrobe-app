@@ -39,6 +39,24 @@
         "id" : { "stringUnit" : { "state" : "translated", "value" : "Flash" } }
       }
     },
+    "capture.camera.gallery" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose from library" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Pilih dari galeri" } }
+      }
+    },
+    "capture.camera.zoomIn" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom in" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Perbesar" } }
+      }
+    },
+    "capture.camera.zoomOut" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom out" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Perkecil" } }
+      }
+    },
     "capture.camera.samplePlaceholder" : {
       "localizations" : {
         "en" : {
@@ -592,6 +610,12 @@
             "value" : "Gambar gagal disiapkan untuk dibagikan. Hasil editmu aman — coba lagi."
           }
         }
+      }
+    },
+    "error.photoImportFailed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "That photo couldn't be imported. Pick another one, or take a new photo." } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Foto itu tidak bisa diimpor. Pilih yang lain, atau ambil foto baru." } }
       }
     },
     "error.network" : {

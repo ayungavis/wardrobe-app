@@ -31,6 +31,8 @@
 	<string>The camera is used to photograph your outfit for the daily challenge. Photos stay on your device until you choose to share them.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Lets you save your edited outfit photo to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this.</string>
 	<key>SentryDSN</key>
 	<string>$(SENTRY_DSN)</string>
 	<key>SentryEnvironment</key>

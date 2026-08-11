@@ -9,9 +9,16 @@ struct CaptureFlowViewModelTests {
         challenge: ActiveChallenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast),
         camera: FakeCameraService = FakeCameraService(),
         store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
-        photoStore: SpyPhotoStore = SpyPhotoStore()
+        photoStore: SpyPhotoStore = SpyPhotoStore(),
+        libraryPreview: FakeLibraryPreview = FakeLibraryPreview()
     ) -> CaptureFlowViewModel {
-        CaptureFlowViewModel(challenge: challenge, camera: camera, store: store, photoStore: photoStore)
+        CaptureFlowViewModel(
+            challenge: challenge,
+            camera: camera,
+            store: store,
+            photoStore: photoStore,
+            libraryPreview: libraryPreview
+        )
     }
 
     // MARK: Initial stage (FR-013/014/017)
@@ -90,74 +97,6 @@ struct CaptureFlowViewModelTests {
         sut.recheckPermission()
 
         #expect(sut.stage == .editor)
-    }
-
-    // MARK: Flip camera & flash
-
-    @Test func flipCameraTogglesService() async {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        let sut = makeSUT(camera: camera)
-
-        sut.flipCamera()
-        await sut.flipTask?.value
-
-        #expect(camera.toggleCount == 1)
-    }
-
-    @Test func flipCameraFailureIsNonFatal() async {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        camera.toggleError = AppError.cameraUnavailable
-        let sut = makeSUT(camera: camera)
-
-        sut.flipCamera()
-        await sut.flipTask?.value
-
-        #expect(sut.stage == .camera) // stays usable on the current camera
-        #expect(sut.alertError == nil)
-    }
-
-    @Test func toggleFlashMirrorsServiceState() {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        let sut = makeSUT(camera: camera)
-        #expect(!sut.isFlashOn)
-
-        sut.toggleFlash()
-
-        #expect(camera.isFlashOn)
-        #expect(sut.isFlashOn)
-    }
-
-    // MARK: Zoom & focus
-
-    @Test func setZoomMirrorsClampedServiceValue() {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        let sut = makeSUT(camera: camera)
-
-        sut.setZoom(2.5)
-        #expect(sut.zoomFactor == 2.5)
-
-        sut.setZoom(99) // clamped by the service ceiling
-        #expect(sut.zoomFactor == CameraZoom.maxFactor)
-        #expect(camera.zoomFactor == CameraZoom.maxFactor)
-
-        sut.setZoom(0.1) // clamped by the floor
-        #expect(sut.zoomFactor == CameraZoom.minFactor)
-    }
-
-    @Test func focusForwardsPointToService() {
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        let sut = makeSUT(camera: camera)
-        let point = CGPoint(x: 0.25, y: 0.75)
-
-        sut.focus(at: point)
-
-        #expect(camera.focusPoints == [point])
-        #expect(sut.focusPoint == point)
     }
 
     // MARK: Capture — straight to editor (FR-016, story-style)

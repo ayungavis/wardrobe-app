@@ -7,6 +7,7 @@ public enum AppError: Error, Equatable, Sendable {
     case unexpected
     case cameraUnavailable
     case captureFailed
+    case photoImportFailed
     case exportFailed
     case photoSaveFailed
 
@@ -21,6 +22,8 @@ public enum AppError: Error, Equatable, Sendable {
             String(localized: "error.cameraUnavailable", bundle: .module)
         case .captureFailed:
             String(localized: "error.captureFailed", bundle: .module)
+        case .photoImportFailed:
+            String(localized: "error.photoImportFailed", bundle: .module)
         case .exportFailed:
             String(localized: "error.exportFailed", bundle: .module)
         case .photoSaveFailed:

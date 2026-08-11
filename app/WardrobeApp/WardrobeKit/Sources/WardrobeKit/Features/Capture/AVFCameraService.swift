@@ -11,7 +11,16 @@
         private var inFlightDelegate: PhotoCaptureDelegate?
         private var position: AVCaptureDevice.Position = .back
         private var currentInput: AVCaptureDeviceInput?
+        private var subjectAreaObserver: (any NSObjectProtocol)?
+        /// Device zoom that equals a displayed "1x". On virtual multi-camera
+        /// devices `videoZoomFactor == 1` is the ultra-wide lens, so the
+        /// standard lens sits at the first switch-over factor.
+        private var baseZoomFactor: CGFloat = 1
         public private(set) var isFlashOn = false
+
+        public var isUsingFrontCamera: Bool {
+            position == .front
+        }
 
         public init() {}
 
@@ -52,7 +61,7 @@
                 session.addInput(input)
                 session.addOutput(output)
                 session.commitConfiguration()
-                currentInput = input
+                adoptInput(input)
                 isConfigured = true
             }
 
@@ -77,19 +86,92 @@
             }
             session.addInput(newInput)
             session.commitConfiguration()
-            currentInput = newInput
             position = newPosition
-            zoomFactor = CameraZoom.minFactor // the new device starts unzoomed
+            adoptInput(newInput)
         }
 
+        /// Prefers the virtual multi-camera devices, because they are what
+        /// expose the ultra-wide lens behind a single continuous zoom scale.
         private static func makeInput(position: AVCaptureDevice.Position) -> AVCaptureDeviceInput? {
-            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) else {
+            let types: [AVCaptureDevice.DeviceType] = position == .back
+                ? [.builtInTripleCamera, .builtInDualWideCamera, .builtInWideAngleCamera]
+                : [.builtInWideAngleCamera]
+            guard let device = types.lazy
+                .compactMap({ AVCaptureDevice.default($0, for: .video, position: position) })
+                .first
+            else {
                 return nil
             }
             return try? AVCaptureDeviceInput(device: device)
         }
 
+        /// Adopts a freshly added input: reset zoom mapping, put the device in
+        /// the continuous-autofocus mode iPhone's own Camera uses, and watch
+        /// for subject changes so a tap-to-focus never stays locked forever.
+        private func adoptInput(_ input: AVCaptureDeviceInput) {
+            currentInput = input
+            let device = input.device
+            baseZoomFactor = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { CGFloat($0.doubleValue) } ?? 1
+
+            configure(device) { device in
+                device.videoZoomFactor = baseZoomFactor
+                device.isSubjectAreaChangeMonitoringEnabled = true
+                if device.isSmoothAutoFocusSupported {
+                    device.isSmoothAutoFocusEnabled = true
+                }
+                applyContinuousModes(to: device)
+            }
+            observeSubjectAreaChanges(of: device)
+        }
+
+        private func applyContinuousModes(to device: AVCaptureDevice) {
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+        }
+
+        private func observeSubjectAreaChanges(of device: AVCaptureDevice) {
+            removeSubjectAreaObserver()
+            // `queue: .main` means the block already runs on the main actor —
+            // no non-Sendable `Notification` crosses an isolation boundary.
+            subjectAreaObserver = NotificationCenter.default.addObserver(
+                forName: AVCaptureDevice.subjectAreaDidChangeNotification,
+                object: device,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.resetFocusToContinuous()
+                }
+            }
+        }
+
+        private func removeSubjectAreaObserver() {
+            guard let subjectAreaObserver else { return }
+            NotificationCenter.default.removeObserver(subjectAreaObserver)
+            self.subjectAreaObserver = nil
+        }
+
+        /// Back to "the camera decides", centred — what Camera.app does once
+        /// the framing changes after a manual tap.
+        private func resetFocusToContinuous() {
+            guard let device = currentInput?.device else { return }
+            configure(device) { device in
+                let center = CGPoint(x: 0.5, y: 0.5)
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = center
+                }
+                if device.isExposurePointOfInterestSupported {
+                    device.exposurePointOfInterest = center
+                }
+                applyContinuousModes(to: device)
+            }
+        }
+
         public func stopSession() {
+            removeSubjectAreaObserver()
             let session = session
             Task.detached { session.stopRunning() }
         }
@@ -98,13 +180,28 @@
             isFlashOn.toggle()
         }
 
-        public private(set) var zoomFactor: CGFloat = CameraZoom.minFactor
+        public var displayZoomFactor: CGFloat {
+            guard let device = currentInput?.device else { return CameraZoom.standard }
+            return device.videoZoomFactor / baseZoomFactor
+        }
 
-        public func setZoom(_ factor: CGFloat) {
+        /// Only the presets this device can actually reach — 0.5x needs an
+        /// ultra-wide lens, so it disappears on a plain wide-angle camera.
+        public var zoomOptions: [CGFloat] {
+            guard let device = currentInput?.device else { return [CameraZoom.standard] }
+            let lowest = device.minAvailableVideoZoomFactor / baseZoomFactor
+            let highest = device.maxAvailableVideoZoomFactor / baseZoomFactor
+            let supported = CameraZoom.presets.filter { $0 >= lowest && $0 <= highest }
+            return supported.isEmpty ? [CameraZoom.standard] : supported
+        }
+
+        public func setDisplayZoom(_ factor: CGFloat) {
             guard let device = currentInput?.device else { return }
-            let clamped = CameraZoom.clamp(factor, deviceMax: device.maxAvailableVideoZoomFactor)
-            configure(device) { $0.videoZoomFactor = clamped }
-            zoomFactor = clamped
+            let deviceFactor = min(
+                device.maxAvailableVideoZoomFactor,
+                max(device.minAvailableVideoZoomFactor, factor * baseZoomFactor)
+            )
+            configure(device) { $0.videoZoomFactor = deviceFactor }
         }
 
         // ponytail: no `captureDevicePointConverted` — close enough under
@@ -123,6 +220,9 @@
                     device.exposurePointOfInterest = point
                     device.exposureMode = .autoExpose
                 }
+                // Subject-area monitoring hands focus back to the camera once
+                // the framing changes — see `observeSubjectAreaChanges`.
+                device.isSubjectAreaChangeMonitoringEnabled = true
             }
         }
 
