@@ -33,7 +33,8 @@ public struct CaptureFlowView: View {
             case .editor:
                 EditorView(
                     viewModel: makeEditorViewModel(viewModel.challenge),
-                    onDiscard: { viewModel.discardPhoto() }
+                    onDiscard: { viewModel.discardPhoto() },
+                    onComplete: { viewModel.completeChallenge() }
                 )
             }
         }
@@ -42,6 +43,11 @@ public struct CaptureFlowView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 viewModel.recheckPermission()
+            }
+        }
+        .onChange(of: viewModel.isCompleted) { _, completed in
+            if completed {
+                dismiss() // back to Challenge, which now shows the daily state
             }
         }
         .alert(

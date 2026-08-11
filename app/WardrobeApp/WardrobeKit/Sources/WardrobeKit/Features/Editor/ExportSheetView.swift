@@ -32,20 +32,7 @@ struct ExportSheetView: View {
                         DownsampledPhotoView(data: photo.data)
                             .clipShape(.rect(cornerRadius: 12))
 
-                        if viewModel.didSaveToPhotos {
-                            Label {
-                                Text("editor.saved", bundle: .module)
-                            } icon: {
-                                Image(systemName: "checkmark.circle.fill")
-                            }
-                            .foregroundStyle(AppColor.accent)
-                            .frame(minHeight: 44)
-                        } else {
-                            PrimaryButton(Text("editor.saveToPhotos", bundle: .module)) {
-                                viewModel.saveToPhotos()
-                            }
-                        }
-
+                        // Saving lives on the editor's bottom bar — one path.
                         ShareLink(
                             item: photo,
                             preview: SharePreview(String(localized: "editor.export.title", bundle: .module))

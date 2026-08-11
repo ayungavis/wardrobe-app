@@ -10,10 +10,16 @@ public struct EditorView: View {
     @State private var isDiscardConfirmPresented = false
 
     private let onDiscard: () -> Void
+    private let onComplete: () -> Void
 
-    public init(viewModel: EditorViewModel, onDiscard: @escaping () -> Void) {
+    public init(
+        viewModel: EditorViewModel,
+        onDiscard: @escaping () -> Void,
+        onComplete: @escaping () -> Void
+    ) {
         _viewModel = State(wrappedValue: viewModel)
         self.onDiscard = onDiscard
+        self.onComplete = onComplete
     }
 
     public var body: some View {
@@ -102,7 +108,8 @@ public struct EditorView: View {
                     onSticker: { viewModel.isStickerPickerPresented = true },
                     onCrop: viewModel.beginCrop,
                     onSave: viewModel.saveDirectly,
-                    onSend: viewModel.beginExport
+                    onShare: viewModel.beginExport,
+                    onComplete: onComplete
                 )
             }
 

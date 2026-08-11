@@ -17,6 +17,22 @@
         }
       }
     },
+    "capture.camera.flash" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flash"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flash"
+          }
+        }
+      }
+    },
     "capture.camera.flip" : {
       "localizations" : {
         "en" : {
@@ -33,52 +49,20 @@
         }
       }
     },
-    "capture.camera.flash" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Flash" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Flash" } }
-      }
-    },
     "capture.camera.gallery" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose from library" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Pilih dari galeri" } }
-      }
-    },
-    "capture.gallery.denied.message" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow photo access in Settings to browse your library here. You can still pick a single photo without it." } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Izinkan akses foto di Settings untuk menelusuri galeri di sini. Kamu tetap bisa memilih satu foto tanpa itu." } }
-      }
-    },
-    "capture.gallery.denied.title" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Photo access needed" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Butuh akses foto" } }
-      }
-    },
-    "capture.gallery.title" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recents" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Terbaru" } }
-      }
-    },
-    "capture.gallery.useSystemPicker" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a photo instead" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Pilih satu foto saja" } }
-      }
-    },
-    "capture.camera.zoomIn" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom in" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Perbesar" } }
-      }
-    },
-    "capture.camera.zoomOut" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom out" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Perkecil" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose from library"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilih dari galeri"
+          }
+        }
       }
     },
     "capture.camera.samplePlaceholder" : {
@@ -93,6 +77,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kamera contoh (perangkat ini tanpa kamera)"
+          }
+        }
+      }
+    },
+    "capture.camera.zoomIn" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom in"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perbesar"
+          }
+        }
+      }
+    },
+    "capture.camera.zoomOut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom out"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perkecil"
           }
         }
       }
@@ -209,6 +225,70 @@
         }
       }
     },
+    "capture.gallery.denied.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow photo access in Settings to browse your library here. You can still pick a single photo without it."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Izinkan akses foto di Settings untuk menelusuri galeri di sini. Kamu tetap bisa memilih satu foto tanpa itu."
+          }
+        }
+      }
+    },
+    "capture.gallery.denied.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo access needed"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Butuh akses foto"
+          }
+        }
+      }
+    },
+    "capture.gallery.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recents"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terbaru"
+          }
+        }
+      }
+    },
+    "capture.gallery.useSystemPicker" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a photo instead"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilih satu foto saja"
+          }
+        }
+      }
+    },
     "challenge.abandon.confirm.action" : {
       "localizations" : {
         "en" : {
@@ -317,6 +397,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tantangan sedang berjalan"
+          }
+        }
+      }
+    },
+    "challenge.completedToday.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come back tomorrow for a new one. Your outfit is in History."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kembali besok untuk tantangan baru. Outfitmu ada di Riwayat."
+          }
+        }
+      }
+    },
+    "challenge.completedToday.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've completed today's challenge"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan hari ini sudah selesai"
           }
         }
       }
@@ -449,28 +561,84 @@
         }
       }
     },
+    "editor.complete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Complete challenge"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selesaikan tantangan"
+          }
+        }
+      }
+    },
     "editor.discard.action" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard Photo" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Buang Foto" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard Photo"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buang Foto"
+          }
+        }
       }
     },
     "editor.discard.keep" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keep Draft & Close" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Simpan Draf & Tutup" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Draft & Close"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simpan Draf & Tutup"
+          }
+        }
       }
     },
     "editor.discard.message" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discarding removes the photo and all edits. Your challenge stays active." } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Membuang akan menghapus foto dan semua edit. Tantanganmu tetap aktif." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discarding removes the photo and all edits. Your challenge stays active."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membuang akan menghapus foto dan semua edit. Tantanganmu tetap aktif."
+          }
+        }
       }
     },
     "editor.discard.title" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard photo?" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Buang foto?" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard photo?"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buang foto?"
+          }
+        }
       }
     },
     "editor.export.title" : {
@@ -485,6 +653,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bagikan outfitmu"
+          }
+        }
+      }
+    },
+    "editor.save" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simpan"
           }
         }
       }
@@ -505,13 +689,8 @@
         }
       }
     },
-    "editor.save" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Simpan" } }
-      }
-    },
     "editor.saveToPhotos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -523,6 +702,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Simpan ke Foto"
+          }
+        }
+      }
+    },
+    "editor.share" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bagikan"
+          }
+        }
+      }
+    },
+    "editor.text.alignment" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text alignment"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perataan teks"
+          }
+        }
+      }
+    },
+    "editor.text.background" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text background"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latar teks"
           }
         }
       }
@@ -543,16 +770,20 @@
         }
       }
     },
-    "editor.text.background" : {
+    "editor.text.size" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text background" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Latar teks" } }
-      }
-    },
-    "editor.tool.sticker" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stickers" } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Stiker" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text size"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ukuran teks"
+          }
+        }
       }
     },
     "editor.tool.crop" : {
@@ -567,6 +798,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Potong"
+          }
+        }
+      }
+    },
+    "editor.tool.sticker" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stickers"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stiker"
           }
         }
       }
@@ -636,12 +883,6 @@
         }
       }
     },
-    "error.photoImportFailed" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "That photo couldn't be imported. Pick another one, or take a new photo." } },
-        "id" : { "stringUnit" : { "state" : "translated", "value" : "Foto itu tidak bisa diimpor. Pilih yang lain, atau ambil foto baru." } }
-      }
-    },
     "error.network" : {
       "localizations" : {
         "en" : {
@@ -654,6 +895,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terjadi masalah jaringan. Periksa koneksimu lalu coba lagi."
+          }
+        }
+      }
+    },
+    "error.photoImportFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That photo couldn't be imported. Pick another one, or take a new photo."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto itu tidak bisa diimpor. Pilih yang lain, atau ambil foto baru."
           }
         }
       }

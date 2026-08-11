@@ -15,7 +15,9 @@ public struct ChallengeView: View {
 
         NavigationStack {
             Group {
-                if let active = viewModel.activeChallenge {
+                if viewModel.hasCompletedToday {
+                    CompletedTodayView()
+                } else if let active = viewModel.activeChallenge {
                     ActiveChallengeStateView(
                         challenge: active,
                         onResume: { viewModel.resume() },
@@ -127,6 +129,21 @@ struct ChallengeCardView: View {
         .frame(maxWidth: .infinity)
         .background(AppColor.surface, in: RoundedRectangle(cornerRadius: 16))
         .appShadow(.card)
+    }
+}
+
+/// PRD §17 "Completed today": the deck stays closed until the daily reset.
+struct CompletedTodayView: View {
+    var body: some View {
+        ContentUnavailableView {
+            Label {
+                Text("challenge.completedToday.title", bundle: .module)
+            } icon: {
+                Image(systemName: "checkmark.seal.fill")
+            }
+        } description: {
+            Text("challenge.completedToday.message", bundle: .module)
+        }
     }
 }
 

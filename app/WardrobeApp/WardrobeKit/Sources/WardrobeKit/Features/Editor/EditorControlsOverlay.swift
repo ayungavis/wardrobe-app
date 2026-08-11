@@ -1,7 +1,8 @@
 import DesignSystem
 import SwiftUI
 
-/// X top-left, tool rail top-right, Save pill + send arrow at the bottom.
+/// X top-left, tool rail top-right, Save + Share + the completing checkmark
+/// along the bottom.
 struct EditorControlsOverlay: View {
     let isSaving: Bool
     let didSave: Bool
@@ -10,7 +11,8 @@ struct EditorControlsOverlay: View {
     let onSticker: () -> Void
     let onCrop: () -> Void
     let onSave: () -> Void
-    let onSend: () -> Void
+    let onShare: () -> Void
+    let onComplete: () -> Void
 
     var body: some View {
         VStack {
@@ -25,10 +27,11 @@ struct EditorControlsOverlay: View {
 
             Spacer()
 
-            HStack {
+            HStack(spacing: Spacing.sm) {
                 savePill
+                sharePill
                 Spacer()
-                sendButton
+                completeButton
             }
         }
         .padding(Spacing.lg)
@@ -66,15 +69,31 @@ struct EditorControlsOverlay: View {
         .accessibilityLabel(Text("editor.save", bundle: .module))
     }
 
-    private var sendButton: some View {
-        Button(action: onSend) {
-            Image(systemName: "arrow.right")
-                .font(.system(size: 22, weight: .bold))
+    private var sharePill: some View {
+        Button(action: onShare) {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "square.and.arrow.up")
+                Text("editor.share", bundle: .module)
+            }
+            .font(AppFont.body.weight(.semibold))
+            .foregroundStyle(AppColor.onMedia)
+            .padding(.horizontal, Spacing.lg)
+            .frame(minHeight: 44)
+            .background(.ultraThinMaterial, in: Capsule())
+        }
+        .accessibilityLabel(Text("editor.share", bundle: .module))
+    }
+
+    /// FR-028: the checkmark is the only action that completes the challenge.
+    private var completeButton: some View {
+        Button(action: onComplete) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(AppColor.onMedia)
                 .frame(width: 56, height: 56)
                 .background(AppColor.accent, in: Circle())
         }
-        .accessibilityLabel(Text("editor.export.title", bundle: .module))
+        .accessibilityLabel(Text("editor.complete", bundle: .module))
     }
 }
 

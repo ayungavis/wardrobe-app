@@ -63,6 +63,73 @@ public enum TextColor: String, CaseIterable, Sendable {
     }
 }
 
+/// Story-style typefaces, all built from system font designs — no font files
+/// to license or ship.
+public enum TextFontStyle: String, CaseIterable, Sendable {
+    case classic, bold, rounded, serif, mono
+
+    public var design: Font.Design {
+        switch self {
+        case .classic, .bold: .default
+        case .rounded: .rounded
+        case .serif: .serif
+        case .mono: .monospaced
+        }
+    }
+
+    public var weight: Font.Weight {
+        self == .bold ? .black : .bold
+    }
+
+    /// Shown on the style chips.
+    public var sampleLabel: String {
+        switch self {
+        case .classic: "Aa"
+        case .bold: "Aa"
+        case .rounded: "Aa"
+        case .serif: "Aa"
+        case .mono: "Aa"
+        }
+    }
+}
+
+public enum TextAlignmentStyle: String, CaseIterable, Sendable {
+    case leading, center, trailing
+
+    public var textAlignment: TextAlignment {
+        switch self {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+
+    public var frameAlignment: Alignment {
+        switch self {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+
+    public var symbolName: String {
+        switch self {
+        case .leading: "text.alignleft"
+        case .center: "text.aligncenter"
+        case .trailing: "text.alignright"
+        }
+    }
+
+    /// Cycled by the toolbar button, the way story editors do it.
+    public var next: TextAlignmentStyle {
+        switch self {
+        case .leading: .center
+        case .center: .trailing
+        case .trailing: .leading
+        }
+    }
+}
+
 public struct TextItem: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public var content: String
@@ -72,9 +139,19 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
     public var rotationDegrees: Double
     public var colorName: String
     public var hasBackground: Bool
+    public var fontName: String
+    public var alignmentName: String
 
     public var textColor: TextColor {
         TextColor(rawValue: colorName) ?? .white
+    }
+
+    public var fontStyle: TextFontStyle {
+        TextFontStyle(rawValue: fontName) ?? .classic
+    }
+
+    public var alignmentStyle: TextAlignmentStyle {
+        TextAlignmentStyle(rawValue: alignmentName) ?? .center
     }
 
     public init(
@@ -84,7 +161,9 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
         scale: CGFloat = 1,
         rotationDegrees: Double = 0,
         colorName: String = TextColor.white.rawValue,
-        hasBackground: Bool = false
+        hasBackground: Bool = false,
+        fontName: String = TextFontStyle.classic.rawValue,
+        alignmentName: String = TextAlignmentStyle.center.rawValue
     ) {
         self.id = id
         self.content = content
@@ -93,6 +172,8 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
         self.rotationDegrees = rotationDegrees
         self.colorName = colorName
         self.hasBackground = hasBackground
+        self.fontName = fontName
+        self.alignmentName = alignmentName
     }
 
     public init(from decoder: Decoder) throws {
@@ -104,8 +185,10 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
         rotationDegrees = try container.decodeIfPresent(Double.self, forKey: .rotationDegrees) ?? 0
         colorName = try container.decodeIfPresent(String.self, forKey: .colorName) ?? TextColor.white.rawValue
         hasBackground = try container.decodeIfPresent(Bool.self, forKey: .hasBackground) ?? false
+        fontName = try container.decodeIfPresent(String.self, forKey: .fontName) ?? TextFontStyle.classic.rawValue
+        alignmentName = try container.decodeIfPresent(String.self, forKey: .alignmentName)
+            ?? TextAlignmentStyle.center.rawValue
     }
-    // ponytail: no custom fonts; add the field when the design asks.
 }
 
 /// Emoji sticker overlay (PRD FR-019 sticker set).

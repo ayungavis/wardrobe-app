@@ -9,7 +9,8 @@ struct TextItemLabel: View {
 
     var body: some View {
         Text(item.content)
-            .font(.system(size: fontSize, weight: .bold))
+            .font(.system(size: fontSize, weight: item.fontStyle.weight, design: item.fontStyle.design))
+            .multilineTextAlignment(item.alignmentStyle.textAlignment)
             .foregroundStyle(item.hasBackground ? item.textColor.contrastText : item.textColor.color)
             .padding(item.hasBackground ? EdgeInsets(
                 top: fontSize * 0.15, leading: fontSize * 0.35,

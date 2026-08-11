@@ -18,6 +18,7 @@ struct CameraControlTests {
             challenge: challenge,
             camera: camera,
             store: store,
+            completedStore: InMemoryCompletedChallengeStore(),
             photoStore: photoStore,
             library: library
         )

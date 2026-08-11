@@ -23,9 +23,15 @@ struct ChallengeViewModelTests {
     private func makeSUT(
         repository: ChallengeRepository = ControlledChallengeRepository(),
         store: ActiveChallengeStore = InMemoryActiveChallengeStore(),
+        completedStore: CompletedChallengeStore = InMemoryCompletedChallengeStore(),
         photoStore: PhotoStore = SpyPhotoStore()
     ) -> ChallengeViewModel {
-        ChallengeViewModel(repository: repository, store: store, photoStore: photoStore)
+        ChallengeViewModel(
+            repository: repository,
+            store: store,
+            completedStore: completedStore,
+            photoStore: photoStore
+        )
     }
 
     // MARK: Deck loading
@@ -100,6 +106,45 @@ struct ChallengeViewModelTests {
 
         #expect(store.stored == first)
         #expect(sut.isCaptureFlowPresented)
+    }
+
+    // MARK: Daily limit (FR-012)
+
+    @Test func onAppearFlagsTodaysCompletionAndBlocksAccept() {
+        let completedStore = InMemoryCompletedChallengeStore()
+        completedStore.stored = [makeCompletion(at: Date())]
+        let store = InMemoryActiveChallengeStore()
+        let sut = makeSUT(store: store, completedStore: completedStore)
+
+        sut.onAppear()
+        sut.accept(ChallengeCard(prompt: "x"))
+
+        #expect(sut.hasCompletedToday)
+        #expect(sut.activeChallenge == nil)
+        #expect(store.stored == nil)
+        #expect(!sut.isCaptureFlowPresented)
+    }
+
+    @Test func yesterdaysCompletionReopensTheDeck() {
+        let completedStore = InMemoryCompletedChallengeStore()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        completedStore.stored = [makeCompletion(at: yesterday)]
+        let sut = makeSUT(completedStore: completedStore)
+
+        sut.onAppear()
+        sut.accept(ChallengeCard(prompt: "x"))
+
+        #expect(!sut.hasCompletedToday)
+        #expect(sut.activeChallenge != nil)
+    }
+
+    private func makeCompletion(at date: Date) -> CompletedChallenge {
+        CompletedChallenge(
+            card: ChallengeCard(prompt: "done"),
+            photoID: UUID().uuidString,
+            draft: EditDraft(),
+            completedAt: date
+        )
     }
 
     @Test func acceptAnotherCardIsIgnoredWhileActive() {

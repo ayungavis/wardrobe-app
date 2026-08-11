@@ -33,8 +33,13 @@ public final class CaptureFlowViewModel {
     /// thumbnail arriving never invalidates the whole grid.
     public let library: PhotoLibraryBrowsing
 
+    /// Set once the checkmark commits — the flow's cover closes on it.
+    public private(set) var isCompleted = false
+    private var isCompleting = false
+
     private let camera: CameraService
     private let store: ActiveChallengeStore
+    private let completedStore: CompletedChallengeStore
     private let photoStore: PhotoStore
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
@@ -47,12 +52,14 @@ public final class CaptureFlowViewModel {
         challenge: ActiveChallenge,
         camera: CameraService,
         store: ActiveChallengeStore,
+        completedStore: CompletedChallengeStore,
         photoStore: PhotoStore,
         library: PhotoLibraryBrowsing
     ) {
         self.challenge = challenge
         self.camera = camera
         self.store = store
+        self.completedStore = completedStore
         self.photoStore = photoStore
         self.library = library
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
@@ -277,6 +284,26 @@ public final class CaptureFlowViewModel {
         // ponytail: HEIC keeps its bytes inside a `.jpg` file — every read
         // goes through CGImageSource, which sniffs content, not names.
         persistPhoto(data)
+    }
+
+    /// The checkmark — the only action that completes the challenge (FR-028).
+    /// Guarded twice over: an in-flight flag here, and a same-day check in the
+    /// store, so repeated taps can never write two records (FR-029).
+    public func completeChallenge() {
+        guard !isCompleting, !isCompleted, let photoID = challenge.photoID else { return }
+        isCompleting = true
+        defer { isCompleting = false }
+
+        completedStore.append(CompletedChallenge(
+            card: challenge.card,
+            photoID: photoID,
+            draft: challenge.draft,
+            completedAt: Date()
+        ))
+        store.clear() // the photo file stays — History will render it
+        isCompleted = true
+        let cardID = challenge.card.id.uuidString
+        Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
     }
 
     /// Editor X: throw the photo and its edits away, back to the camera.

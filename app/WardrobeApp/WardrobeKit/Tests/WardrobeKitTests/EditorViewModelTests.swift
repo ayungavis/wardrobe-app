@@ -294,7 +294,27 @@ struct EditorViewModelTests {
         #expect(draft.texts[0].colorName == TextColor.white.rawValue)
         #expect(draft.texts[0].hasBackground == false)
         #expect(draft.texts[0].rotationDegrees == 0)
+        #expect(draft.texts[0].fontStyle == .classic)
+        #expect(draft.texts[0].alignmentStyle == .center)
         #expect(draft.stickers.isEmpty)
+    }
+
+    @Test func textFontAndAlignmentCommitAndPersist() throws {
+        let store = InMemoryActiveChallengeStore()
+        let item = TextItem(content: "OOTD")
+        let sut = try makeSUT(store: store, draft: EditDraft(texts: [item]))
+
+        sut.beginEditingText(item)
+        var updated = item
+        updated.fontName = TextFontStyle.serif.rawValue
+        updated.alignmentName = TextAlignmentStyle.trailing.rawValue
+        sut.updateWorking(text: updated)
+        sut.commitTool()
+
+        #expect(sut.draft.texts[0].fontStyle == .serif)
+        #expect(sut.draft.texts[0].alignmentStyle == .trailing)
+        #expect(store.stored?.draft.texts[0].fontName == TextFontStyle.serif.rawValue)
+        #expect(store.stored?.draft.texts[0].alignmentName == TextAlignmentStyle.trailing.rawValue)
     }
 
     @Test func draftWithPreRotationStickerDecodesWithZeroRotation() throws {

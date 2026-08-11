@@ -6,17 +6,20 @@ import Foundation
 public final class AppContainer {
     private let challengeRepository: ChallengeRepository
     private let activeChallengeStore: ActiveChallengeStore
+    private let completedChallengeStore: CompletedChallengeStore
     private let photoStore: PhotoStore
     private let cameraService: CameraService
 
     public init(
         challengeRepository: ChallengeRepository = MockChallengeRepository(),
         activeChallengeStore: ActiveChallengeStore = UserDefaultsActiveChallengeStore(),
+        completedChallengeStore: CompletedChallengeStore = UserDefaultsCompletedChallengeStore(),
         photoStore: PhotoStore = FilePhotoStore(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
         self.activeChallengeStore = activeChallengeStore
+        self.completedChallengeStore = completedChallengeStore
         self.photoStore = photoStore
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
@@ -33,6 +36,7 @@ public final class AppContainer {
         ChallengeViewModel(
             repository: challengeRepository,
             store: activeChallengeStore,
+            completedStore: completedChallengeStore,
             photoStore: photoStore
         )
     }
@@ -42,6 +46,7 @@ public final class AppContainer {
             challenge: challenge,
             camera: cameraService,
             store: activeChallengeStore,
+            completedStore: completedChallengeStore,
             photoStore: photoStore,
             library: Self.defaultPhotoLibrary()
         )

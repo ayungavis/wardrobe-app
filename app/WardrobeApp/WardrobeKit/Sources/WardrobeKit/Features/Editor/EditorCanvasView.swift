@@ -113,26 +113,33 @@ struct EditorCanvasView: View {
     }
 }
 
-/// The photo itself. Takes a plain value rather than the view model so moving
-/// an overlay never invalidates (or re-decodes) the image layer.
+/// The story frame: a 9:16 window with the photo aspect-filled into it, the
+/// same framing the camera preview showed and the same one the export uses.
+///
+/// Takes a plain value rather than the view model so moving an overlay never
+/// invalidates (or re-decodes) the image layer.
 private struct CanvasPhotoLayer: View {
     let image: CGImage?
     @Binding var canvasSize: CGSize
 
     var body: some View {
-        if let image {
-            Image(decorative: image, scale: 1)
-                .resizable()
-                .scaledToFit()
-                .clipShape(.rect(cornerRadius: 12))
-                .onGeometryChange(for: CGSize.self) { proxy in
-                    proxy.size
-                } action: { newSize in
-                    canvasSize = newSize
+        Color.clear
+            .aspectRatio(StoryCanvas.aspectRatio, contentMode: .fit)
+            .overlay {
+                if let image {
+                    Image(decorative: image, scale: 1)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ProgressView()
+                        .tint(AppColor.onMedia)
                 }
-        } else {
-            ProgressView()
-                .tint(AppColor.onMedia)
-        }
+            }
+            .clipShape(.rect(cornerRadius: 12))
+            .onGeometryChange(for: CGSize.self) { proxy in
+                proxy.size
+            } action: { newSize in
+                canvasSize = newSize
+            }
     }
 }

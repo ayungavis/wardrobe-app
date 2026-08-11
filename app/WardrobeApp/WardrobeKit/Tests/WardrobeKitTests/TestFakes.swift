@@ -18,6 +18,19 @@ final class InMemoryActiveChallengeStore: ActiveChallengeStore, @unchecked Senda
     }
 }
 
+final class InMemoryCompletedChallengeStore: CompletedChallengeStore, @unchecked Sendable {
+    var stored: [CompletedChallenge] = []
+
+    func load() -> [CompletedChallenge] {
+        stored
+    }
+
+    func append(_ completion: CompletedChallenge) {
+        guard !hasCompletion(on: completion.completedAt) else { return }
+        stored.append(completion)
+    }
+}
+
 /// An actor, mirroring the real browser's isolation, so tests exercise the
 /// same async boundaries.
 actor FakePhotoLibrary: PhotoLibraryBrowsing {

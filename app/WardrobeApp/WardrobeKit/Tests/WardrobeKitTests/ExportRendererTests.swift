@@ -62,15 +62,21 @@ struct ExportRendererTests {
         }
     }
 
-    @Test func exportAppliesCropPixelSize() throws {
+    /// The editor canvas is 9:16, so every export is — crop or no crop,
+    /// overlays or none. What you see is what gets saved and shared.
+    @Test(arguments: [
+        EditDraft(),
+        EditDraft(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))),
+        EditDraft(texts: [TextItem(content: "OOTD")]),
+    ])
+    func exportAlwaysUsesStoryCanvasSize(draft: EditDraft) throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 100, height: 200)
-        let draft = EditDraft(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
 
         let exported = try ExportRenderer.render(original: original, draft: draft)
         let props = try properties(of: exported)
 
-        #expect(props[kCGImagePropertyPixelWidth] as? Int == 50)
-        #expect(props[kCGImagePropertyPixelHeight] as? Int == 100)
+        #expect(props[kCGImagePropertyPixelWidth] as? Int == Int(StoryCanvas.exportSize.width))
+        #expect(props[kCGImagePropertyPixelHeight] as? Int == Int(StoryCanvas.exportSize.height))
     }
 
     @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() throws {

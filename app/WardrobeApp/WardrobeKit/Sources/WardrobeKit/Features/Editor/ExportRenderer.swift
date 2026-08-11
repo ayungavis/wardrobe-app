@@ -26,9 +26,11 @@ public enum ExportRenderer {
     // raise when a print/quality requirement appears.
     static let maxOutputPixel: CGFloat = 4096
 
-    /// Decodes to pixels (drops all source metadata), applies the crop,
-    /// overlays text via the same layout math the editor preview uses, and
-    /// re-encodes through `CGImageDestination` writing zero source properties.
+    /// Decodes to pixels (drops all source metadata), applies the crop, then
+    /// composes the story frame — the very same 9:16 layout the editor canvas
+    /// shows — and re-encodes through `CGImageDestination` writing zero source
+    /// properties. Save and Share both come through here, so the file always
+    /// matches the preview.
     public static func render(original: Data, draft: EditDraft) throws -> Data {
         // Orientation-corrected, metadata-free decode.
         guard var image = ImageDecoding.downsampledImage(from: original, maxPixel: maxOutputPixel) else {
@@ -46,11 +48,7 @@ public enum ExportRenderer {
             image = cropped
         }
 
-        if draft.texts.isEmpty, draft.stickers.isEmpty {
-            return try encodeJPEG(image) // no compositing needed
-        }
-
-        let size = CGSize(width: image.width, height: image.height)
+        let size = StoryCanvas.exportSize
         let renderer = ImageRenderer(
             content: ExportCompositionView(image: image, texts: draft.texts, stickers: draft.stickers, size: size)
         )
@@ -92,8 +90,12 @@ struct ExportCompositionView: View {
 
     var body: some View {
         ZStack {
+            // Aspect-fill, matching `CanvasPhotoLayer`.
             Image(decorative: image, scale: 1)
                 .resizable()
+                .scaledToFill()
+                .frame(width: size.width, height: size.height)
+                .clipped()
 
             ForEach(stickers) { item in
                 StickerLabel(item: item, fontSize: TextRendering.stickerFontSize(for: item, in: size))

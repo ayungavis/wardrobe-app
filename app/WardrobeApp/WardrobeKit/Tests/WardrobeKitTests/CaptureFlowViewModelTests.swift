@@ -9,6 +9,7 @@ struct CaptureFlowViewModelTests {
         challenge: ActiveChallenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast),
         camera: FakeCameraService = FakeCameraService(),
         store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
+        completedStore: InMemoryCompletedChallengeStore = InMemoryCompletedChallengeStore(),
         photoStore: SpyPhotoStore = SpyPhotoStore(),
         library: FakePhotoLibrary = FakePhotoLibrary()
     ) -> CaptureFlowViewModel {
@@ -16,6 +17,7 @@ struct CaptureFlowViewModelTests {
             challenge: challenge,
             camera: camera,
             store: store,
+            completedStore: completedStore,
             photoStore: photoStore,
             library: library
         )
@@ -183,5 +185,52 @@ struct CaptureFlowViewModelTests {
         #expect(store.stored?.photoID == nil)
         #expect(store.stored?.draft.isEmpty == true)
         #expect(sut.stage == .camera)
+    }
+
+    // MARK: Completion (FR-012/029/030)
+
+    private func makeEditorStageSUT(
+        store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
+        completedStore: InMemoryCompletedChallengeStore = InMemoryCompletedChallengeStore()
+    ) -> CaptureFlowViewModel {
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = UUID().uuidString
+        store.stored = challenge
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        return makeSUT(challenge: challenge, camera: camera, store: store, completedStore: completedStore)
+    }
+
+    @Test func completeChallengeRecordsCompletionAndClearsActiveChallenge() {
+        let store = InMemoryActiveChallengeStore()
+        let completedStore = InMemoryCompletedChallengeStore()
+        let sut = makeEditorStageSUT(store: store, completedStore: completedStore)
+
+        sut.completeChallenge()
+
+        #expect(completedStore.stored.count == 1)
+        #expect(completedStore.stored[0].card.prompt == "x")
+        #expect(store.stored == nil)
+        #expect(sut.isCompleted)
+    }
+
+    @Test func completeChallengeIsIdempotent() {
+        let completedStore = InMemoryCompletedChallengeStore()
+        let sut = makeEditorStageSUT(completedStore: completedStore)
+
+        sut.completeChallenge()
+        sut.completeChallenge()
+
+        #expect(completedStore.stored.count == 1)
+    }
+
+    @Test func completeChallengeWithoutPhotoRecordsNothing() {
+        let completedStore = InMemoryCompletedChallengeStore()
+        let sut = makeSUT(completedStore: completedStore)
+
+        sut.completeChallenge()
+
+        #expect(completedStore.stored.isEmpty)
+        #expect(!sut.isCompleted)
     }
 }
