@@ -5,11 +5,15 @@ import Testing
 @MainActor
 struct DevMenuViewModelTests {
     private func makeSUT(
-        store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
-        completedStore: InMemoryCompletedChallengeStore = InMemoryCompletedChallengeStore(),
-        photoStore: SpyPhotoStore = SpyPhotoStore()
+        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
+        completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
+        photoRepository: SpyPhotoRepository = SpyPhotoRepository()
     ) -> DevMenuViewModel {
-        DevMenuViewModel(store: store, completedStore: completedStore, photoStore: photoStore)
+        DevMenuViewModel(
+            activeRepository: activeRepository,
+            completedRepository: completedRepository,
+            photoRepository: photoRepository
+        )
     }
 
     private func makeCompletion(at date: Date, photoID: String = UUID().uuidString) -> CompletedChallenge {
@@ -28,53 +32,57 @@ struct DevMenuViewModelTests {
     }
 
     @Test func resetTodayClearsCompletionActiveChallengeAndPhotos() {
-        let store = InMemoryActiveChallengeStore()
-        store.stored = makeActive(photoID: "active-photo")
-        let completedStore = InMemoryCompletedChallengeStore()
-        completedStore.stored = [makeCompletion(at: Date(), photoID: "done-photo")]
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(store: store, completedStore: completedStore, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        activeRepository.stored = makeActive(photoID: "active-photo")
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        completedRepository.stored = [makeCompletion(at: Date(), photoID: "done-photo")]
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(
+            activeRepository: activeRepository,
+            completedRepository: completedRepository,
+            photoRepository: photoRepository
+        )
 
         sut.resetToday()
 
-        #expect(completedStore.stored.isEmpty)
-        #expect(store.stored == nil)
-        #expect(photoStore.deleted.sorted() == ["active-photo", "done-photo"])
+        #expect(completedRepository.stored.isEmpty)
+        #expect(activeRepository.stored == nil)
+        #expect(photoRepository.deleted.sorted() == ["active-photo", "done-photo"])
         #expect(sut.summary == DevStateSummary())
         #expect(sut.lastAction != nil)
     }
 
     @Test func resetTodayKeepsEarlierCompletions() {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-        let completedStore = InMemoryCompletedChallengeStore()
-        completedStore.stored = [makeCompletion(at: yesterday, photoID: "old"), makeCompletion(at: Date())]
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(completedStore: completedStore, photoStore: photoStore)
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        completedRepository.stored = [makeCompletion(at: yesterday, photoID: "old"), makeCompletion(at: Date())]
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(completedRepository: completedRepository, photoRepository: photoRepository)
 
         sut.resetToday()
 
-        #expect(completedStore.stored.map(\.photoID) == ["old"])
-        #expect(!photoStore.deleted.contains("old"))
+        #expect(completedRepository.stored.map(\.photoID) == ["old"])
+        #expect(!photoRepository.deleted.contains("old"))
         #expect(sut.summary.completionCount == 1)
         #expect(!sut.summary.hasCompletedToday)
     }
 
     @Test func resetTodayIsSafeWhenNothingToReset() {
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(photoStore: photoStore)
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(photoRepository: photoRepository)
 
         sut.resetToday()
 
-        #expect(photoStore.deleted.isEmpty)
+        #expect(photoRepository.deleted.isEmpty)
         #expect(sut.summary == DevStateSummary())
     }
 
     @Test func summaryReflectsStoresAfterRefresh() {
-        let store = InMemoryActiveChallengeStore()
-        store.stored = makeActive(photoID: nil)
-        let completedStore = InMemoryCompletedChallengeStore()
-        completedStore.stored = [makeCompletion(at: Date())]
-        let sut = makeSUT(store: store, completedStore: completedStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        activeRepository.stored = makeActive(photoID: nil)
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        completedRepository.stored = [makeCompletion(at: Date())]
+        let sut = makeSUT(activeRepository: activeRepository, completedRepository: completedRepository)
 
         sut.refresh()
 

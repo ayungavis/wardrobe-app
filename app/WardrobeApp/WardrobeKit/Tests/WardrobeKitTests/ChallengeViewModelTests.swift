@@ -21,49 +21,49 @@ actor ControlledChallengeRepository: ChallengeRepository {
 @MainActor
 struct ChallengeViewModelTests {
     private func makeSUT(
-        repository: ChallengeRepository = ControlledChallengeRepository(),
-        store: ActiveChallengeStore = InMemoryActiveChallengeStore(),
-        completedStore: CompletedChallengeStore = InMemoryCompletedChallengeStore(),
-        photoStore: PhotoStore = SpyPhotoStore()
+        challengeRepository: ChallengeRepository = ControlledChallengeRepository(),
+        activeRepository: ActiveChallengeRepository = InMemoryActiveChallengeRepository(),
+        completedRepository: CompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
+        photoRepository: PhotoRepository = SpyPhotoRepository()
     ) -> ChallengeViewModel {
         ChallengeViewModel(
-            repository: repository,
-            store: store,
-            completedStore: completedStore,
-            photoStore: photoStore
+            challengeRepository: challengeRepository,
+            activeRepository: activeRepository,
+            completedRepository: completedRepository,
+            photoRepository: photoRepository
         )
     }
 
     // MARK: Deck loading
 
     @Test func loadSuccessSetsLoadedDeck() async {
-        let repository = ControlledChallengeRepository()
-        let sut = makeSUT(repository: repository)
+        let challengeRepository = ControlledChallengeRepository()
+        let sut = makeSUT(challengeRepository: challengeRepository)
         let cards = [ChallengeCard(prompt: "Wear something red.")]
 
         sut.load()
         #expect(sut.deck == .loading)
 
-        await repository.resolveNext(with: .success(cards))
+        await challengeRepository.resolveNext(with: .success(cards))
         await sut.loadTask?.value
 
         #expect(sut.deck == .loaded(cards))
     }
 
     @Test func loadFailureSetsTypedError() async {
-        let repository = ControlledChallengeRepository()
-        let sut = makeSUT(repository: repository)
+        let challengeRepository = ControlledChallengeRepository()
+        let sut = makeSUT(challengeRepository: challengeRepository)
 
         sut.load()
-        await repository.resolveNext(with: .failure(URLError(.notConnectedToInternet)))
+        await challengeRepository.resolveNext(with: .failure(URLError(.notConnectedToInternet)))
         await sut.loadTask?.value
 
         #expect(sut.deck == .failed(.network))
     }
 
     @Test func reloadCancelsStaleRequest() async {
-        let repository = ControlledChallengeRepository()
-        let sut = makeSUT(repository: repository)
+        let challengeRepository = ControlledChallengeRepository()
+        let sut = makeSUT(challengeRepository: challengeRepository)
         let stale = [ChallengeCard(prompt: "stale")]
         let latest = [ChallengeCard(prompt: "latest")]
 
@@ -71,8 +71,8 @@ struct ChallengeViewModelTests {
         let staleTask = sut.loadTask
         sut.load()
 
-        await repository.resolveNext(with: .success(stale))
-        await repository.resolveNext(with: .success(latest))
+        await challengeRepository.resolveNext(with: .success(stale))
+        await challengeRepository.resolveNext(with: .success(latest))
         await staleTask?.value
         await sut.loadTask?.value
 
@@ -82,54 +82,54 @@ struct ChallengeViewModelTests {
     // MARK: Accept (FR-011)
 
     @Test func acceptPersistsActiveChallengeAndPresentsFlow() {
-        let store = InMemoryActiveChallengeStore()
-        let sut = makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = makeSUT(activeRepository: activeRepository)
         let card = ChallengeCard(prompt: "x")
 
         sut.accept(card)
 
         #expect(sut.activeChallenge?.card == card)
-        #expect(store.stored?.card == card)
+        #expect(activeRepository.stored?.card == card)
         #expect(sut.isCaptureFlowPresented)
     }
 
     @Test func acceptSameCardIsIdempotent() {
-        let store = InMemoryActiveChallengeStore()
-        let sut = makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = makeSUT(activeRepository: activeRepository)
         let card = ChallengeCard(prompt: "x")
 
         sut.accept(card)
-        let first = store.stored
+        let first = activeRepository.stored
         sut.isCaptureFlowPresented = false
 
         sut.accept(card)
 
-        #expect(store.stored == first)
+        #expect(activeRepository.stored == first)
         #expect(sut.isCaptureFlowPresented)
     }
 
     // MARK: Daily limit (FR-012)
 
     @Test func onAppearFlagsTodaysCompletionAndBlocksAccept() {
-        let completedStore = InMemoryCompletedChallengeStore()
-        completedStore.stored = [makeCompletion(at: Date())]
-        let store = InMemoryActiveChallengeStore()
-        let sut = makeSUT(store: store, completedStore: completedStore)
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        completedRepository.stored = [makeCompletion(at: Date())]
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = makeSUT(activeRepository: activeRepository, completedRepository: completedRepository)
 
         sut.onAppear()
         sut.accept(ChallengeCard(prompt: "x"))
 
         #expect(sut.hasCompletedToday)
         #expect(sut.activeChallenge == nil)
-        #expect(store.stored == nil)
+        #expect(activeRepository.stored == nil)
         #expect(!sut.isCaptureFlowPresented)
     }
 
     @Test func yesterdaysCompletionReopensTheDeck() {
-        let completedStore = InMemoryCompletedChallengeStore()
+        let completedRepository = InMemoryCompletedChallengeRepository()
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-        completedStore.stored = [makeCompletion(at: yesterday)]
-        let sut = makeSUT(completedStore: completedStore)
+        completedRepository.stored = [makeCompletion(at: yesterday)]
+        let sut = makeSUT(completedRepository: completedRepository)
 
         sut.onAppear()
         sut.accept(ChallengeCard(prompt: "x"))
@@ -148,8 +148,8 @@ struct ChallengeViewModelTests {
     }
 
     @Test func acceptAnotherCardIsIgnoredWhileActive() {
-        let store = InMemoryActiveChallengeStore()
-        let sut = makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = makeSUT(activeRepository: activeRepository)
         let first = ChallengeCard(prompt: "first")
 
         sut.accept(first)
@@ -161,9 +161,9 @@ struct ChallengeViewModelTests {
     }
 
     @Test func onAppearLoadsPersistedActiveChallenge() {
-        let store = InMemoryActiveChallengeStore()
-        store.stored = ActiveChallenge(card: ChallengeCard(prompt: "persisted"), acceptedAt: .distantPast)
-        let sut = makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        activeRepository.stored = ActiveChallenge(card: ChallengeCard(prompt: "persisted"), acceptedAt: .distantPast)
+        let sut = makeSUT(activeRepository: activeRepository)
 
         sut.onAppear()
 
@@ -173,26 +173,26 @@ struct ChallengeViewModelTests {
     // MARK: Abandon (FR-017)
 
     @Test func abandonWithoutDraftClearsImmediately() {
-        let store = InMemoryActiveChallengeStore()
-        let sut = makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = makeSUT(activeRepository: activeRepository)
         sut.accept(ChallengeCard(prompt: "x"))
 
         sut.requestAbandon()
 
         #expect(!sut.isAbandonConfirmationPresented)
         #expect(sut.activeChallenge == nil)
-        #expect(store.stored == nil)
+        #expect(activeRepository.stored == nil)
     }
 
     @Test func abandonWithDraftRequiresConfirmationThenDeletesPhoto() throws {
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(store: store, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(activeRepository: activeRepository, photoRepository: photoRepository)
         sut.accept(ChallengeCard(prompt: "x"))
 
-        var active = try #require(store.stored)
+        var active = try #require(activeRepository.stored)
         active.photoID = "11111111-2222-3333-4444-555555555555"
-        store.stored = active
+        activeRepository.stored = active
         sut.refreshActiveChallenge()
 
         sut.requestAbandon()
@@ -200,8 +200,8 @@ struct ChallengeViewModelTests {
         #expect(sut.activeChallenge != nil)
 
         sut.abandon()
-        #expect(photoStore.deleted == ["11111111-2222-3333-4444-555555555555"])
+        #expect(photoRepository.deleted == ["11111111-2222-3333-4444-555555555555"])
         #expect(sut.activeChallenge == nil)
-        #expect(store.stored == nil)
+        #expect(activeRepository.stored == nil)
     }
 }

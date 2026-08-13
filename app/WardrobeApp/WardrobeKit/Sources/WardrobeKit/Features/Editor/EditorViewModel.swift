@@ -25,22 +25,22 @@ public final class EditorViewModel {
     public private(set) var isSaving = false
 
     private var challenge: ActiveChallenge
-    private let store: ActiveChallengeStore
-    private let photoStore: PhotoStore
-    private let librarySaver: PhotoLibrarySaving
+    private let activeRepository: ActiveChallengeRepository
+    private let photoRepository: PhotoRepository
+    private let librarySaver: PhotoLibrarySaveService
     private(set) var loadTask: Task<Void, Never>?
     private(set) var exportTask: Task<Void, Never>?
     private(set) var saveTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
-        store: ActiveChallengeStore,
-        photoStore: PhotoStore,
-        librarySaver: PhotoLibrarySaving
+        activeRepository: ActiveChallengeRepository,
+        photoRepository: PhotoRepository,
+        librarySaver: PhotoLibrarySaveService
     ) {
         self.challenge = challenge
-        self.store = store
-        self.photoStore = photoStore
+        self.activeRepository = activeRepository
+        self.photoRepository = photoRepository
         self.librarySaver = librarySaver
         draft = challenge.draft
     }
@@ -61,10 +61,10 @@ public final class EditorViewModel {
 
         loadTask = Task {
             do {
-                let photoStore = photoStore
+                let photoRepository = photoRepository
                 // Full decode + downsample stay off the main actor.
                 let (data, preview) = try await Task.detached(priority: .userInitiated) {
-                    let data = try photoStore.loadOriginal(id: photoID)
+                    let data = try photoRepository.loadOriginal(id: photoID)
                     let preview = ImageDecoding.downsampledImage(from: data, maxPixel: 1600)
                     return (data, preview)
                 }.value
@@ -159,7 +159,7 @@ public final class EditorViewModel {
 
     private func persistDraft() {
         challenge.draft = draft
-        store.save(challenge)
+        activeRepository.save(challenge)
     }
 
     // MARK: Direct manipulation on committed overlays (story-style drag/pinch)
@@ -230,7 +230,7 @@ public final class EditorViewModel {
         exportTask = Task {
             do {
                 let start = ContinuousClock.now
-                let photo = try ExportRenderer.render(original: data, draft: draft)
+                let photo = try ExportService.render(original: data, draft: draft)
                 try Task.checkCancellation()
                 Log.ui.info("Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms")
                 exportState = .loaded(ExportedPhoto(data: photo))
@@ -265,7 +265,7 @@ public final class EditorViewModel {
         saveTask = Task {
             defer { isSaving = false }
             do {
-                let photo = try ExportRenderer.render(original: data, draft: draft)
+                let photo = try ExportService.render(original: data, draft: draft)
                 try Task.checkCancellation()
                 try await librarySaver.save(photo)
                 didSaveToPhotos = true

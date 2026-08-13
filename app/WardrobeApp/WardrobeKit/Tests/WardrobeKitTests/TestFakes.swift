@@ -2,7 +2,7 @@
 import Foundation
 @testable import WardrobeKit
 
-final class InMemoryActiveChallengeStore: ActiveChallengeStore, @unchecked Sendable {
+final class InMemoryActiveChallengeRepository: ActiveChallengeRepository, @unchecked Sendable {
     var stored: ActiveChallenge?
 
     func load() -> ActiveChallenge? {
@@ -18,7 +18,7 @@ final class InMemoryActiveChallengeStore: ActiveChallengeStore, @unchecked Senda
     }
 }
 
-final class InMemoryCompletedChallengeStore: CompletedChallengeStore, @unchecked Sendable {
+final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, @unchecked Sendable {
     var stored: [CompletedChallenge] = []
 
     func load() -> [CompletedChallenge] {
@@ -37,7 +37,7 @@ final class InMemoryCompletedChallengeStore: CompletedChallengeStore, @unchecked
 
 /// An actor, mirroring the real browser's isolation, so tests exercise the
 /// same async boundaries.
-actor FakePhotoLibrary: PhotoLibraryBrowsing {
+actor FakePhotoLibrary: PhotoLibraryService {
     private var currentAccess: PhotoLibraryAccess
     private var accessAfterRequest: PhotoLibraryAccess
     private var assets: [PhotoAsset]
@@ -82,7 +82,7 @@ actor FakePhotoLibrary: PhotoLibraryBrowsing {
     }
 }
 
-final class SpyPhotoStore: PhotoStore, @unchecked Sendable {
+final class SpyPhotoRepository: PhotoRepository, @unchecked Sendable {
     var saved: [String: Data] = [:]
     var deleted: [String] = []
     var saveError: Error?

@@ -8,17 +8,17 @@ struct CaptureFlowViewModelTests {
     private func makeSUT(
         challenge: ActiveChallenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast),
         camera: FakeCameraService = FakeCameraService(),
-        store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
-        completedStore: InMemoryCompletedChallengeStore = InMemoryCompletedChallengeStore(),
-        photoStore: SpyPhotoStore = SpyPhotoStore(),
+        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
+        completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
+        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
         library: FakePhotoLibrary = FakePhotoLibrary()
     ) -> CaptureFlowViewModel {
         CaptureFlowViewModel(
             challenge: challenge,
             camera: camera,
-            store: store,
-            completedStore: completedStore,
-            photoStore: photoStore,
+            activeRepository: activeRepository,
+            completedRepository: completedRepository,
+            photoRepository: photoRepository,
             library: library
         )
     }
@@ -108,17 +108,17 @@ struct CaptureFlowViewModelTests {
         camera.permission = .granted
         let photo = Data([0xAB, 0xCD])
         camera.captureResult = .success(photo)
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
 
         sut.capture()
         await sut.captureTask?.value
 
-        let savedID = photoStore.saved.keys.first
+        let savedID = photoRepository.saved.keys.first
         #expect(savedID != nil)
-        #expect(photoStore.saved.values.first == photo)
-        #expect(store.stored?.photoID == savedID)
+        #expect(photoRepository.saved.values.first == photo)
+        #expect(activeRepository.stored?.photoID == savedID)
         #expect(sut.stage == .editor)
         #expect(!sut.isCapturing)
     }
@@ -139,15 +139,15 @@ struct CaptureFlowViewModelTests {
     @Test func capturePhotoWriteFailurePersistsNothing() async {
         let camera = FakeCameraService()
         camera.permission = .granted
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        photoStore.saveError = AppError.unexpected
-        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        photoRepository.saveError = AppError.unexpected
+        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
 
         sut.capture()
         await sut.captureTask?.value
 
-        #expect(store.stored == nil)
+        #expect(activeRepository.stored == nil)
         #expect(sut.stage == .camera)
         #expect(sut.alertError == .captureFailed)
     }
@@ -173,64 +173,74 @@ struct CaptureFlowViewModelTests {
         let photoID = UUID().uuidString
         challenge.photoID = photoID
         challenge.draft = EditDraft(texts: [TextItem(content: "hi")])
-        let store = InMemoryActiveChallengeStore()
-        store.stored = challenge
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(challenge: challenge, camera: camera, store: store, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        activeRepository.stored = challenge
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(
+            challenge: challenge,
+            camera: camera,
+            activeRepository: activeRepository,
+            photoRepository: photoRepository
+        )
         #expect(sut.stage == .editor)
 
         sut.discardPhoto()
 
-        #expect(photoStore.deleted == [photoID])
-        #expect(store.stored?.photoID == nil)
-        #expect(store.stored?.draft.isEmpty == true)
+        #expect(photoRepository.deleted == [photoID])
+        #expect(activeRepository.stored?.photoID == nil)
+        #expect(activeRepository.stored?.draft.isEmpty == true)
         #expect(sut.stage == .camera)
     }
 
     // MARK: Completion (FR-012/029/030)
 
     private func makeEditorStageSUT(
-        store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
-        completedStore: InMemoryCompletedChallengeStore = InMemoryCompletedChallengeStore()
+        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
+        completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository()
     ) -> CaptureFlowViewModel {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
-        store.stored = challenge
+        activeRepository.stored = challenge
         let camera = FakeCameraService()
         camera.permission = .granted
-        return makeSUT(challenge: challenge, camera: camera, store: store, completedStore: completedStore)
+        return makeSUT(
+            challenge: challenge,
+            camera: camera,
+            activeRepository: activeRepository,
+            completedRepository: completedRepository
+        )
     }
 
     @Test func completeChallengeRecordsCompletionAndClearsActiveChallenge() {
-        let store = InMemoryActiveChallengeStore()
-        let completedStore = InMemoryCompletedChallengeStore()
-        let sut = makeEditorStageSUT(store: store, completedStore: completedStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        let sut = makeEditorStageSUT(activeRepository: activeRepository, completedRepository: completedRepository)
 
         sut.completeChallenge()
 
-        #expect(completedStore.stored.count == 1)
-        #expect(completedStore.stored[0].card.prompt == "x")
-        #expect(store.stored == nil)
+        #expect(completedRepository.stored.count == 1)
+        #expect(completedRepository.stored[0].card.prompt == "x")
+        #expect(activeRepository.stored == nil)
         #expect(sut.isCompleted)
     }
 
     @Test func completeChallengeIsIdempotent() {
-        let completedStore = InMemoryCompletedChallengeStore()
-        let sut = makeEditorStageSUT(completedStore: completedStore)
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        let sut = makeEditorStageSUT(completedRepository: completedRepository)
 
         sut.completeChallenge()
         sut.completeChallenge()
 
-        #expect(completedStore.stored.count == 1)
+        #expect(completedRepository.stored.count == 1)
     }
 
     @Test func completeChallengeWithoutPhotoRecordsNothing() {
-        let completedStore = InMemoryCompletedChallengeStore()
-        let sut = makeSUT(completedStore: completedStore)
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        let sut = makeSUT(completedRepository: completedRepository)
 
         sut.completeChallenge()
 
-        #expect(completedStore.stored.isEmpty)
+        #expect(completedRepository.stored.isEmpty)
         #expect(!sut.isCompleted)
     }
 }

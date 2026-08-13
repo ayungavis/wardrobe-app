@@ -1,34 +1,6 @@
 import Foundation
 import Observation
 
-public struct ChallengeCard: Identifiable, Equatable, Sendable, Codable {
-    public let id: UUID
-    public let prompt: String
-
-    public init(id: UUID = UUID(), prompt: String) {
-        self.id = id
-        self.prompt = prompt
-    }
-}
-
-public protocol ChallengeRepository: Sendable {
-    func fetchDailyDeck() async throws -> [ChallengeCard]
-}
-
-// ponytail: mock deck until the backend exists; replace with the API-backed
-// repository once services/ ships its first endpoint.
-public struct MockChallengeRepository: ChallengeRepository {
-    public init() {}
-
-    public func fetchDailyDeck() async throws -> [ChallengeCard] {
-        [
-            ChallengeCard(prompt: "Today is a good day to wear something red."),
-            ChallengeCard(prompt: "Style your most comfortable shoes for going out."),
-            ChallengeCard(prompt: "Layer two pieces you have never worn together."),
-        ]
-    }
-}
-
 @MainActor
 @Observable
 public final class ChallengeViewModel {
@@ -39,27 +11,27 @@ public final class ChallengeViewModel {
     public var isCaptureFlowPresented = false
     public var isAbandonConfirmationPresented = false
 
-    private let repository: ChallengeRepository
-    private let store: ActiveChallengeStore
-    private let completedStore: CompletedChallengeStore
-    private let photoStore: PhotoStore
+    private let challengeRepository: ChallengeRepository
+    private let activeRepository: ActiveChallengeRepository
+    private let completedRepository: CompletedChallengeRepository
+    private let photoRepository: PhotoRepository
     private(set) var loadTask: Task<Void, Never>?
 
     public init(
-        repository: ChallengeRepository,
-        store: ActiveChallengeStore,
-        completedStore: CompletedChallengeStore,
-        photoStore: PhotoStore
+        challengeRepository: ChallengeRepository,
+        activeRepository: ActiveChallengeRepository,
+        completedRepository: CompletedChallengeRepository,
+        photoRepository: PhotoRepository
     ) {
-        self.repository = repository
-        self.store = store
-        self.completedStore = completedStore
-        self.photoStore = photoStore
+        self.challengeRepository = challengeRepository
+        self.activeRepository = activeRepository
+        self.completedRepository = completedRepository
+        self.photoRepository = photoRepository
     }
 
     public func onAppear() {
-        activeChallenge = store.load()
-        hasCompletedToday = completedStore.hasCompletion(on: Date())
+        activeChallenge = activeRepository.load()
+        hasCompletedToday = completedRepository.hasCompletion(on: Date())
         #if DEBUG
             // UI-verification seam: `-autoResume` opens the capture flow without a tap.
             if ProcessInfo.processInfo.arguments.contains("-autoResume"), activeChallenge != nil {
@@ -76,7 +48,7 @@ public final class ChallengeViewModel {
 
         loadTask = Task {
             do {
-                let cards = try await repository.fetchDailyDeck()
+                let cards = try await challengeRepository.fetchDailyDeck()
                 try Task.checkCancellation()
                 deck = .loaded(cards)
             } catch is CancellationError {
@@ -101,7 +73,7 @@ public final class ChallengeViewModel {
         }
 
         let challenge = ActiveChallenge(card: card, acceptedAt: Date())
-        store.save(challenge)
+        activeRepository.save(challenge)
         activeChallenge = challenge
         isCaptureFlowPresented = true
         Log.ui.info("Challenge accepted: \(card.id.uuidString, privacy: .public)")
@@ -124,12 +96,12 @@ public final class ChallengeViewModel {
     public func abandon() {
         if let photoID = activeChallenge?.photoID {
             do {
-                try photoStore.deleteOriginal(id: photoID)
+                try photoRepository.deleteOriginal(id: photoID)
             } catch {
                 Log.report(error) // orphaned file is not worth blocking the abandon
             }
         }
-        store.clear()
+        activeRepository.clear()
         activeChallenge = nil
         Log.ui.info("Challenge abandoned")
     }
@@ -137,7 +109,7 @@ public final class ChallengeViewModel {
     /// The capture flow mutates both stores (photo, draft, completion) —
     /// re-read them when its cover closes.
     public func refreshActiveChallenge() {
-        activeChallenge = store.load()
-        hasCompletedToday = completedStore.hasCompletion(on: Date())
+        activeChallenge = activeRepository.load()
+        hasCompletedToday = completedRepository.hasCompletion(on: Date())
     }
 }

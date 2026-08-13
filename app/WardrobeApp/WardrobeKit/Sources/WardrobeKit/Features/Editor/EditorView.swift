@@ -35,7 +35,7 @@ public struct EditorView: View {
             ExportSheetView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.isStickerPickerPresented) {
-            StickerPickerSheet { viewModel.addSticker($0) }
+            StickerPickerView { viewModel.addSticker($0) }
         }
         .confirmationDialog(
             Text("editor.discard.title", bundle: .module),
@@ -100,7 +100,7 @@ public struct EditorView: View {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
 
             if viewModel.activeTool == nil {
-                EditorControlsOverlay(
+                EditorControlsView(
                     isSaving: viewModel.isSaving,
                     didSave: viewModel.didSaveToPhotos,
                     onClose: { isDiscardConfirmPresented = true },
@@ -114,7 +114,7 @@ public struct EditorView: View {
             }
 
             if case let .text(working, isNew) = viewModel.activeTool {
-                TextComposerOverlay(
+                TextComposerView(
                     working: working,
                     isExisting: !isNew,
                     onUpdate: { viewModel.updateWorking(text: $0) },
