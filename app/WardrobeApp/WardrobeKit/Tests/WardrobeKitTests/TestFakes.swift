@@ -29,6 +29,10 @@ final class InMemoryCompletedChallengeStore: CompletedChallengeStore, @unchecked
         guard !hasCompletion(on: completion.completedAt) else { return }
         stored.append(completion)
     }
+
+    func removeCompletions(on date: Date) {
+        stored.removeAll { Calendar.current.isDate($0.completedAt, inSameDayAs: date) }
+    }
 }
 
 /// An actor, mirroring the real browser's isolation, so tests exercise the

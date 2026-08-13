@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
+    @State private var isDevMenuPresented = DevMode.opensOnLaunch
     private let container: AppContainer
 
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
@@ -30,6 +31,24 @@ public struct ChallengeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.background)
             .navigationTitle(Text("tab.challenge", bundle: .module))
+            // Long-press anywhere on this screen opens the dev menu. `including:`
+            // reads a process constant, so view identity never changes.
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 1).onEnded { _ in
+                    isDevMenuPresented = true
+                },
+                including: DevMode.isEnabled ? .all : .none
+            )
+            .sheet(
+                isPresented: $isDevMenuPresented,
+                onDismiss: { viewModel.refreshActiveChallenge() },
+                content: {
+                    DevMenuView(
+                        viewModel: container.makeDevMenuViewModel(),
+                        onStateChanged: { viewModel.refreshActiveChallenge() }
+                    )
+                }
+            )
         }
         .task { viewModel.onAppear() }
         .confirmationDialog(

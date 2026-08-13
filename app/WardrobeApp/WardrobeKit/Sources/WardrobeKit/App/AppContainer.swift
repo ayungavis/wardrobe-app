@@ -69,6 +69,14 @@ public final class AppContainer {
         )
     }
 
+    public func makeDevMenuViewModel() -> DevMenuViewModel {
+        DevMenuViewModel(
+            store: activeChallengeStore,
+            completedStore: completedChallengeStore,
+            photoStore: photoStore
+        )
+    }
+
     private static func defaultLibrarySaver() -> PhotoLibrarySaving {
         #if os(iOS)
             PHPhotoLibrarySaver()

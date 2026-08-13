@@ -32,6 +32,9 @@ public protocol CompletedChallengeStore: Sendable {
     /// Ignores a completion for a day that already has one — FR-029 requires
     /// completing to be idempotent, so a repeated tap can never double up.
     func append(_ completion: CompletedChallenge)
+    /// Drops every completion recorded on `date`. Used by the dev menu today;
+    /// the same call is what an "undo completion" feature would need.
+    func removeCompletions(on date: Date)
 }
 
 public extension CompletedChallengeStore {
@@ -67,6 +70,15 @@ public final class UserDefaultsCompletedChallengeStore: CompletedChallengeStore,
             return // already completed that day
         }
         completions.append(completion)
+        save(completions)
+    }
+
+    public func removeCompletions(on date: Date) {
+        let kept = load().filter { !calendar.isDate($0.completedAt, inSameDayAs: date) }
+        save(kept)
+    }
+
+    private func save(_ completions: [CompletedChallenge]) {
         guard let data = try? JSONEncoder().encode(completions) else {
             Log.report(AppError.unexpected)
             return
