@@ -10,16 +10,16 @@ struct CameraControlTests {
     private func makeSUT(
         challenge: ActiveChallenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast),
         camera: FakeCameraService = FakeCameraService(),
-        store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
-        photoStore: SpyPhotoStore = SpyPhotoStore(),
+        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
+        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
         library: FakePhotoLibrary = FakePhotoLibrary()
     ) -> CaptureFlowViewModel {
         CaptureFlowViewModel(
             challenge: challenge,
             camera: camera,
-            store: store,
-            completedStore: InMemoryCompletedChallengeStore(),
-            photoStore: photoStore,
+            activeRepository: activeRepository,
+            completedRepository: InMemoryCompletedChallengeRepository(),
+            photoRepository: photoRepository,
             library: library
         )
     }
@@ -127,32 +127,32 @@ struct CameraControlTests {
     @Test func usePickedPhotoPersistsThenOpensEditor() async throws {
         let camera = FakeCameraService()
         camera.permission = .granted
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
         let picked = try SampleCameraService.makeSampleJPEG(width: 60, height: 60)
 
         sut.usePickedPhoto(picked)
         await sut.importTask?.value
 
-        let savedID = photoStore.saved.keys.first
-        #expect(photoStore.saved.values.first == picked)
-        #expect(store.stored?.photoID == savedID)
+        let savedID = photoRepository.saved.keys.first
+        #expect(photoRepository.saved.values.first == picked)
+        #expect(activeRepository.stored?.photoID == savedID)
         #expect(sut.stage == .editor)
     }
 
     @Test func usePickedPhotoRejectsUndecodableDataAndPersistsNothing() async {
         let camera = FakeCameraService()
         camera.permission = .granted
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
 
         sut.usePickedPhoto(Data("not an image".utf8))
         await sut.importTask?.value
 
-        #expect(photoStore.saved.isEmpty)
-        #expect(store.stored == nil)
+        #expect(photoRepository.saved.isEmpty)
+        #expect(activeRepository.stored == nil)
         #expect(sut.stage == .camera)
         #expect(sut.alertError == .photoImportFailed)
     }
@@ -219,16 +219,16 @@ struct CameraControlTests {
         camera.permission = .granted
         let picked = try SampleCameraService.makeSampleJPEG(width: 60, height: 60)
         let library = FakePhotoLibrary(access: .authorized, assets: [PhotoAsset(id: "a")], data: picked)
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore, library: library)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository, library: library)
         sut.isGalleryPresented = true
 
         sut.importAsset(id: "a")
         await sut.importTask?.value
 
-        #expect(photoStore.saved.values.first == picked)
-        #expect(store.stored?.photoID == photoStore.saved.keys.first)
+        #expect(photoRepository.saved.values.first == picked)
+        #expect(activeRepository.stored?.photoID == photoRepository.saved.keys.first)
         #expect(sut.stage == .editor)
         #expect(!sut.isGalleryPresented)
     }
@@ -237,15 +237,15 @@ struct CameraControlTests {
         let camera = FakeCameraService()
         camera.permission = .granted
         let library = FakePhotoLibrary(access: .authorized, assets: [PhotoAsset(id: "a")]) // no data
-        let store = InMemoryActiveChallengeStore()
-        let photoStore = SpyPhotoStore()
-        let sut = makeSUT(camera: camera, store: store, photoStore: photoStore, library: library)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository, library: library)
 
         sut.importAsset(id: "a")
         await sut.importTask?.value
 
-        #expect(photoStore.saved.isEmpty)
-        #expect(store.stored == nil)
+        #expect(photoRepository.saved.isEmpty)
+        #expect(activeRepository.stored == nil)
         #expect(sut.stage == .camera)
         #expect(sut.alertError == .photoImportFailed)
     }

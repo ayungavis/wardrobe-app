@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
+    @State private var isDevMenuPresented = DevMode.opensOnLaunch
     private let container: AppContainer
 
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
@@ -30,6 +31,24 @@ public struct ChallengeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.background)
             .navigationTitle(Text("tab.challenge", bundle: .module))
+            // Long-press anywhere on this screen opens the dev menu. `including:`
+            // reads a process constant, so view identity never changes.
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 1).onEnded { _ in
+                    isDevMenuPresented = true
+                },
+                including: DevMode.isEnabled ? .all : .none
+            )
+            .sheet(
+                isPresented: $isDevMenuPresented,
+                onDismiss: { viewModel.refreshActiveChallenge() },
+                content: {
+                    DevMenuView(
+                        viewModel: container.makeDevMenuViewModel(),
+                        onStateChanged: { viewModel.refreshActiveChallenge() }
+                    )
+                }
+            )
         }
         .task { viewModel.onAppear() }
         .confirmationDialog(
@@ -110,77 +129,4 @@ public struct ChallengeView: View {
         .tabViewStyle(.page)
         #endif
     }
-}
-
-struct ChallengeCardView: View {
-    let card: ChallengeCard
-    let onAccept: () -> Void
-
-    var body: some View {
-        VStack(spacing: Spacing.xl) {
-            Text(card.prompt)
-                .font(AppFont.title)
-                .foregroundStyle(AppColor.textPrimary)
-                .multilineTextAlignment(.center)
-
-            PrimaryButton(Text("challenge.accept", bundle: .module), action: onAccept)
-        }
-        .padding(Spacing.xl)
-        .frame(maxWidth: .infinity)
-        .background(AppColor.surface, in: RoundedRectangle(cornerRadius: 16))
-        .appShadow(.card)
-    }
-}
-
-/// PRD §17 "Completed today": the deck stays closed until the daily reset.
-struct CompletedTodayView: View {
-    var body: some View {
-        ContentUnavailableView {
-            Label {
-                Text("challenge.completedToday.title", bundle: .module)
-            } icon: {
-                Image(systemName: "checkmark.seal.fill")
-            }
-        } description: {
-            Text("challenge.completedToday.message", bundle: .module)
-        }
-    }
-}
-
-/// PRD §17 "Challenge active": accepted prompt + resume/abandon.
-struct ActiveChallengeStateView: View {
-    let challenge: ActiveChallenge
-    let onResume: () -> Void
-    let onAbandon: () -> Void
-
-    var body: some View {
-        VStack(spacing: Spacing.xl) {
-            Spacer()
-
-            Text("challenge.active.title", bundle: .module)
-                .font(AppFont.caption)
-                .foregroundStyle(AppColor.textSecondary)
-                .textCase(.uppercase)
-
-            Text(challenge.card.prompt)
-                .font(AppFont.title)
-                .foregroundStyle(AppColor.textPrimary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
-
-            PrimaryButton(Text("challenge.active.resume", bundle: .module), action: onResume)
-
-            Button(role: .destructive, action: onAbandon) {
-                Text("challenge.active.abandon", bundle: .module)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-        }
-        .padding(Spacing.xl)
-    }
-}
-
-#Preview {
-    let container = AppContainer()
-    ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
 }

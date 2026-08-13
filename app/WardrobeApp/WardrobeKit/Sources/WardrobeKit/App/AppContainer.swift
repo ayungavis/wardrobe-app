@@ -5,22 +5,22 @@ import Foundation
 @MainActor
 public final class AppContainer {
     private let challengeRepository: ChallengeRepository
-    private let activeChallengeStore: ActiveChallengeStore
-    private let completedChallengeStore: CompletedChallengeStore
-    private let photoStore: PhotoStore
+    private let activeChallengeRepository: ActiveChallengeRepository
+    private let completedChallengeRepository: CompletedChallengeRepository
+    private let photoRepository: PhotoRepository
     private let cameraService: CameraService
 
     public init(
         challengeRepository: ChallengeRepository = MockChallengeRepository(),
-        activeChallengeStore: ActiveChallengeStore = UserDefaultsActiveChallengeStore(),
-        completedChallengeStore: CompletedChallengeStore = UserDefaultsCompletedChallengeStore(),
-        photoStore: PhotoStore = FilePhotoStore(),
+        activeChallengeRepository: ActiveChallengeRepository = UserDefaultsActiveChallengeRepository(),
+        completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
+        photoRepository: PhotoRepository = FilePhotoRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
-        self.activeChallengeStore = activeChallengeStore
-        self.completedChallengeStore = completedChallengeStore
-        self.photoStore = photoStore
+        self.activeChallengeRepository = activeChallengeRepository
+        self.completedChallengeRepository = completedChallengeRepository
+        self.photoRepository = photoRepository
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -34,10 +34,10 @@ public final class AppContainer {
 
     public func makeChallengeViewModel() -> ChallengeViewModel {
         ChallengeViewModel(
-            repository: challengeRepository,
-            store: activeChallengeStore,
-            completedStore: completedChallengeStore,
-            photoStore: photoStore
+            challengeRepository: challengeRepository,
+            activeRepository: activeChallengeRepository,
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository
         )
     }
 
@@ -45,35 +45,43 @@ public final class AppContainer {
         CaptureFlowViewModel(
             challenge: challenge,
             camera: cameraService,
-            store: activeChallengeStore,
-            completedStore: completedChallengeStore,
-            photoStore: photoStore,
+            activeRepository: activeChallengeRepository,
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository,
             library: Self.defaultPhotoLibrary()
         )
     }
 
-    private static func defaultPhotoLibrary() -> PhotoLibraryBrowsing {
+    private static func defaultPhotoLibrary() -> PhotoLibraryService {
         #if os(iOS)
-            PHPhotoLibraryBrowser()
+            PHPhotoLibraryService()
         #else
-            NoopPhotoLibraryBrowser()
+            NoopPhotoLibraryService()
         #endif
     }
 
     public func makeEditorViewModel(challenge: ActiveChallenge) -> EditorViewModel {
         EditorViewModel(
             challenge: challenge,
-            store: activeChallengeStore,
-            photoStore: photoStore,
+            activeRepository: activeChallengeRepository,
+            photoRepository: photoRepository,
             librarySaver: Self.defaultLibrarySaver()
         )
     }
 
-    private static func defaultLibrarySaver() -> PhotoLibrarySaving {
+    public func makeDevMenuViewModel() -> DevMenuViewModel {
+        DevMenuViewModel(
+            activeRepository: activeChallengeRepository,
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository
+        )
+    }
+
+    private static func defaultLibrarySaver() -> PhotoLibrarySaveService {
         #if os(iOS)
-            PHPhotoLibrarySaver()
+            PHPhotoLibrarySaveService()
         #else
-            NoopPhotoLibrarySaver()
+            NoopPhotoLibrarySaveService()
         #endif
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import WardrobeKit
 
-final class SpyLibrarySaver: PhotoLibrarySaving, @unchecked Sendable {
+final class SpyLibrarySaver: PhotoLibrarySaveService, @unchecked Sendable {
     var saveError: Error?
     private(set) var savedData: [Data] = []
 
@@ -18,20 +18,20 @@ final class SpyLibrarySaver: PhotoLibrarySaving, @unchecked Sendable {
 @MainActor
 struct EditorViewModelTests {
     private func makeSUT(
-        store: InMemoryActiveChallengeStore = InMemoryActiveChallengeStore(),
-        photoStore: SpyPhotoStore = SpyPhotoStore(),
+        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
+        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
         librarySaver: SpyLibrarySaver = SpyLibrarySaver(),
         draft: EditDraft = EditDraft()
     ) throws -> EditorViewModel {
-        let photoID = try photoStore.saveOriginal(SampleCameraService.makeSampleJPEG(width: 100, height: 200))
+        let photoID = try photoRepository.saveOriginal(SampleCameraService.makeSampleJPEG(width: 100, height: 200))
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
         challenge.draft = draft
-        store.stored = challenge
+        activeRepository.stored = challenge
         return EditorViewModel(
             challenge: challenge,
-            store: store,
-            photoStore: photoStore,
+            activeRepository: activeRepository,
+            photoRepository: photoRepository,
             librarySaver: librarySaver
         )
     }
@@ -49,8 +49,8 @@ struct EditorViewModelTests {
     }
 
     @Test func commitCropPersistsDraftToStore() throws {
-        let store = InMemoryActiveChallengeStore()
-        let sut = try makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = try makeSUT(activeRepository: activeRepository)
         let spec = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
 
         sut.beginCrop()
@@ -58,26 +58,26 @@ struct EditorViewModelTests {
         sut.commitTool()
 
         #expect(sut.draft.crop == spec)
-        #expect(store.stored?.draft.crop == spec)
+        #expect(activeRepository.stored?.draft.crop == spec)
         #expect(sut.activeTool == nil)
     }
 
     @Test func cancelToolDiscardsWorkingChanges() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let committed = EditDraft(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
-        let sut = try makeSUT(store: store, draft: committed)
+        let sut = try makeSUT(activeRepository: activeRepository, draft: committed)
 
         sut.beginCrop()
         sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4)))
         sut.cancelTool()
 
         #expect(sut.draft == committed)
-        #expect(store.stored?.draft == committed)
+        #expect(activeRepository.stored?.draft == committed)
     }
 
     @Test func commitNewTextAppendsAndEmptyTextIsDropped() throws {
-        let store = InMemoryActiveChallengeStore()
-        let sut = try makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = try makeSUT(activeRepository: activeRepository)
 
         sut.beginNewText()
         guard case var .text(working, _) = sut.activeTool else {
@@ -88,7 +88,7 @@ struct EditorViewModelTests {
         sut.updateWorking(text: working)
         sut.commitTool()
         #expect(sut.draft.texts.map(\.content) == ["OOTD"])
-        #expect(store.stored?.draft.texts.map(\.content) == ["OOTD"])
+        #expect(activeRepository.stored?.draft.texts.map(\.content) == ["OOTD"])
 
         sut.beginNewText()
         sut.commitTool() // empty content — dropped
@@ -110,31 +110,31 @@ struct EditorViewModelTests {
     }
 
     @Test func removeWorkingTextDeletesAndPersists() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let item = TextItem(content: "bye")
-        let sut = try makeSUT(store: store, draft: EditDraft(texts: [item]))
+        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [item]))
 
         sut.beginEditingText(item)
         sut.removeWorkingText()
 
         #expect(sut.draft.texts.isEmpty)
-        #expect(store.stored?.draft.texts.isEmpty == true)
+        #expect(activeRepository.stored?.draft.texts.isEmpty == true)
         #expect(sut.activeTool == nil)
     }
 
     @Test func moveAndScaleTextClampAndPersistOnFinish() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let item = TextItem(content: "hi")
-        let sut = try makeSUT(store: store, draft: EditDraft(texts: [item]))
+        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [item]))
 
         sut.moveText(id: item.id, to: CGPoint(x: 1.7, y: -0.3))
         sut.scaleText(id: item.id, to: 9)
         #expect(sut.draft.texts[0].position == CGPoint(x: 1, y: 0)) // clamped
         #expect(sut.draft.texts[0].scale == 3) // clamped
-        #expect(store.stored?.draft.texts.first?.scale == 1) // not persisted yet
+        #expect(activeRepository.stored?.draft.texts.first?.scale == 1) // not persisted yet
 
         sut.finishDirectManipulation()
-        #expect(store.stored?.draft.texts.first?.scale == 3) // persisted at gesture end
+        #expect(activeRepository.stored?.draft.texts.first?.scale == 3) // persisted at gesture end
     }
 
     @Test func moveUnknownTextIDIsNoOp() throws {
@@ -163,22 +163,22 @@ struct EditorViewModelTests {
     // MARK: Stickers (FR-019)
 
     @Test func addStickerAppendsCenteredAndPersists() throws {
-        let store = InMemoryActiveChallengeStore()
-        let sut = try makeSUT(store: store)
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = try makeSUT(activeRepository: activeRepository)
 
         sut.isStickerPickerPresented = true
         sut.addSticker("🔥")
 
         #expect(sut.draft.stickers.map(\.emoji) == ["🔥"])
         #expect(sut.draft.stickers[0].position == CGPoint(x: 0.5, y: 0.5))
-        #expect(store.stored?.draft.stickers.count == 1)
+        #expect(activeRepository.stored?.draft.stickers.count == 1)
         #expect(!sut.isStickerPickerPresented)
     }
 
     @Test func moveAndScaleStickerClampAndPersistOnFinish() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let sticker = StickerItem(emoji: "✨")
-        let sut = try makeSUT(store: store, draft: EditDraft(stickers: [sticker]))
+        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(stickers: [sticker]))
 
         sut.moveSticker(id: sticker.id, to: CGPoint(x: -1, y: 2))
         sut.scaleSticker(id: sticker.id, to: 99)
@@ -186,37 +186,37 @@ struct EditorViewModelTests {
         #expect(sut.draft.stickers[0].scale == 4)
 
         sut.finishDirectManipulation()
-        #expect(store.stored?.draft.stickers.first?.scale == 4)
+        #expect(activeRepository.stored?.draft.stickers.first?.scale == 4)
     }
 
     @Test func removeStickerPersists() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let sticker = StickerItem(emoji: "✨")
-        let sut = try makeSUT(store: store, draft: EditDraft(stickers: [sticker]))
+        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(stickers: [sticker]))
 
         sut.removeSticker(id: sticker.id)
 
         #expect(sut.draft.stickers.isEmpty)
-        #expect(store.stored?.draft.stickers.isEmpty == true)
+        #expect(activeRepository.stored?.draft.stickers.isEmpty == true)
     }
 
     // MARK: Rotation (story-style two-finger rotate)
 
     @Test func rotateTextAndStickerPersistOnFinish() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let text = TextItem(content: "hi")
         let sticker = StickerItem(emoji: "✨")
-        let sut = try makeSUT(store: store, draft: EditDraft(texts: [text], stickers: [sticker]))
+        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [text], stickers: [sticker]))
 
         sut.rotateText(id: text.id, to: 42)
         sut.rotateSticker(id: sticker.id, to: -30)
         #expect(sut.draft.texts[0].rotationDegrees == 42)
         #expect(sut.draft.stickers[0].rotationDegrees == -30)
-        #expect(store.stored?.draft.texts.first?.rotationDegrees == 0) // not persisted mid-gesture
+        #expect(activeRepository.stored?.draft.texts.first?.rotationDegrees == 0) // not persisted mid-gesture
 
         sut.finishDirectManipulation()
-        #expect(store.stored?.draft.texts.first?.rotationDegrees == 42)
-        #expect(store.stored?.draft.stickers.first?.rotationDegrees == -30)
+        #expect(activeRepository.stored?.draft.texts.first?.rotationDegrees == 42)
+        #expect(activeRepository.stored?.draft.stickers.first?.rotationDegrees == -30)
     }
 
     @Test func rotateUnknownIDIsNoOp() throws {
@@ -300,9 +300,9 @@ struct EditorViewModelTests {
     }
 
     @Test func textFontAndAlignmentCommitAndPersist() throws {
-        let store = InMemoryActiveChallengeStore()
+        let activeRepository = InMemoryActiveChallengeRepository()
         let item = TextItem(content: "OOTD")
-        let sut = try makeSUT(store: store, draft: EditDraft(texts: [item]))
+        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [item]))
 
         sut.beginEditingText(item)
         var updated = item
@@ -313,8 +313,8 @@ struct EditorViewModelTests {
 
         #expect(sut.draft.texts[0].fontStyle == .serif)
         #expect(sut.draft.texts[0].alignmentStyle == .trailing)
-        #expect(store.stored?.draft.texts[0].fontName == TextFontStyle.serif.rawValue)
-        #expect(store.stored?.draft.texts[0].alignmentName == TextAlignmentStyle.trailing.rawValue)
+        #expect(activeRepository.stored?.draft.texts[0].fontName == TextFontStyle.serif.rawValue)
+        #expect(activeRepository.stored?.draft.texts[0].alignmentName == TextAlignmentStyle.trailing.rawValue)
     }
 
     @Test func draftWithPreRotationStickerDecodesWithZeroRotation() throws {
@@ -329,14 +329,14 @@ struct EditorViewModelTests {
     }
 
     @Test func originalBytesNeverChangeAfterCommits() throws {
-        let photoStore = SpyPhotoStore()
-        let sut = try makeSUT(photoStore: photoStore)
-        let originalBytes = photoStore.saved.values.first
+        let photoRepository = SpyPhotoRepository()
+        let sut = try makeSUT(photoRepository: photoRepository)
+        let originalBytes = photoRepository.saved.values.first
 
         sut.beginCrop()
         sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)))
         sut.commitTool()
 
-        #expect(photoStore.saved.values.first == originalBytes) // §18.5 write-once
+        #expect(photoRepository.saved.values.first == originalBytes) // §18.5 write-once
     }
 }
