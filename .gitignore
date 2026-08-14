@@ -16,3 +16,5 @@ DerivedData/
 
 # Per-developer signing override (see Config/Debug.xcconfig)
 Local.xcconfig
+
+*.mlpackage
