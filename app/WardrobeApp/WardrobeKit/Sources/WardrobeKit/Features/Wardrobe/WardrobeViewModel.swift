@@ -54,14 +54,26 @@ public final class WardrobeViewModel {
         Log.ui.info("Wardrobe scan: \(fresh.count) new of \(photos.count) selected")
         guard !fresh.isEmpty else { return }
 
+        // Loaded once per batch: the whole matching index is small enough to
+        // hold, and re-reading it per garment would be wasteful.
+        let known = (try? repository.fingerprints()) ?? []
+        let categories = Dictionary(
+            (try? repository.items())?.map { ($0.id, $0.category) } ?? [],
+            uniquingKeysWith: { first, _ in first }
+        )
+
         for (index, photo) in fresh.enumerated() {
             scanProgress = Double(index) / Double(fresh.count)
-            process(photo)
+            process(photo, known: known, categories: categories)
         }
         scanProgress = 1
     }
 
-    private func process(_ photo: (id: String, data: Data)) {
+    private func process(
+        _ photo: (id: String, data: Data),
+        known: [ItemFingerprint],
+        categories: [UUID: GarmentCategory]
+    ) {
         guard let image = ImageDecoding.downsampledImage(from: photo.data, maxPixel: 2048) else {
             Log.ui.error("Wardrobe scan: undecodable photo")
             return
@@ -70,7 +82,7 @@ public final class WardrobeViewModel {
         do {
             guard let result = try segmentation.segment(image) else { return }
             for (category, cutout) in segmentation.cutouts(from: result) {
-                try store(category: category, cutout: cutout)
+                try store(category: category, cutout: cutout, known: known, categories: categories)
             }
             processedPhotoIDs.insert(photo.id)
         } catch {
@@ -78,11 +90,16 @@ public final class WardrobeViewModel {
         }
     }
 
-    /// ponytail: every scanned garment becomes a new item — duplicate matching
-    /// is task A6, and FR-029 requires the user to confirm a merge anyway. The
-    /// fingerprint is already recorded so that matching has history to work with
-    /// the moment it lands.
-    private func store(category: GarmentCategory, cutout: GarmentCutout) throws {
+    /// ponytail: matching runs for real, but its result is only logged — merging
+    /// needs the confirmation UI from task A7, and FR-029 forbids doing it
+    /// silently. Watching these lines on real photos is what calibrates the
+    /// thresholds before the UI is built.
+    private func store(
+        category: GarmentCategory,
+        cutout: GarmentCutout,
+        known: [ItemFingerprint],
+        categories: [UUID: GarmentCategory]
+    ) throws {
         let now = Date()
         let id = UUID()
         let item = try WardrobeItem(
@@ -92,12 +109,23 @@ public final class WardrobeViewModel {
             createdAt: now,
             updatedAt: now
         )
+        let print = fingerprint(for: id, cutout: cutout, at: now)
+        report(ItemMatching.candidates(for: print, category: category, among: known, categories: categories))
+
         try repository.insert(
             item,
-            fingerprint: fingerprint(for: id, cutout: cutout, at: now),
+            fingerprint: print,
             wear: WearRecord(itemID: id, wornAt: now)
         )
         items.insert(item, at: 0)
+    }
+
+    private func report(_ matches: [ItemMatch]) {
+        guard let best = matches.first else {
+            Log.ui.info("Match: no candidates")
+            return
+        }
+        Log.ui.info("Match: \(matches.count) candidates, best \(best.score) \(String(describing: best.confidence))")
     }
 
     private func fingerprint(for itemID: UUID, cutout: GarmentCutout, at date: Date) -> ItemFingerprint {
