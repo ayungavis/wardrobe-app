@@ -4,6 +4,10 @@ included:
 excluded:
   - app/WardrobeApp/WardrobeKit/.build
 
+opt_in_rules:
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+
 disabled_rules:
   # Trailing commas keep multi-line diffs small; TODOs are tracked against PRD FR-ids.
   - trailing_comma
