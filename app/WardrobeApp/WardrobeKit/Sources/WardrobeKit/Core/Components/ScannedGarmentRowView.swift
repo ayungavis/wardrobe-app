@@ -23,13 +23,10 @@ struct ScannedGarmentRowView: View {
                     .foregroundStyle(AppColor.textPrimary)
             }
 
-            if garment.matches.isEmpty {
-                Text("wardrobe.review.newOnly", bundle: .module)
-                    .font(AppFont.caption)
-                    .foregroundStyle(AppColor.textSecondary)
-            } else {
-                choices
-            }
+            // Always shown, even with no candidates: a row with nothing to
+            // match against is exactly where "skip" is needed most, because a
+            // bogus detection rarely looks like anything already owned.
+            choices
         }
         .padding(.vertical, Spacing.xs)
     }
@@ -49,6 +46,12 @@ struct ScannedGarmentRowView: View {
                     image: candidateImage(match.itemID)
                 ) { onChoose(.existing(match.itemID)) }
             }
+
+            choice(
+                isSelected: garment.decision == .discard,
+                label: Text("wardrobe.review.skip", bundle: .module),
+                image: nil
+            ) { onChoose(.discard) }
         }
     }
 

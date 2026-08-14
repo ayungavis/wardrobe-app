@@ -34,6 +34,9 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
     public enum Decision: Equatable, Sendable {
         case new
         case existing(UUID)
+        /// Segmentation was wrong — a bag, a shadow, a slice of background.
+        /// Kept out of the wardrobe so it never becomes a match candidate.
+        case discard
     }
 
     /// Pre-selects the proposal only when matching was confident, which is what

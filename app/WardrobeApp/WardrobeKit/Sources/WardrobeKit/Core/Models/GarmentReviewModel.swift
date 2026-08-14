@@ -117,6 +117,8 @@ public final class GarmentReviewModel {
                     try insert(garment, completionID: completionID, at: date)
                 case let .existing(itemID):
                     try merge(garment, into: itemID, completionID: completionID, at: date)
+                case .discard:
+                    try thumbnails.delete(file: garment.cutoutFile)
                 }
             } catch {
                 Log.report(error)

@@ -113,6 +113,40 @@ struct GarmentReviewModelTests {
         #expect(sut.garments.isEmpty)
     }
 
+    // MARK: Discarding
+
+    /// A bag or a slice of background must leave no trace — least of all a
+    /// fingerprint, which would poison every later match.
+    @Test func discardingWritesNothingAndDeletesTheCutout() throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        thumbnails.files["bogus.png"] = Data([0x01])
+        let sut = makeSUT(repository: repository, thumbnails: thumbnails)
+        sut.stage([makeGarment(decision: .discard, file: "bogus.png")])
+
+        sut.commit(completionID: nil, at: Date())
+
+        #expect(try repository.items().isEmpty)
+        #expect(try repository.fingerprints().isEmpty)
+        #expect(thumbnails.files.isEmpty)
+        #expect(sut.garments.isEmpty)
+    }
+
+    @Test func discardingOneGarmentKeepsTheOthersInTheSameBatch() throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        thumbnails.files["bogus.png"] = Data([0x01])
+        thumbnails.files["shirt.png"] = Data([0x02])
+        let sut = makeSUT(repository: repository, thumbnails: thumbnails)
+        let kept = makeGarment(decision: .new, file: "shirt.png")
+        sut.stage([makeGarment(decision: .discard, file: "bogus.png"), kept])
+
+        sut.commit(completionID: nil, at: Date())
+
+        #expect(try repository.items().map(\.id) == [kept.id])
+        #expect(thumbnails.files.keys.sorted() == ["shirt.png"])
+    }
+
     @Test func choosingOverridesTheProposal() {
         let sut = makeSUT()
         let itemID = UUID()
@@ -125,5 +159,17 @@ struct GarmentReviewModelTests {
         sut.choose(.new, for: garment.id)
 
         #expect(sut.garments.first?.decision == .new)
+    }
+
+    @Test func choosingTouchesOnlyTheRowItNames() {
+        let sut = makeSUT()
+        let first = makeGarment(decision: .new)
+        let second = makeGarment(decision: .new)
+        sut.stage([first, second])
+
+        sut.choose(.discard, for: second.id)
+
+        #expect(sut.garments.first?.decision == .new)
+        #expect(sut.garments.last?.decision == .discard)
     }
 }

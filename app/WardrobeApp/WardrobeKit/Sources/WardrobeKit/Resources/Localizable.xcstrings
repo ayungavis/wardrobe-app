@@ -1203,18 +1203,18 @@
         }
       }
     },
-    "wardrobe.review.newOnly" : {
+    "wardrobe.review.skip" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nothing similar in your wardrobe — this will be added as a new item."
+            "value" : "Not clothing — skip"
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tidak ada yang mirip di lemarimu — ini akan ditambahkan sebagai item baru."
+            "value" : "Bukan pakaian — lewati"
           }
         }
       }
