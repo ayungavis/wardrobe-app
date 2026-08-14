@@ -74,6 +74,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
             for: fingerprint, category: category, among: known, categories: categories
         )
         Log.ui.info("Match: \(matches.count) candidates, best \(matches.first?.score ?? 0)")
+        logCalibration(for: fingerprint, category: category, among: known, categories: categories)
 
         return try ScannedGarment(
             id: id,
@@ -84,4 +85,43 @@ public struct WardrobeGarmentScanService: GarmentScanService {
             decision: ScannedGarment.defaultDecision(for: matches)
         )
     }
+
+    /// Every same-category comparison, including the ones that fall below the
+    /// threshold — those are the near misses, and tuning `ItemMatching.Tuning`
+    /// without seeing them would be guesswork.
+    ///
+    /// Ids and numbers only: nothing about what the photo contains (PRD §18/§24).
+    private func logCalibration(
+        for fingerprint: ItemFingerprint,
+        category: GarmentCategory,
+        among known: [ItemFingerprint],
+        categories: [UUID: GarmentCategory]
+    ) {
+        guard DevMode.isEnabled else { return }
+
+        let comparable = known.filter {
+            $0.version == fingerprint.version && categories[$0.itemID] == category
+        }
+        let scored = comparable
+            .map { (other: $0, comparison: ItemMatching.compare(fingerprint, $0)) }
+            .sorted { $0.comparison.score > $1.comparison.score }
+            .prefix(Self.calibrationSampleSize)
+
+        for entry in scored {
+            let printed = entry.comparison.printDistance.map { String(format: "%.3f", $0) } ?? "none"
+            Log.ui.info("""
+            Calib garment=\(fingerprint.itemID.uuidString.prefix(8), privacy: .public) \
+            cat=\(category.rawValue, privacy: .public) \
+            vs=\(entry.other.itemID.uuidString.prefix(8), privacy: .public) \
+            dE=\(String(format: "%.1f", entry.comparison.colorDelta), privacy: .public) \
+            fp=\(printed, privacy: .public) \
+            dAsp=\(String(format: "%.3f", entry.comparison.aspectDelta), privacy: .public) \
+            q=\(String(format: "%.2f", entry.comparison.maskQuality), privacy: .public) \
+            score=\(String(format: "%.3f", entry.comparison.score), privacy: .public)
+            """)
+        }
+    }
+
+    /// A fifty-item wardrobe must not print fifty lines per garment.
+    private static let calibrationSampleSize = 5
 }

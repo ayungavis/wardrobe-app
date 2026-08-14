@@ -65,11 +65,30 @@ enum ItemMatching {
 
     // MARK: Scoring
 
+    /// The raw distances behind a score. Kept rather than discarded so the
+    /// spreads in `Tuning` can be calibrated from real photos instead of guessed
+    /// — the fused score alone says nothing about which signal was wrong.
+    struct Comparison: Equatable {
+        let colorDelta: Float
+        /// Nil when either side has no feature print (Vision failed at scan).
+        let printDistance: Float?
+        let aspectDelta: Float
+        let maskQuality: Float
+        let score: Float
+    }
+
     static func score(_ lhs: ItemFingerprint, _ rhs: ItemFingerprint) -> Float {
-        let color = colorScore(lhs.colorLab, rhs.colorLab)
-        let aspect = similarity(abs(lhs.aspectRatio - rhs.aspectRatio), spread: Tuning.aspectSpread)
-        let print = GarmentFingerprinting.distance(lhs.featurePrint, rhs.featurePrint)
-            .map { similarity($0, spread: Tuning.printSpread) }
+        compare(lhs, rhs).score
+    }
+
+    static func compare(_ lhs: ItemFingerprint, _ rhs: ItemFingerprint) -> Comparison {
+        let colorDelta = deltaE(lhs.colorLab, rhs.colorLab)
+        let aspectDelta = abs(lhs.aspectRatio - rhs.aspectRatio)
+        let printDistance = GarmentFingerprinting.distance(lhs.featurePrint, rhs.featurePrint)
+
+        let color = colorDelta.map { similarity($0, spread: Tuning.colorSpread) } ?? 0
+        let aspect = similarity(aspectDelta, spread: Tuning.aspectSpread)
+        let print = printDistance.map { similarity($0, spread: Tuning.printSpread) }
 
         // A torn mask makes the silhouette untrustworthy, so its weight moves to
         // colour rather than being thrown away.
@@ -77,19 +96,26 @@ enum ItemMatching {
         let aspectWeight = Tuning.aspectWeight * quality
         let colorWeight = Tuning.colorWeight + (Tuning.aspectWeight - aspectWeight)
 
-        guard let print else {
+        let score: Float = if let print {
+            color * colorWeight + print * Tuning.printWeight + aspect * aspectWeight
+        } else {
             // Vision failed for one side (§A5): renormalise over what is left
             // instead of scoring the garment as a mismatch.
-            let total = colorWeight + aspectWeight
-            return (color * colorWeight + aspect * aspectWeight) / total
+            (color * colorWeight + aspect * aspectWeight) / (colorWeight + aspectWeight)
         }
-        return color * colorWeight + print * Tuning.printWeight + aspect * aspectWeight
+
+        return Comparison(
+            colorDelta: colorDelta ?? .infinity,
+            printDistance: printDistance,
+            aspectDelta: aspectDelta,
+            maskQuality: quality,
+            score: score
+        )
     }
 
-    private static func colorScore(_ lhs: [Float], _ rhs: [Float]) -> Float {
-        guard lhs.count == rhs.count, !lhs.isEmpty else { return 0 }
-        let deltaE = zip(lhs, rhs).map { ($0 - $1) * ($0 - $1) }.reduce(0, +).squareRoot()
-        return similarity(deltaE, spread: Tuning.colorSpread)
+    private static func deltaE(_ lhs: [Float], _ rhs: [Float]) -> Float? {
+        guard lhs.count == rhs.count, !lhs.isEmpty else { return nil }
+        return zip(lhs, rhs).map { ($0 - $1) * ($0 - $1) }.reduce(0, +).squareRoot()
     }
 
     private static func similarity(_ distance: Float, spread: Float) -> Float {

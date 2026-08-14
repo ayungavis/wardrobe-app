@@ -116,6 +116,41 @@ struct ItemMatchingTests {
         #expect(cautious?.confidence == .uncertain)
     }
 
+    // MARK: Raw distances
+
+    /// Calibration reads these numbers; if they stop being the real distances,
+    /// every threshold tuned from them is tuned against noise.
+    @Test func compareReportsTheRawDistances() {
+        let stored = makeFingerprint(color: [70, 5, 15], aspect: 0.8, print: [1, 0, 0, 0])
+        let scanned = makeFingerprint(color: [70, 5, 12], aspect: 0.95, print: [1, 0, 0, 0])
+
+        let comparison = ItemMatching.compare(scanned, stored)
+
+        #expect(comparison.colorDelta == 3)
+        #expect(comparison.printDistance == 0)
+        #expect(abs(comparison.aspectDelta - 0.15) < 0.0001)
+        #expect(comparison.maskQuality == 1)
+    }
+
+    @Test func compareReportsNoPrintDistanceWhenVisionFailed() {
+        let stored = makeFingerprint(print: nil)
+        let scanned = makeFingerprint(color: stored.colorLab, aspect: stored.aspectRatio)
+
+        let comparison = ItemMatching.compare(scanned, stored)
+
+        #expect(comparison.printDistance == nil)
+        #expect(comparison.score > 0.95) // still scored on colour and shape
+    }
+
+    /// `compare` was extracted out of `score`; this is the guard that the
+    /// extraction moved no numbers.
+    @Test func scoreIsTheComparisonScore() {
+        let stored = makeFingerprint(color: [40, -10, 20], aspect: 1.2, print: [0, 1, 0, 0])
+        let scanned = makeFingerprint(color: [55, 2, 8], aspect: 0.7, maskQuality: 0.5)
+
+        #expect(ItemMatching.score(scanned, stored) == ItemMatching.compare(scanned, stored).score)
+    }
+
     // MARK: Ranking
 
     @Test func anItemIsJudgedByItsClosestFingerprint() {
