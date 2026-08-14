@@ -5,7 +5,7 @@ import Observation
 @MainActor
 @Observable
 public final class WardrobeViewModel {
-    public private(set) var items: [ClothingItem] = []
+    public private(set) var items: [WardrobeItem] = []
     public private(set) var isScanning = false
     /// 0...1, drives the button's label while a batch is running.
     public private(set) var scanProgress: Double = 0
@@ -13,10 +13,24 @@ public final class WardrobeViewModel {
     private var processedPhotoIDs: Set<String> = []
     private let segmentation: GarmentSegmentationService
     private let thumbnails: GarmentThumbnailRepository
+    private let repository: WardrobeItemRepository
 
-    public init(segmentation: GarmentSegmentationService, thumbnails: GarmentThumbnailRepository) {
+    public init(
+        segmentation: GarmentSegmentationService,
+        thumbnails: GarmentThumbnailRepository,
+        repository: WardrobeItemRepository
+    ) {
         self.segmentation = segmentation
         self.thumbnails = thumbnails
+        self.repository = repository
+    }
+
+    public func load() {
+        do {
+            items = try repository.items()
+        } catch {
+            Log.report(error)
+        }
     }
 
     /// Each entry is a stable identifier plus the photo's bytes. Photos whose
@@ -45,7 +59,7 @@ public final class WardrobeViewModel {
         do {
             guard let result = try segmentation.segment(image) else { return }
             for (category, cutout) in segmentation.cutouts(from: result) {
-                items.append(makeItem(category: category, cutout: cutout))
+                try store(category: category, cutout: cutout)
             }
             processedPhotoIDs.insert(photo.id)
         } catch {
@@ -53,9 +67,23 @@ public final class WardrobeViewModel {
         }
     }
 
-    private func makeItem(category: GarmentCategory, cutout: CGImage) -> ClothingItem {
+    /// ponytail: every scanned garment becomes a new item — duplicate matching
+    /// is task A6, and FR-029 requires the user to confirm a merge anyway.
+    private func store(category: GarmentCategory, cutout: CGImage) throws {
+        let now = Date()
         let id = UUID()
-        let path = (try? thumbnails.save(cutout, id: id)) ?? ""
-        return ClothingItem(id: id, category: category, dateWorn: Date(), thumbnailPath: path)
+        let item = try WardrobeItem(
+            id: id,
+            category: category,
+            cutoutPath: thumbnails.save(cutout, id: id),
+            createdAt: now,
+            updatedAt: now
+        )
+        try repository.insert(
+            item,
+            fingerprint: nil,
+            wear: WearRecord(itemID: id, wornAt: now)
+        )
+        items.insert(item, at: 0)
     }
 }

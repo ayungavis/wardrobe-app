@@ -35,6 +35,33 @@ final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, 
     }
 }
 
+@MainActor
+final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
+    var storedItems: [WardrobeItem] = []
+    var storedFingerprints: [ItemFingerprint] = []
+    var storedWears: [WearRecord] = []
+
+    func items() throws -> [WardrobeItem] {
+        storedItems.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func fingerprints() throws -> [ItemFingerprint] {
+        storedFingerprints
+    }
+
+    func wears(for itemID: UUID) throws -> [WearRecord] {
+        storedWears.filter { $0.itemID == itemID }
+    }
+
+    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
+        storedItems.append(item)
+        if let fingerprint {
+            storedFingerprints.append(fingerprint)
+        }
+        storedWears.append(wear)
+    }
+}
+
 /// An actor, mirroring the real browser's isolation, so tests exercise the
 /// same async boundaries.
 actor FakePhotoLibrary: PhotoLibraryService {

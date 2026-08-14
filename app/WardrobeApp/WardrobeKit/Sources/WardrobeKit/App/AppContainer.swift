@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// Composition root. Owns dependency construction so views and view models
 /// stay injectable and testable.
@@ -72,9 +73,25 @@ public final class AppContainer {
     public func makeWardrobeViewModel() -> WardrobeViewModel {
         WardrobeViewModel(
             segmentation: Self.defaultSegmentation(),
-            thumbnails: FileGarmentThumbnailRepository()
+            thumbnails: FileGarmentThumbnailRepository(),
+            repository: SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
         )
     }
+
+    /// Built once per process; `ModelContainer` is Sendable and cheap to share.
+    private static let wardrobeContainer: ModelContainer = {
+        do {
+            return try ModelContainer(for: SwiftDataWardrobeItemRepository.schema)
+        } catch {
+            Log.report(error)
+            // A wardrobe that cannot persist still beats a crash on launch.
+            // swiftlint:disable:next force_try
+            return try! ModelContainer(
+                for: SwiftDataWardrobeItemRepository.schema,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            )
+        }
+    }()
 
     private static func defaultSegmentation() -> GarmentSegmentationService {
         #if os(iOS)

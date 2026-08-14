@@ -25,7 +25,7 @@ public struct WardrobeView: View {
         }
     }
 
-    private var filteredItems: [ClothingItem] {
+    private var filteredItems: [WardrobeItem] {
         guard let category = filter.category else { return viewModel.items }
         return viewModel.items.filter { $0.category == category }
     }
@@ -42,6 +42,7 @@ public struct WardrobeView: View {
             grid
         }
         .background(AppColor.background)
+        .task { viewModel.load() }
     }
 
     private var scanButton: some View {
