@@ -10,19 +10,24 @@ struct DevMenuView: View {
     @State private var isResetConfirmationPresented = false
     @State private var isWardrobeResetConfirmationPresented = false
     @State private var isBulkScanPresented = false
+    @State private var isBenchmarkPresented = false
     /// Called after an action mutates a repository, so the screen behind the sheet
     /// updates right away instead of waiting for dismissal.
     private let onStateChanged: () -> Void
     /// Built on demand so a scan always starts from an empty queue.
     private let makeReview: () -> GarmentReviewModel
+    /// Same reason: every benchmark run starts from an empty set of labels.
+    private let makeBenchmark: () -> MatchBenchmarkViewModel
 
     init(
         viewModel: DevMenuViewModel,
         makeReview: @escaping () -> GarmentReviewModel,
+        makeBenchmark: @escaping () -> MatchBenchmarkViewModel,
         onStateChanged: @escaping () -> Void
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.makeReview = makeReview
+        self.makeBenchmark = makeBenchmark
         self.onStateChanged = onStateChanged
     }
 
@@ -35,6 +40,7 @@ struct DevMenuView: View {
                 }
                 DevWardrobeSection(
                     onScan: { isBulkScanPresented = true },
+                    onBenchmark: { isBenchmarkPresented = true },
                     onReset: { isWardrobeResetConfirmationPresented = true }
                 )
             }
@@ -88,6 +94,9 @@ struct DevMenuView: View {
         }
         .sheet(isPresented: $isBulkScanPresented, onDismiss: onStateChanged) {
             BulkScanView(review: makeReview())
+        }
+        .sheet(isPresented: $isBenchmarkPresented) {
+            MatchBenchmarkView(viewModel: makeBenchmark())
         }
         .presentationDetents([.medium, .large])
         .task { viewModel.refresh() }
@@ -156,12 +165,16 @@ private struct DevTodaySection: View {
 
 private struct DevWardrobeSection: View {
     let onScan: () -> Void
+    let onBenchmark: () -> Void
     let onReset: () -> Void
 
     var body: some View {
         Section {
             Button(action: onScan) {
                 Text(verbatim: "Bulk scan photos")
+            }
+            Button(action: onBenchmark) {
+                Text(verbatim: "Match benchmark")
             }
             Button(role: .destructive, action: onReset) {
                 Text(verbatim: "Reset wardrobe")
@@ -179,6 +192,7 @@ private struct DevWardrobeSection: View {
     DevMenuView(
         viewModel: container.makeDevMenuViewModel(),
         makeReview: { container.makeGarmentReviewModel() },
+        makeBenchmark: { container.makeMatchBenchmarkViewModel() },
         onStateChanged: {}
     )
 }
