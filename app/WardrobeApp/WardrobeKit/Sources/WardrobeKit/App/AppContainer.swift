@@ -72,6 +72,14 @@ public final class AppContainer {
 
     public func makeWardrobeViewModel() -> WardrobeViewModel {
         WardrobeViewModel(
+            scanner: makeGarmentScanService(),
+            thumbnails: garmentThumbnailRepository,
+            repository: makeWardrobeItemRepository()
+        )
+    }
+
+    public func makeGarmentScanService() -> GarmentScanService {
+        WardrobeGarmentScanService(
             segmentation: Self.defaultSegmentation(),
             thumbnails: garmentThumbnailRepository,
             repository: makeWardrobeItemRepository()

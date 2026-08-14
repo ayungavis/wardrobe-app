@@ -14,16 +14,16 @@ public final class WardrobeViewModel {
     public private(set) var pendingReview: [ScannedGarment] = []
 
     private var processedPhotoIDs: Set<String> = []
-    private let segmentation: GarmentSegmentationService
+    private let scanner: GarmentScanService
     private let thumbnails: GarmentThumbnailRepository
     private let repository: WardrobeItemRepository
 
     public init(
-        segmentation: GarmentSegmentationService,
+        scanner: GarmentScanService,
         thumbnails: GarmentThumbnailRepository,
         repository: WardrobeItemRepository
     ) {
-        self.segmentation = segmentation
+        self.scanner = scanner
         self.thumbnails = thumbnails
         self.repository = repository
     }
@@ -66,17 +66,14 @@ public final class WardrobeViewModel {
         Log.ui.info("Wardrobe scan: \(fresh.count) new of \(photos.count) selected")
         guard !fresh.isEmpty else { return }
 
-        // Loaded once per batch: the whole matching index is small enough to
-        // hold, and re-reading it per garment would be wasteful.
-        let known = (try? repository.fingerprints()) ?? []
-        let categories = Dictionary(
-            (try? repository.items())?.map { ($0.id, $0.category) } ?? [],
-            uniquingKeysWith: { first, _ in first }
-        )
-
         for (index, photo) in fresh.enumerated() {
             scanProgress = Double(index) / Double(fresh.count)
-            process(photo, known: known, categories: categories)
+            do {
+                try stageForReview(scanner.scan(photo: photo.data))
+                processedPhotoIDs.insert(photo.id)
+            } catch {
+                Log.report(error)
+            }
         }
         scanProgress = 1
     }
@@ -151,62 +148,5 @@ public final class WardrobeViewModel {
         )
         try repository.recordWear(WearRecord(itemID: itemID, wornAt: Date()), fingerprint: fingerprint)
         try thumbnails.delete(file: garment.cutoutFile)
-    }
-
-    private func process(
-        _ photo: (id: String, data: Data),
-        known: [ItemFingerprint],
-        categories: [UUID: GarmentCategory]
-    ) {
-        guard let image = ImageDecoding.downsampledImage(from: photo.data, maxPixel: 2048) else {
-            Log.ui.error("Wardrobe scan: undecodable photo")
-            return
-        }
-
-        do {
-            guard let result = try segmentation.segment(image) else { return }
-            for (category, cutout) in segmentation.cutouts(from: result) {
-                try store(category: category, cutout: cutout, known: known, categories: categories)
-            }
-            processedPhotoIDs.insert(photo.id)
-        } catch {
-            Log.report(error)
-        }
-    }
-
-    /// Queues a decision instead of writing one: the user confirms first.
-    private func store(
-        category: GarmentCategory,
-        cutout: GarmentCutout,
-        known: [ItemFingerprint],
-        categories: [UUID: GarmentCategory]
-    ) throws {
-        let id = UUID()
-        let print = fingerprint(for: id, cutout: cutout, at: Date())
-        let matches = ItemMatching.candidates(
-            for: print, category: category, among: known, categories: categories
-        )
-        Log.ui.info("Match: \(matches.count) candidates, best \(matches.first?.score ?? 0)")
-
-        try stageForReview([ScannedGarment(
-            id: id,
-            category: category,
-            cutoutFile: thumbnails.save(cutout.image, id: id),
-            fingerprint: print,
-            matches: matches,
-            decision: ScannedGarment.defaultDecision(for: matches)
-        )])
-    }
-
-    private func fingerprint(for itemID: UUID, cutout: GarmentCutout, at date: Date) -> ItemFingerprint {
-        ItemFingerprint(
-            itemID: itemID,
-            version: GarmentFingerprinting.version,
-            colorLab: GarmentFingerprinting.colorSignature(of: cutout.image),
-            aspectRatio: GarmentFingerprinting.aspectRatio(of: cutout.image),
-            featurePrint: GarmentFingerprinting.featurePrint(of: cutout.image),
-            maskQuality: cutout.maskQuality,
-            createdAt: date
-        )
     }
 }

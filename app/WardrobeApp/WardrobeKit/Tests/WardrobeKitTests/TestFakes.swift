@@ -98,6 +98,21 @@ final class InMemoryGarmentThumbnailRepository: GarmentThumbnailRepository, @unc
     }
 }
 
+@MainActor
+final class FakeGarmentScanService: GarmentScanService {
+    var result: [ScannedGarment] = []
+    var error: Error?
+    private(set) var scannedPhotos: [Data] = []
+
+    func scan(photo: Data) throws -> [ScannedGarment] {
+        scannedPhotos.append(photo)
+        if let error {
+            throw error
+        }
+        return result
+    }
+}
+
 /// An actor, mirroring the real browser's isolation, so tests exercise the
 /// same async boundaries.
 actor FakePhotoLibrary: PhotoLibraryService {

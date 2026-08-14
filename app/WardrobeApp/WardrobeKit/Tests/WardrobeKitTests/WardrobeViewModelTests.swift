@@ -7,13 +7,10 @@ import Testing
 struct WardrobeViewModelTests {
     private func makeSUT(
         repository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
-        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository()
+        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository(),
+        scanner: FakeGarmentScanService = FakeGarmentScanService()
     ) -> WardrobeViewModel {
-        WardrobeViewModel(
-            segmentation: NoopGarmentSegmentationService(),
-            thumbnails: thumbnails,
-            repository: repository
-        )
+        WardrobeViewModel(scanner: scanner, thumbnails: thumbnails, repository: repository)
     }
 
     private func makeGarment(
