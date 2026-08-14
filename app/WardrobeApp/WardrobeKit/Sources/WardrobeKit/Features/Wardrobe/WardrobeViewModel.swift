@@ -1,87 +1,61 @@
-//
-//  WardrobeViewModel.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 11/08/26.
-//
-
-
+import CoreGraphics
 import Foundation
-import UIKit
+import Observation
 
 @MainActor
-final class WardrobeViewModel: ObservableObject {
-    
-    @Published var items: [ClothingItem] = []
-    @Published var isScanning: Bool = false
-    @Published var scanProgress: Double = 0.0 // 0.0 - 1.0
-    @Published var processedPhotos: [ProcessedPhoto] = []
-    
+@Observable
+public final class WardrobeViewModel {
+    public private(set) var items: [ClothingItem] = []
+    public private(set) var isScanning = false
+    /// 0...1, drives the button's label while a batch is running.
+    public private(set) var scanProgress: Double = 0
+
     private var processedPhotoIDs: Set<String> = []
-    private let garmentSegmentation = GarmentSegmentationService()
-    private let thumbnailStore = ThumbnailStore()
-    
-    func processSelectedPhotos(_ entries: [(id: String, image: UIImage)]) async {
+    private let segmentation: GarmentSegmentationService
+    private let thumbnails: GarmentThumbnailRepository
+
+    public init(segmentation: GarmentSegmentationService, thumbnails: GarmentThumbnailRepository) {
+        self.segmentation = segmentation
+        self.thumbnails = thumbnails
+    }
+
+    /// Each entry is a stable identifier plus the photo's bytes. Photos whose
+    /// identifier was processed before are skipped.
+    public func process(_ photos: [(id: String, data: Data)]) async {
         isScanning = true
         defer { isScanning = false }
-        
-        print("📸 Picker returned \(entries.count) total photo(s)")
-        
-        let newEntries = entries.filter { !processedPhotoIDs.contains($0.id) }
-        let skippedCount = entries.count - newEntries.count
 
-            print("✅ \(newEntries.count) new photo(s) to process")
-            print("⏭️ \(skippedCount) photo(s) skipped — already processed before")
-        
-        let total = newEntries.count
-        guard total > 0 else {
-            print("🛑 Nothing new to process, stopping here")
-                    return
-            } // everything was already processed, nothing new to do
+        let fresh = photos.filter { !processedPhotoIDs.contains($0.id) }
+        Log.ui.info("Wardrobe scan: \(fresh.count) new of \(photos.count) selected")
+        guard !fresh.isEmpty else { return }
 
-            for (index, entry) in newEntries.enumerated() {
-                scanProgress = Double(index) / Double(total)
-                print("⚙️ Processing photo \(index + 1)/\(total) — id: \(entry.id)")
-            
-                do {
-                    guard let (classMap, uprightImage) = try garmentSegmentation.segment(entry.image) else {
-                        print("⚠️ Segmentation returned nil for photo id: \(entry.id)")
-                        continue
-                    }
-                    let cutouts = garmentSegmentation.cutoutAll(classMap: classMap, uprightImage: uprightImage)
-
-                    if let cutout = cutouts[.top] {
-                        items.append(makeClothingItem(category: "top", croppedImage: cutout))
-                    }
-                    if let cutout = cutouts[.bottom] {
-                        items.append(makeClothingItem(category: "bottom", croppedImage: cutout))
-                    }
-
-                    processedPhotoIDs.insert(entry.id)
-                    print("✅ Finished photo id: \(entry.id) — now marked as processed")
-                    
-            } catch {
-                print("⚠️ Error processing photo \(index): \(error)")
-                continue
-            }
+        for (index, photo) in fresh.enumerated() {
+            scanProgress = Double(index) / Double(fresh.count)
+            process(photo)
         }
-        print("🏁 Done. Total processed IDs so far: \(processedPhotoIDs.count)")
-        scanProgress = 1.0
+        scanProgress = 1
     }
-    
-    private func makeClothingItem(category: String, croppedImage: UIImage) -> ClothingItem {
+
+    private func process(_ photo: (id: String, data: Data)) {
+        guard let image = ImageDecoding.downsampledImage(from: photo.data, maxPixel: 2048) else {
+            Log.ui.error("Wardrobe scan: undecodable photo")
+            return
+        }
+
+        do {
+            guard let result = try segmentation.segment(image) else { return }
+            for (category, cutout) in segmentation.cutouts(from: result) {
+                items.append(makeItem(category: category, cutout: cutout))
+            }
+            processedPhotoIDs.insert(photo.id)
+        } catch {
+            Log.report(error)
+        }
+    }
+
+    private func makeItem(category: GarmentCategory, cutout: CGImage) -> ClothingItem {
         let id = UUID()
-        let path = thumbnailStore.save(croppedImage, id: id) ?? ""
-        
-        return ClothingItem(
-            id: id,
-            assetLocalIdentifier: "", // no longer tracking a specific PHAsset
-            category: category,
-            subcategory: "unclassified",
-            dominantColor: nil,
-            dateWorn: Date(),
-            croppedThumbnailPath: path
-        )
+        let path = (try? thumbnails.save(cutout, id: id)) ?? ""
+        return ClothingItem(id: id, category: category, dateWorn: Date(), thumbnailPath: path)
     }
 }
-

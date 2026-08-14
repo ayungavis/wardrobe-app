@@ -69,6 +69,21 @@ public final class AppContainer {
         )
     }
 
+    public func makeWardrobeViewModel() -> WardrobeViewModel {
+        WardrobeViewModel(
+            segmentation: Self.defaultSegmentation(),
+            thumbnails: FileGarmentThumbnailRepository()
+        )
+    }
+
+    private static func defaultSegmentation() -> GarmentSegmentationService {
+        #if os(iOS)
+            FASHNGarmentSegmentationService()
+        #else
+            NoopGarmentSegmentationService()
+        #endif
+    }
+
     public func makeDevMenuViewModel() -> DevMenuViewModel {
         DevMenuViewModel(
             activeRepository: activeChallengeRepository,

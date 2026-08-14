@@ -24,7 +24,9 @@ jobs:
       PROVISIONING_PROFILE_NAME: WardrobeApp Apple Distribution
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          lfs: true # Core ML weights are LFS-tracked (see ci.yml)
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:

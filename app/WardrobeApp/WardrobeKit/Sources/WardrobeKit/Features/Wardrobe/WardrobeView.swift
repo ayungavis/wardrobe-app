@@ -1,124 +1,114 @@
-//import DesignSystem
-//import SwiftUI
-//
-//public struct WardrobeView: View {
-//    public init() {}
-//
-//    public var body: some View {
-//        NavigationStack {
-//            // PRD §17: empty state explains that completing the first
-//            // challenge creates wardrobe items.
-//            ContentUnavailableView {
-//                Label {
-//                    Text("wardrobe.empty.title", bundle: .module)
-//                } icon: {
-//                    Image(systemName: "tshirt")
-//                }
-//            } description: {
-//                Text("wardrobe.empty.message", bundle: .module)
-//            }
-//            .navigationTitle(Text("tab.wardrobe", bundle: .module))
-//        }
-//    }
-//}
-//
-//#Preview {
-//    WardrobeView()
-//}
-import SwiftUI
+import DesignSystem
 import PhotosUI
+import SwiftUI
 
-struct WardrobeView: View {
-    @StateObject private var viewModel = WardrobeViewModel()
+// ponytail: temporary bulk-scan UI for exercising the detector. The real
+// wardrobe fills from completed challenges (see docs/wardrobe-generation.md).
+public struct WardrobeView: View {
+    @State private var viewModel: WardrobeViewModel
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var filter: CategoryFilter = .all
 
-    enum CategoryFilter: String, CaseIterable {
-        case all = "All"
-        case top = "Tops"
-        case bottom = "Bottoms"
+    public init(viewModel: WardrobeViewModel) {
+        _viewModel = State(wrappedValue: viewModel)
+    }
+
+    enum CategoryFilter: CaseIterable {
+        case all, top, bottom
+
+        var category: GarmentCategory? {
+            switch self {
+            case .all: nil
+            case .top: .top
+            case .bottom: .bottom
+            }
+        }
     }
 
     private var filteredItems: [ClothingItem] {
-        switch filter {
-        case .all: return viewModel.items
-        case .top: return viewModel.items.filter { $0.category == "top" }
-        case .bottom: return viewModel.items.filter { $0.category == "bottom" }
-        }
+        guard let category = filter.category else { return viewModel.items }
+        return viewModel.items.filter { $0.category == category }
     }
 
     private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.flexible(), spacing: Spacing.md),
+        GridItem(.flexible(), spacing: Spacing.md),
     ]
 
-    var body: some View {
-        VStack {
-            PhotosPicker(
-                selection: $selectedPhotos,
-                maxSelectionCount: 20,
-                matching: .images
-            ) {
-                if viewModel.isScanning {
-                    Text("Processing… \(Int(viewModel.scanProgress * 100))%")
-                } else {
-                    Text("Add Outfit Photos")
+    public var body: some View {
+        VStack(spacing: Spacing.md) {
+            scanButton
+            filterPicker
+            grid
+        }
+        .background(AppColor.background)
+    }
+
+    private var scanButton: some View {
+        PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 20, matching: .images) {
+            if viewModel.isScanning {
+                HStack(spacing: Spacing.xs) {
+                    Text("wardrobe.scan.processing", bundle: .module)
+                    Text(verbatim: "\(Int(viewModel.scanProgress * 100))%")
                 }
-            }
-            .disabled(viewModel.isScanning)
-            .buttonStyle(.borderedProminent)
-            .padding()
-            .onChange(of: selectedPhotos) { _, newItems in
-                Task {
-                    guard !newItems.isEmpty else { return }
-
-                    var entries: [(id: String, image: UIImage)] = []
-                    for item in newItems {
-                        if let data = try? await item.loadTransferable(type: Data.self),
-                           let uiImage = UIImage(data: data) {
-                            let id = "\(data.hashValue)"
-                            entries.append((id: id, image: uiImage))
-                        }
-                    }
-
-                    await viewModel.processSelectedPhotos(entries)
-                }
-            }
-
-            Picker("Filter", selection: $filter) {
-                ForEach(CategoryFilter.allCases, id: \.self) { option in
-                    Text(option.rawValue).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(filteredItems, id: \.id) { item in
-                        VStack {
-                            if let uiImage = UIImage(contentsOfFile: item.croppedThumbnailPath) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: 150)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.gray.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            } else {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(height: 150)
-                            }
-
-                            Text(item.category.capitalized)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding()
+            } else {
+                Text("wardrobe.scan.add", bundle: .module)
             }
         }
+        .disabled(viewModel.isScanning)
+        .buttonStyle(.borderedProminent)
+        .tint(AppColor.accent)
+        .padding(Spacing.lg)
+        .onChange(of: selectedPhotos) { _, newItems in
+            Task { await scan(newItems) }
+        }
     }
+
+    private var filterPicker: some View {
+        Picker(String(localized: "wardrobe.filter", bundle: .module), selection: $filter) {
+            ForEach(CategoryFilter.allCases, id: \.self) { option in
+                Text(option.title, bundle: .module).tag(option)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, Spacing.lg)
+    }
+
+    private var grid: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: Spacing.md) {
+                ForEach(filteredItems) { item in
+                    WardrobeItemCellView(item: item)
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+
+    /// `itemIdentifier` is the picker's own stable id. `data.hashValue` is not:
+    /// Swift seeds hashing per process, so it never matches after a relaunch.
+    private func scan(_ pickerItems: [PhotosPickerItem]) async {
+        guard !pickerItems.isEmpty else { return }
+
+        var photos: [(id: String, data: Data)] = []
+        for item in pickerItems {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            photos.append((id: item.itemIdentifier ?? UUID().uuidString, data: data))
+        }
+        await viewModel.process(photos)
+    }
+}
+
+private extension WardrobeView.CategoryFilter {
+    var title: LocalizedStringKey {
+        switch self {
+        case .all: "wardrobe.filter.all"
+        case .top: "wardrobe.filter.top"
+        case .bottom: "wardrobe.filter.bottom"
+        }
+    }
+}
+
+#Preview {
+    WardrobeView(viewModel: AppContainer().makeWardrobeViewModel())
 }
