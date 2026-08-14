@@ -11,6 +11,9 @@ public protocol WardrobeItemRepository: AnyObject {
     /// One transaction: the item, its first fingerprint, and the wear that
     /// created it. `fingerprint` is nil until fingerprinting lands (task A5).
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws
+    /// Empties all three tables. Dev-menu reset; the thumbnail files are the
+    /// caller's to clean up.
+    func deleteAll() throws
 }
 
 // MARK: - SwiftData
@@ -56,6 +59,13 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         context.insert(WearRecordEntity(wear))
         try context.save()
     }
+
+    public func deleteAll() throws {
+        try context.delete(model: WardrobeItemEntity.self)
+        try context.delete(model: ItemFingerprintEntity.self)
+        try context.delete(model: WearRecordEntity.self)
+        try context.save()
+    }
 }
 
 // MARK: - Storage entities
@@ -71,6 +81,8 @@ final class WardrobeItemEntity {
     private(set) var id: UUID = UUID()
     var category: String = GarmentCategory.top.rawValue
     var status: String = ItemStatus.pending.rawValue
+    /// Column keeps its old name so no schema migration is needed; the domain
+    /// calls it `cutoutFile` because that is what it now holds.
     var cutoutPath: String = ""
     var illustrationURL: URL?
     var styleVersion: String?
@@ -81,7 +93,7 @@ final class WardrobeItemEntity {
         id = item.id
         category = item.category.rawValue
         status = item.status.rawValue
-        cutoutPath = item.cutoutPath
+        cutoutPath = item.cutoutFile
         illustrationURL = item.illustrationURL
         styleVersion = item.styleVersion
         createdAt = item.createdAt
@@ -93,7 +105,7 @@ final class WardrobeItemEntity {
             id: id,
             category: GarmentCategory(rawValue: category) ?? .top,
             status: ItemStatus(rawValue: status) ?? .pending,
-            cutoutPath: cutoutPath,
+            cutoutFile: cutoutPath,
             illustrationURL: illustrationURL,
             styleVersion: styleVersion,
             createdAt: createdAt,

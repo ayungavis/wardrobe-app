@@ -21,7 +21,7 @@ struct WardrobeItemRepositoryTests {
         WardrobeItem(
             id: id,
             category: category,
-            cutoutPath: "/tmp/\(id.uuidString).png",
+            cutoutFile: "\(id.uuidString).png",
             createdAt: createdAt,
             updatedAt: createdAt
         )
@@ -85,6 +85,18 @@ struct WardrobeItemRepositoryTests {
         try sut.insert(other, fingerprint: nil, wear: WearRecord(itemID: other.id, wornAt: Date()))
 
         #expect(try sut.wears(for: mine.id) == [myWear])
+    }
+
+    @Test func deleteAllEmptiesEveryTable() throws {
+        let sut = try makeSUT()
+        let item = makeItem()
+        try sut.insert(item, fingerprint: makeFingerprint(itemID: item.id), wear: WearRecord(itemID: item.id, wornAt: Date()))
+
+        try sut.deleteAll()
+
+        #expect(try sut.items().isEmpty)
+        #expect(try sut.fingerprints().isEmpty)
+        #expect(try sut.wears(for: item.id).isEmpty)
     }
 
     @Test func insertWithoutFingerprintStillStoresItemAndWear() throws {

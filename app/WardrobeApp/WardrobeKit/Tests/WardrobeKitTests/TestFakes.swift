@@ -60,6 +60,33 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         }
         storedWears.append(wear)
     }
+
+    func deleteAll() throws {
+        storedItems.removeAll()
+        storedFingerprints.removeAll()
+        storedWears.removeAll()
+    }
+}
+
+final class InMemoryGarmentThumbnailRepository: GarmentThumbnailRepository, @unchecked Sendable {
+    var files: [String: Data] = [:]
+    private(set) var deleteAllCount = 0
+
+    func save(_: CGImage, id: UUID) throws -> String {
+        let file = "\(id.uuidString).png"
+        files[file] = Data([0x01])
+        return file
+    }
+
+    func data(forFile file: String) throws -> Data {
+        guard let data = files[URL(filePath: file).lastPathComponent] else { throw AppError.unexpected }
+        return data
+    }
+
+    func deleteAll() throws {
+        deleteAllCount += 1
+        files.removeAll()
+    }
 }
 
 /// An actor, mirroring the real browser's isolation, so tests exercise the

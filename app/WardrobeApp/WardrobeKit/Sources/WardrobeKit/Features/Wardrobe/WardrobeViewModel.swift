@@ -27,10 +27,21 @@ public final class WardrobeViewModel {
 
     public func load() {
         do {
-            items = try repository.items()
+            let loaded = try repository.items()
+            items = loaded
+            let missing = loaded.count { (try? thumbnails.data(forFile: $0.cutoutFile)) == nil }
+            if missing > 0 {
+                // Loud on purpose: a silent grey tile is how the stale-path bug
+                // stayed invisible until someone reinstalled the app.
+                Log.ui.error("Wardrobe: \(missing) of \(loaded.count) items have no image on disk")
+            }
         } catch {
             Log.report(error)
         }
+    }
+
+    public func thumbnailData(for item: WardrobeItem) -> Data? {
+        try? thumbnails.data(forFile: item.cutoutFile)
     }
 
     /// Each entry is a stable identifier plus the photo's bytes. Photos whose
@@ -59,7 +70,9 @@ public final class WardrobeViewModel {
         do {
             guard let result = try segmentation.segment(image) else { return }
             for (category, cutout) in segmentation.cutouts(from: result) {
-                try store(category: category, cutout: cutout)
+                // maskQuality lands on the fingerprint at task A5; logged until then.
+                Log.ui.info("Cut-out \(category.rawValue, privacy: .public) quality \(cutout.maskQuality)")
+                try store(category: category, cutout: cutout.image)
             }
             processedPhotoIDs.insert(photo.id)
         } catch {
@@ -75,7 +88,7 @@ public final class WardrobeViewModel {
         let item = try WardrobeItem(
             id: id,
             category: category,
-            cutoutPath: thumbnails.save(cutout, id: id),
+            cutoutFile: thumbnails.save(cutout, id: id),
             createdAt: now,
             updatedAt: now
         )

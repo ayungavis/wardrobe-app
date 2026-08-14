@@ -79,7 +79,9 @@ public struct WardrobeView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Spacing.md) {
                 ForEach(filteredItems) { item in
-                    WardrobeItemCellView(item: item)
+                    // ponytail: reads the file on each body pass; fine for a few
+                    // dozen items, revisit when the wardrobe outgrows a screenful.
+                    WardrobeItemCellView(item: item, data: viewModel.thumbnailData(for: item))
                 }
             }
             .padding(Spacing.lg)

@@ -21,23 +21,32 @@ public protocol GarmentSegmentationService: Sendable {
     func segment(_ image: CGImage) throws -> GarmentSegmentation?
 }
 
+/// A repaired, normalized garment image and how much its mask could be trusted.
+public struct GarmentCutout: Sendable {
+    public let image: CGImage
+    public let maskQuality: Float
+}
+
 // MARK: - Cut-outs (pure, cross-platform, unit-testable)
 
 public extension GarmentSegmentationService {
     /// One pass over the class map produces every category's cut-out, instead
-    /// of scanning once per category.
-    func cutouts(from segmentation: GarmentSegmentation) -> [GarmentCategory: CGImage] {
+    /// of scanning once per category. Each one comes out repaired (§7) and on
+    /// the shared 1024² canvas.
+    func cutouts(from segmentation: GarmentSegmentation) -> [GarmentCategory: GarmentCutout] {
         let masks = GarmentMask.build(from: segmentation.classMap)
         guard !masks.isEmpty else { return [:] }
 
         let photo = CIImage(cgImage: segmentation.image)
         let context = CIContext()
-        var results: [GarmentCategory: CGImage] = [:]
+        var results: [GarmentCategory: GarmentCutout] = [:]
 
         for (category, mask) in masks {
-            if let cutout = GarmentMask.cutout(photo: photo, mask: mask, context: context) {
-                results[category] = cutout
-            }
+            guard let repaired = GarmentMask.repair(mask),
+                  let cutout = GarmentMask.cutout(photo: photo, repaired: repaired, context: context),
+                  let normalized = GarmentNormalization.normalize(cutout)
+            else { continue }
+            results[category] = GarmentCutout(image: normalized, maskQuality: repaired.quality)
         }
         return results
     }
@@ -102,35 +111,88 @@ enum GarmentMask {
         return box
     }
 
-    /// Applies the mask to the photo and crops to the garment's bounding box.
-    static func cutout(photo: CIImage, mask: Mask, context: CIContext) -> CGImage? {
-        guard let maskImage = grayscaleImage(from: mask) else { return nil }
+    /// Applies the repaired mask to the photo, paints the closed holes with the
+    /// garment's own average colour, and crops to the bounding box.
+    ///
+    /// Holes must not simply show the photo through: what sits behind them is
+    /// the wearer's arm, which looks worse than the hole did. Padding is left to
+    /// `GarmentNormalization` so framing has a single owner.
+    static func cutout(photo: CIImage, repaired: Repaired, context: CIContext) -> CGImage? {
+        let mask = repaired.mask
+        guard let garmentMask = softenedMask(repaired.holes.isEmpty ? mask.pixels : withoutHoles(repaired),
+                                             like: mask, photo: photo),
+            let filledMask = softenedMask(mask.pixels, like: mask, photo: photo)
+        else { return nil }
 
-        let maskCI = CIImage(cgImage: maskImage)
-        let scaleX = photo.extent.width / maskCI.extent.width
-        let scaleY = photo.extent.height / maskCI.extent.height
-        let scaled = maskCI.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-        let softened = scaled
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 2.0])
-            .cropped(to: scaled.extent)
+        let garment = photo.applyingFilter("CIBlendWithMask", parameters: [kCIInputMaskImageKey: garmentMask])
+        let patch = CIImage(color: averageColor(of: garment, context: context))
+            .cropped(to: photo.extent)
+            .applyingFilter("CIBlendWithMask", parameters: [kCIInputMaskImageKey: filledMask])
+        let composed = garment.composited(over: patch)
 
-        let blended = photo.applyingFilter(
-            "CIBlendWithMask",
-            parameters: [kCIInputMaskImageKey: softened]
-        )
-        guard let composited = context.createCGImage(blended, from: blended.extent) else { return nil }
-
+        guard let image = context.createCGImage(composed, from: composed.extent) else { return nil }
         let box = mask.bounds
+        let scaleX = photo.extent.width / CGFloat(mask.width)
+        let scaleY = photo.extent.height / CGFloat(mask.height)
         let cropRect = CGRect(
             x: CGFloat(box.minX) * scaleX,
             y: CGFloat(box.minY) * scaleY,
-            width: CGFloat(box.maxX - box.minX) * scaleX,
-            height: CGFloat(box.maxY - box.minY) * scaleY
-        )
-        .insetBy(dx: -10, dy: -10)
-        .intersection(CGRect(x: 0, y: 0, width: composited.width, height: composited.height))
+            width: CGFloat(box.maxX - box.minX + 1) * scaleX,
+            height: CGFloat(box.maxY - box.minY + 1) * scaleY
+        ).intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
 
-        return composited.cropping(to: cropRect) ?? composited
+        return image.cropping(to: cropRect) ?? image
+    }
+
+    private static func withoutHoles(_ repaired: Repaired) -> [UInt8] {
+        var pixels = repaired.mask.pixels
+        for index in pixels.indices where repaired.holes[index] == 255 {
+            pixels[index] = 0
+        }
+        return pixels
+    }
+
+    private static func softenedMask(_ pixels: [UInt8], like mask: Mask, photo: CIImage) -> CIImage? {
+        let source = Mask(pixels: pixels, width: mask.width, height: mask.height, bounds: mask.bounds)
+        guard let image = grayscaleImage(from: source) else { return nil }
+
+        let maskCI = CIImage(cgImage: image)
+        let scaled = maskCI.transformed(by: CGAffineTransform(
+            scaleX: photo.extent.width / maskCI.extent.width,
+            y: photo.extent.height / maskCI.extent.height
+        ))
+        return scaled
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 2.0])
+            .cropped(to: scaled.extent)
+    }
+
+    // ponytail: average rather than median — one GPU call instead of a
+    // histogram pass, and the difference is invisible in a flat fill.
+
+    /// `CIAreaAverage` includes the transparent pixels, so the premultiplied
+    /// result is divided by the alpha average to recover the garment's colour.
+    private static func averageColor(of image: CIImage, context: CIContext) -> CIColor {
+        let average = image.applyingFilter(
+            "CIAreaAverage",
+            parameters: [kCIInputExtentKey: CIVector(cgRect: image.extent)]
+        )
+        var pixel = [UInt8](repeating: 0, count: 4)
+        context.render(
+            average,
+            toBitmap: &pixel,
+            rowBytes: 4,
+            bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+            format: .RGBA8,
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)
+        )
+
+        let alpha = CGFloat(pixel[3]) / 255
+        guard alpha > 0.01 else { return CIColor(red: 0.5, green: 0.5, blue: 0.5) }
+        return CIColor(
+            red: CGFloat(pixel[0]) / 255 / alpha,
+            green: CGFloat(pixel[1]) / 255 / alpha,
+            blue: CGFloat(pixel[2]) / 255 / alpha
+        )
     }
 
     private static func grayscaleImage(from mask: Mask) -> CGImage? {

@@ -73,9 +73,15 @@ public final class AppContainer {
     public func makeWardrobeViewModel() -> WardrobeViewModel {
         WardrobeViewModel(
             segmentation: Self.defaultSegmentation(),
-            thumbnails: FileGarmentThumbnailRepository(),
-            repository: SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
+            thumbnails: garmentThumbnailRepository,
+            repository: makeWardrobeItemRepository()
         )
+    }
+
+    private let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
+
+    private func makeWardrobeItemRepository() -> WardrobeItemRepository {
+        SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
     }
 
     /// Built once per process; `ModelContainer` is Sendable and cheap to share.
@@ -105,7 +111,9 @@ public final class AppContainer {
         DevMenuViewModel(
             activeRepository: activeChallengeRepository,
             completedRepository: completedChallengeRepository,
-            photoRepository: photoRepository
+            photoRepository: photoRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
         )
     }
 

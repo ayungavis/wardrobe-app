@@ -7,9 +7,10 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
     /// User-confirmed, never AI-final (FR-029).
     public var category: GarmentCategory
     public var status: ItemStatus
-    /// Normalized cut-out on disk: the placeholder shown until an illustration
-    /// exists, and the source for re-rendering and recomputing fingerprints.
-    public var cutoutPath: String
+    /// File name of the normalized cut-out: the placeholder shown until an
+    /// illustration exists, and the source for re-rendering and recomputing
+    /// fingerprints. A **name**, not a path — container paths go stale.
+    public var cutoutFile: String
     public var illustrationURL: URL?
     public var styleVersion: String?
     public let createdAt: Date
@@ -19,7 +20,7 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
         id: UUID = UUID(),
         category: GarmentCategory,
         status: ItemStatus = .pending,
-        cutoutPath: String,
+        cutoutFile: String,
         illustrationURL: URL? = nil,
         styleVersion: String? = nil,
         createdAt: Date,
@@ -28,7 +29,7 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
         self.id = id
         self.category = category
         self.status = status
-        self.cutoutPath = cutoutPath
+        self.cutoutFile = cutoutFile
         self.illustrationURL = illustrationURL
         self.styleVersion = styleVersion
         self.createdAt = createdAt
