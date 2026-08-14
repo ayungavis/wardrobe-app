@@ -89,6 +89,14 @@ public final class AppContainer {
         )
     }
 
+    /// Internal: the benchmark is a dev tool and never leaves the package.
+    func makeMatchBenchmarkViewModel() -> MatchBenchmarkViewModel {
+        MatchBenchmarkViewModel(
+            scanner: makeGarmentScanService(),
+            thumbnails: garmentThumbnailRepository
+        )
+    }
+
     public func makeGarmentScanService() -> GarmentScanService {
         WardrobeGarmentScanService(
             segmentation: Self.defaultSegmentation(),

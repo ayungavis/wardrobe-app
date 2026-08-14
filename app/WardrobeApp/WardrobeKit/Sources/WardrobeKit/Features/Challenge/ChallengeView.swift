@@ -46,6 +46,7 @@ public struct ChallengeView: View {
                     DevMenuView(
                         viewModel: container.makeDevMenuViewModel(),
                         makeReview: { container.makeGarmentReviewModel() },
+                        makeBenchmark: { container.makeMatchBenchmarkViewModel() },
                         onStateChanged: { viewModel.refreshActiveChallenge() }
                     )
                 }
