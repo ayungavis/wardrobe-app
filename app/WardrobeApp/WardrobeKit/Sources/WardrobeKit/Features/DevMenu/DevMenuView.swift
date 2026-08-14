@@ -8,6 +8,7 @@ struct DevMenuView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DevMenuViewModel
     @State private var isResetConfirmationPresented = false
+    @State private var isWardrobeResetConfirmationPresented = false
     /// Called after an action mutates a repository, so the screen behind the sheet
     /// updates right away instead of waiting for dismissal.
     private let onStateChanged: () -> Void
@@ -23,6 +24,9 @@ struct DevMenuView: View {
                 DevStateSection(summary: viewModel.summary)
                 DevTodaySection(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
+                }
+                DevWardrobeSection {
+                    isWardrobeResetConfirmationPresented = true
                 }
             }
             .navigationTitle(Text(verbatim: "Dev menu"))
@@ -55,6 +59,23 @@ struct DevMenuView: View {
                 } message: {
                     Text(verbatim: "Deletes today's completion, the active challenge, and their photos.")
                 }
+                .confirmationDialog(
+                    Text(verbatim: "Reset wardrobe?"),
+                    isPresented: $isWardrobeResetConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button(role: .destructive) {
+                        viewModel.resetWardrobe()
+                        onStateChanged()
+                    } label: {
+                        Text(verbatim: "Reset")
+                    }
+                    Button(role: .cancel) {} label: {
+                        Text("common.cancel", bundle: .module)
+                    }
+                } message: {
+                    Text(verbatim: "Deletes every wardrobe item, its wear history, and its cut-out image.")
+                }
         }
         .presentationDetents([.medium, .large])
         .task { viewModel.refresh() }
@@ -80,6 +101,11 @@ private struct DevStateSection: View {
                 Text(verbatim: activeDescription)
             } label: {
                 Text(verbatim: "Active challenge")
+            }
+            LabeledContent {
+                Text(verbatim: "\(summary.wardrobeItemCount)")
+            } label: {
+                Text(verbatim: "Wardrobe items")
             }
         } header: {
             Text(verbatim: "State")
@@ -107,6 +133,22 @@ private struct DevTodaySection: View {
             // New dev actions go here as extra rows — one method on the view
             // model, one Button.
             Text(verbatim: lastAction ?? "Reopens the deck as if today had not started.")
+        }
+    }
+}
+
+private struct DevWardrobeSection: View {
+    let onReset: () -> Void
+
+    var body: some View {
+        Section {
+            Button(role: .destructive, action: onReset) {
+                Text(verbatim: "Reset wardrobe")
+            }
+        } header: {
+            Text(verbatim: "Wardrobe")
+        } footer: {
+            Text(verbatim: "Clears every scanned garment so you can start from an empty wardrobe.")
         }
     }
 }
