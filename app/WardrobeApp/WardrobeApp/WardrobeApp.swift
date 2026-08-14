@@ -16,13 +16,15 @@ struct WardrobeAppApp: App {
         }
     }
 
-    /// DSN comes from Info.plist via xcconfig. Empty DSN (e.g. a dev machine
-    /// without a Sentry account) simply leaves the SDK off.
+    /// DSN comes from Info.plist via xcconfig. A missing or unusable DSN (a dev
+    /// machine without a Sentry account, or a truncated xcconfig value) simply
+    /// leaves the SDK off — starting it with a broken DSN only produces a
+    /// stream of fatal log lines.
     private static func startSentryIfConfigured() {
         guard let dsn = Bundle.main.object(forInfoDictionaryKey: "SentryDSN") as? String,
-              !dsn.isEmpty
+              let url = URL(string: dsn), url.host?.isEmpty == false
         else {
-            Log.app.info("Sentry disabled: no DSN configured")
+            Log.app.info("Sentry disabled: no usable DSN configured")
             return
         }
 
