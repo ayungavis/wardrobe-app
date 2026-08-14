@@ -3,28 +3,96 @@ import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
+    @State private var isDevMenuPresented = DevMode.opensOnLaunch
+    private let container: AppContainer
 
-    public init(viewModel: ChallengeViewModel) {
+    public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
+        self.container = container
     }
 
     public var body: some View {
+        @Bindable var viewModel = viewModel
+
         NavigationStack {
             Group {
-                switch viewModel.deck {
-                case .idle, .loading:
-                    ProgressView()
-                case let .failed(error):
-                    errorView(error)
-                case let .loaded(cards):
-                    deckView(cards)
+                if viewModel.hasCompletedToday {
+                    CompletedTodayView()
+                } else if let active = viewModel.activeChallenge {
+                    ActiveChallengeStateView(
+                        challenge: active,
+                        onResume: { viewModel.resume() },
+                        onAbandon: { viewModel.requestAbandon() }
+                    )
+                } else {
+                    deckContent
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.background)
             .navigationTitle(Text("tab.challenge", bundle: .module))
+            // Long-press anywhere on this screen opens the dev menu. `including:`
+            // reads a process constant, so view identity never changes.
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 1).onEnded { _ in
+                    isDevMenuPresented = true
+                },
+                including: DevMode.isEnabled ? .all : .none
+            )
+            .sheet(
+                isPresented: $isDevMenuPresented,
+                onDismiss: { viewModel.refreshActiveChallenge() },
+                content: {
+                    DevMenuView(
+                        viewModel: container.makeDevMenuViewModel(),
+                        onStateChanged: { viewModel.refreshActiveChallenge() }
+                    )
+                }
+            )
         }
         .task { viewModel.onAppear() }
+        .confirmationDialog(
+            Text("challenge.abandon.confirm.title", bundle: .module),
+            isPresented: $viewModel.isAbandonConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button(role: .destructive) {
+                viewModel.abandon()
+            } label: {
+                Text("challenge.abandon.confirm.action", bundle: .module)
+            }
+            Button(role: .cancel) {} label: {
+                Text("common.cancel", bundle: .module)
+            }
+        } message: {
+            Text("challenge.abandon.confirm.message", bundle: .module)
+        }
+        #if os(iOS)
+        .fullScreenCover(
+            isPresented: $viewModel.isCaptureFlowPresented,
+            onDismiss: { viewModel.refreshActiveChallenge() },
+            content: {
+                if let active = viewModel.activeChallenge {
+                    CaptureFlowView(
+                        viewModel: container.makeCaptureFlowViewModel(challenge: active),
+                        makeEditorViewModel: { container.makeEditorViewModel(challenge: $0) }
+                    )
+                }
+            }
+        )
+        #endif
+    }
+
+    @ViewBuilder
+    private var deckContent: some View {
+        switch viewModel.deck {
+        case .idle, .loading:
+            ProgressView()
+        case let .failed(error):
+            errorView(error)
+        case let .loaded(cards):
+            deckView(cards)
+        }
     }
 
     private func errorView(_ error: AppError) -> some View {
@@ -61,28 +129,4 @@ public struct ChallengeView: View {
         .tabViewStyle(.page)
         #endif
     }
-}
-
-struct ChallengeCardView: View {
-    let card: ChallengeCard
-    let onAccept: () -> Void
-
-    var body: some View {
-        VStack(spacing: Spacing.xl) {
-            Text(card.prompt)
-                .font(AppFont.title)
-                .foregroundStyle(AppColor.textPrimary)
-                .multilineTextAlignment(.center)
-
-            PrimaryButton(Text("challenge.accept", bundle: .module), action: onAccept)
-        }
-        .padding(Spacing.xl)
-        .frame(maxWidth: .infinity)
-        .background(AppColor.surface, in: RoundedRectangle(cornerRadius: 16))
-        .appShadow(.card)
-    }
-}
-
-#Preview {
-    ChallengeView(viewModel: ChallengeViewModel(repository: MockChallengeRepository()))
 }

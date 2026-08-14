@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Full-width primary action button. Takes a `Text` so callers keep control
 /// of localization bundles.
-public struct PrimaryButton: View {
+public struct PrimaryButtonView: View {
     private let title: Text
     private let action: () -> Void
 
@@ -23,6 +23,6 @@ public struct PrimaryButton: View {
 }
 
 #Preview {
-    PrimaryButton(Text(verbatim: "Continue")) {}
+    PrimaryButtonView(Text(verbatim: "Continue")) {}
         .padding()
 }
