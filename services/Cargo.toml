@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/db"]
+members = ["crates/api", "crates/db"]
 
 [workspace.package]
 edition = "2024"
@@ -8,7 +8,9 @@ rust-version = "1.85"
 publish = false
 
 [workspace.dependencies]
+axum = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rust_decimal = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,8 +24,16 @@ sqlx = { version = "0.8", default-features = false, features = [
   "tls-rustls",
   "uuid",
 ] }
+sha2 = "0.10"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["request-id", "trace", "util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # v7 only: every id in this schema is a time-ordered UUIDv7 minted in Rust, so
 # the database never needs a uuid default (docs/backend-schema.md §2).
 uuid = { version = "1", features = ["serde", "v7"] }

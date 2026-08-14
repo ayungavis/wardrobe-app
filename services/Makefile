@@ -3,7 +3,7 @@ export
 
 DATABASE_URL ?= postgres://wardrobe:wardrobe@localhost:5433/wardrobe
 
-.PHONY: up down migrate reset test fmt lint validate
+.PHONY: up down migrate reset run openapi test fmt lint validate
 
 up:
 	docker compose up -d --wait
@@ -20,6 +20,14 @@ reset:
 	sqlx database drop -y --database-url '$(DATABASE_URL)' || true
 	sqlx database create --database-url '$(DATABASE_URL)'
 	$(MAKE) migrate
+
+run: up
+	cargo run -p wardrobe-api --bin wardrobe-api
+
+# Regenerated from the handlers, never hand-edited. A test fails when the
+# committed file drifts from the code.
+openapi:
+	cargo run --quiet -p wardrobe-api --bin openapi > openapi.json
 
 test: up
 	cargo test --workspace

@@ -70,12 +70,18 @@ The Release configuration is signed manually with the CI team (`QHL64K2LPL`) for
 ```bash
 make backend-up        # Postgres + MinIO, waits until both are healthy
 make backend-migrate   # apply the schema
+make backend-run       # serve the API
 make backend-validate  # fmt + clippy -D warnings + tests
 ```
 
+With the API running: <http://localhost:8080/docs> is Swagger UI and
+<http://localhost:8080/health> reports whether the service *and its database* are reachable.
+
 `services/.env` is created from `.env.example` on first use. Local ports are deliberately **not** the defaults — Postgres is on **5433** and MinIO on **9100/9101**, because a system Postgres on 5432 is common enough that sharing it would be the first thing every new machine tripped over.
 
-The API and worker binaries are not written yet; the schema comes first. See [`docs/backend-schema.md`](docs/backend-schema.md).
+**API documentation is generated from the handlers.** [`services/openapi.json`](services/openapi.json) is committed and a test fails if it drifts from the code, so client generators can read it without running anything. Regenerate with `make backend-openapi`.
+
+The queue worker is not written yet, and the API so far serves health, identity, and its own documentation. See [`docs/backend-schema.md`](docs/backend-schema.md) and [`docs/api-contract.md`](docs/api-contract.md).
 
 ## Commands
 
@@ -93,6 +99,8 @@ The API and worker binaries are not written yet; the schema comes first. See [`d
 | `make backend-down`    | Stop them                                                                       |
 | `make backend-migrate` | Apply migrations                                                                |
 | `make backend-reset`   | Drop and rebuild the database from empty                                        |
+| `make backend-run`     | Serve the API — Swagger UI at `/docs`                                           |
+| `make backend-openapi` | Regenerate `services/openapi.json` from the handlers                            |
 | `make backend-test`    | `cargo test` (starts the containers it needs)                                   |
 | `make backend-validate`| fmt → clippy → test                                                             |
 | `make validate`        | Both sides. **Must pass before every PR.**                                      |
@@ -115,6 +123,7 @@ A docs-only change runs nothing. One-time TestFlight credential setup: [`docs/te
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | [`docs/prd.md`](docs/prd.md)                                             | **The source of truth for product behavior.** Read first                |
 | [`docs/backend-schema.md`](docs/backend-schema.md)                       | PostgreSQL schema and why each part is shaped that way                  |
+| [`docs/api-contract.md`](docs/api-contract.md)                           | API decisions OpenAPI cannot express: auth, cursor, idempotency, errors  |
 | [`docs/wardrobe-generation.md`](docs/wardrobe-generation.md)             | The device/server split for detection, matching, and illustration       |
 | [`docs/garment-matching-accuracy.md`](docs/garment-matching-accuracy.md) | What to do when duplicate matching gets it wrong, in cost order         |
 | [`docs/capture-editor-share.md`](docs/capture-editor-share.md)           | The camera → editor → share slice                                       |
