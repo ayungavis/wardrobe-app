@@ -76,10 +76,9 @@ struct GarmentSegmentationTests {
         )
         let cutout = try #require(image)
 
-        let path = try repository.save(cutout, id: UUID())
+        let file = try repository.save(cutout, id: UUID())
 
-        #expect(FileManager.default.fileExists(atPath: path))
-        #expect(try repository.load(path: path).isEmpty == false)
+        #expect(try repository.data(forFile: file).isEmpty == false)
     }
 
     #if !os(iOS)

@@ -4,6 +4,7 @@ PACKAGE    = app/WardrobeApp/WardrobeKit
 DEST       = platform=iOS Simulator,name=iPhone 17 Pro
 BUNDLE_ID  = com.ayungavis.WardrobeApp
 BUILD_LOG  = /tmp/wardrobeapp-build.log
+TEST_FLAGS ?=
 
 .PHONY: generate format lint test build run validate
 
@@ -17,7 +18,7 @@ lint:
 	swiftlint --strict
 
 test:
-	swift test --package-path $(PACKAGE)
+	swift test --package-path $(PACKAGE) $(TEST_FLAGS)
 
 # xcodebuild output is huge — log to a file, print the tail only on failure.
 build: generate

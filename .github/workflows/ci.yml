@@ -9,6 +9,7 @@ on:
 jobs:
   lint:
     runs-on: macos-26
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: brew install swiftlint
@@ -16,12 +17,14 @@ jobs:
 
   test:
     runs-on: macos-26
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: make test
+      - run: script -q /dev/null make test TEST_FLAGS=--no-parallel
 
   build:
     runs-on: macos-26
+    timeout-minutes: 20
     steps:
       # lfs: the Core ML weights are LFS-tracked; without this the runner gets a
       # pointer file and coremlc fails. Only the jobs that compile need them.

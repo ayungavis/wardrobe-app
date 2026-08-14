@@ -20,7 +20,10 @@ struct CameraControlTests {
             activeRepository: activeRepository,
             completedRepository: InMemoryCompletedChallengeRepository(),
             photoRepository: photoRepository,
-            library: library
+            library: library,
+            scanner: FakeGarmentScanService(),
+            wardrobeRepository: InMemoryWardrobeItemRepository(),
+            thumbnails: InMemoryGarmentThumbnailRepository()
         )
     }
 

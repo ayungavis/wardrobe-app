@@ -7,13 +7,51 @@ struct DevMenuViewModelTests {
     private func makeSUT(
         activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
         completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
-        photoRepository: SpyPhotoRepository = SpyPhotoRepository()
+        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
+        wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
+        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository()
     ) -> DevMenuViewModel {
         DevMenuViewModel(
             activeRepository: activeRepository,
             completedRepository: completedRepository,
-            photoRepository: photoRepository
+            photoRepository: photoRepository,
+            wardrobeRepository: wardrobeRepository,
+            thumbnails: thumbnails
         )
+    }
+
+    private func makeWardrobeItem() -> WardrobeItem {
+        let id = UUID()
+        return WardrobeItem(id: id, category: .top, cutoutFile: "\(id.uuidString).png",
+                            createdAt: Date(), updatedAt: Date())
+    }
+
+    @Test func resetWardrobeClearsItemsAndTheirImages() throws {
+        let wardrobe = InMemoryWardrobeItemRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        let item = makeWardrobeItem()
+        try wardrobe.insert(item, fingerprint: nil, wear: WearRecord(itemID: item.id, wornAt: Date()))
+        thumbnails.files[item.cutoutFile] = Data([0x01])
+        let sut = makeSUT(wardrobeRepository: wardrobe, thumbnails: thumbnails)
+
+        sut.resetWardrobe()
+
+        #expect(try wardrobe.items().isEmpty)
+        #expect(thumbnails.files.isEmpty)
+        #expect(thumbnails.deleteAllCount == 1)
+        #expect(sut.summary.wardrobeItemCount == 0)
+        #expect(sut.lastAction != nil)
+    }
+
+    @Test func summaryCountsWardrobeItems() throws {
+        let wardrobe = InMemoryWardrobeItemRepository()
+        let item = makeWardrobeItem()
+        try wardrobe.insert(item, fingerprint: nil, wear: WearRecord(itemID: item.id, wornAt: Date()))
+        let sut = makeSUT(wardrobeRepository: wardrobe)
+
+        sut.refresh()
+
+        #expect(sut.summary.wardrobeItemCount == 1)
     }
 
     private func makeCompletion(at date: Date, photoID: String = UUID().uuidString) -> CompletedChallenge {

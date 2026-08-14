@@ -67,7 +67,7 @@ public final class SampleCameraService: CameraService {
     }
 
     static func makeSampleJPEG(width: Int = 1080, height: Int = 1920) throws -> Data {
-        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        let cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         guard let ctx = CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
             space: cs, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue

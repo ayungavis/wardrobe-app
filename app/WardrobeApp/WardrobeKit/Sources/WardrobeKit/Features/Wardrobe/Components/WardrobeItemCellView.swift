@@ -2,15 +2,14 @@ import DesignSystem
 import SwiftUI
 
 struct WardrobeItemCellView: View {
-    let item: ClothingItem
+    let item: WardrobeItem
+    let data: Data?
 
     private static let thumbnailHeight: CGFloat = 150
 
     var body: some View {
         VStack(spacing: Spacing.xs) {
-            // ponytail: reads the file on each body pass; fine for a few dozen
-            // items, revisit when the wardrobe grows past a screenful.
-            if let data = try? Data(contentsOf: URL(filePath: item.thumbnailPath)) {
+            if let data {
                 DownsampledPhotoView(data: data)
                     .frame(height: Self.thumbnailHeight)
                     .frame(maxWidth: .infinity)

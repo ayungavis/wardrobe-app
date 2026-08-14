@@ -30,6 +30,9 @@ public final class CaptureFlowViewModel {
     public private(set) var isCompleted = false
     private var isCompleting = false
 
+    /// The AI item review shown in the editor drawer (FR-027).
+    public let review: GarmentReviewModel
+
     private let camera: CameraService
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -40,6 +43,7 @@ public final class CaptureFlowViewModel {
     private(set) var flipTask: Task<Void, Never>?
     private(set) var importTask: Task<Void, Never>?
     private(set) var thumbnailTask: Task<Void, Never>?
+    private(set) var completionTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
@@ -47,7 +51,10 @@ public final class CaptureFlowViewModel {
         activeRepository: ActiveChallengeRepository,
         completedRepository: CompletedChallengeRepository,
         photoRepository: PhotoRepository,
-        library: PhotoLibraryService
+        library: PhotoLibraryService,
+        scanner: GarmentScanService,
+        wardrobeRepository: WardrobeItemRepository,
+        thumbnails: GarmentThumbnailRepository
     ) {
         self.challenge = challenge
         self.camera = camera
@@ -55,6 +62,12 @@ public final class CaptureFlowViewModel {
         self.completedRepository = completedRepository
         self.photoRepository = photoRepository
         self.library = library
+        review = GarmentReviewModel(
+            scanner: scanner,
+            photoRepository: photoRepository,
+            wardrobeRepository: wardrobeRepository,
+            thumbnails: thumbnails
+        )
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
         syncCameraState()
     }
@@ -200,13 +213,70 @@ public final class CaptureFlowViewModel {
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
 
+    /// The checkmark — the only action that completes the challenge (FR-028).
+    /// Guarded twice over: an in-flight flag here, and a same-day check in the
+    /// store, so repeated taps can never write two records (FR-029).
+    public func completeChallenge() {
+        guard !isCompleting, !isCompleted, challenge.photoID != nil else { return }
+        isCompleting = true
+
+        completionTask = Task {
+            defer { isCompleting = false }
+            await review.finishScanning()
+            commit()
+        }
+    }
+
+    private func commit() {
+        guard let photoID = challenge.photoID else { return }
+        let now = Date()
+        let completion = CompletedChallenge(
+            card: challenge.card,
+            photoID: photoID,
+            draft: challenge.draft,
+            completedAt: now
+        )
+
+        // Wardrobe first, completion last. The two live in different stores, so
+        // one transaction is impossible; if the bookkeeping fails the challenge
+        // still completes rather than being held hostage by it.
+        review.commit(completionID: completion.id, at: now)
+
+        completedRepository.append(completion)
+        activeRepository.clear() // the photo file stays — History will render it
+        isCompleted = true
+        let cardID = challenge.card.id.uuidString
+        Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
+    }
+
+    /// Editor X: throw the photo and its edits away, back to the camera.
+    public func discardPhoto() {
+        if let photoID = challenge.photoID {
+            do {
+                try photoRepository.deleteOriginal(id: photoID)
+            } catch {
+                Log.report(error) // orphaned file is not worth blocking the retake
+            }
+        }
+        challenge.photoID = nil
+        challenge.draft = EditDraft()
+        activeRepository.save(challenge)
+        stage = .camera
+    }
+}
+
+// MARK: - Photo library import
+
+/// Grouped in an extension: bringing a photo in from the library is a
+/// self-contained errand next to the camera state machine above.
+public extension CaptureFlowViewModel {
     /// Asks for library access as the camera opens, then fills the gallery
     /// button and grid.
     ///
     /// This deliberately departs from PRD §18.1 (ask at the action that needs
     /// it): the IG-style thumbnail has to read the library before the user
     /// touches anything, and the product owner accepted that trade.
-    public func prepareLibraryAccess() {
+    func prepareLibraryAccess() {
         thumbnailTask?.cancel()
         thumbnailTask = Task { [library] in
             var access = await library.access()
@@ -233,7 +303,7 @@ public final class CaptureFlowViewModel {
     private static let recentAssetLimit = 120
 
     /// Tapping a grid cell imports immediately — no confirm step.
-    public func importAsset(id: String) {
+    func importAsset(id: String) {
         importTask?.cancel()
         importTask = Task { [library] in
             let data = await library.imageData(for: id)
@@ -249,13 +319,13 @@ public final class CaptureFlowViewModel {
     }
 
     /// The picker itself failed to hand over any bytes.
-    public func reportImportFailure() {
+    func reportImportFailure() {
         alertError = .photoImportFailed
     }
 
     /// Same safe ordering as a capture: validate, write the file, persist the
     /// id, then move on (FR-016). Undecodable data persists nothing.
-    public func usePickedPhoto(_ data: Data) {
+    func usePickedPhoto(_ data: Data) {
         importTask?.cancel()
         importTask = Task {
             await persistPickedPhoto(data)
@@ -277,40 +347,5 @@ public final class CaptureFlowViewModel {
         // ponytail: HEIC keeps its bytes inside a `.jpg` file — every read
         // goes through CGImageSource, which sniffs content, not names.
         persistPhoto(data)
-    }
-
-    /// The checkmark — the only action that completes the challenge (FR-028).
-    /// Guarded twice over: an in-flight flag here, and a same-day check in the
-    /// store, so repeated taps can never write two records (FR-029).
-    public func completeChallenge() {
-        guard !isCompleting, !isCompleted, let photoID = challenge.photoID else { return }
-        isCompleting = true
-        defer { isCompleting = false }
-
-        completedRepository.append(CompletedChallenge(
-            card: challenge.card,
-            photoID: photoID,
-            draft: challenge.draft,
-            completedAt: Date()
-        ))
-        activeRepository.clear() // the photo file stays — History will render it
-        isCompleted = true
-        let cardID = challenge.card.id.uuidString
-        Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
-    }
-
-    /// Editor X: throw the photo and its edits away, back to the camera.
-    public func discardPhoto() {
-        if let photoID = challenge.photoID {
-            do {
-                try photoRepository.deleteOriginal(id: photoID)
-            } catch {
-                Log.report(error) // orphaned file is not worth blocking the retake
-            }
-        }
-        challenge.photoID = nil
-        challenge.draft = EditDraft()
-        activeRepository.save(challenge)
-        stage = .camera
     }
 }
