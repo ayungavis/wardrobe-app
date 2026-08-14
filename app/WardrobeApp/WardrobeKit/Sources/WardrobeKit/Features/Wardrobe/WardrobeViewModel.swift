@@ -1,29 +1,17 @@
-import CoreGraphics
 import Foundation
 import Observation
 
+/// The wardrobe grid. Filling it is the challenge loop's job (PRD §17) and the
+/// dev-menu bulk scan's — this only reads.
 @MainActor
 @Observable
 public final class WardrobeViewModel {
     public private(set) var items: [WardrobeItem] = []
-    public private(set) var isScanning = false
-    /// 0...1, drives the button's label while a batch is running.
-    public private(set) var scanProgress: Double = 0
-    /// Garments waiting for the user to confirm what they are. Nothing reaches
-    /// the wardrobe until they do (FR-029).
-    public private(set) var pendingReview: [ScannedGarment] = []
 
-    private var processedPhotoIDs: Set<String> = []
-    private let scanner: GarmentScanService
     private let thumbnails: GarmentThumbnailRepository
     private let repository: WardrobeItemRepository
 
-    public init(
-        scanner: GarmentScanService,
-        thumbnails: GarmentThumbnailRepository,
-        repository: WardrobeItemRepository
-    ) {
-        self.scanner = scanner
+    public init(thumbnails: GarmentThumbnailRepository, repository: WardrobeItemRepository) {
         self.thumbnails = thumbnails
         self.repository = repository
     }
@@ -45,108 +33,5 @@ public final class WardrobeViewModel {
 
     public func thumbnailData(for item: WardrobeItem) -> Data? {
         try? thumbnails.data(forFile: item.cutoutFile)
-    }
-
-    public func thumbnailData(forFile file: String) -> Data? {
-        try? thumbnails.data(forFile: file)
-    }
-
-    public func thumbnailData(forItemID itemID: UUID) -> Data? {
-        guard let item = items.first(where: { $0.id == itemID }) else { return nil }
-        return thumbnailData(for: item)
-    }
-
-    /// Each entry is a stable identifier plus the photo's bytes. Photos whose
-    /// identifier was processed before are skipped.
-    public func process(_ photos: [(id: String, data: Data)]) async {
-        isScanning = true
-        defer { isScanning = false }
-
-        let fresh = photos.filter { !processedPhotoIDs.contains($0.id) }
-        Log.ui.info("Wardrobe scan: \(fresh.count) new of \(photos.count) selected")
-        guard !fresh.isEmpty else { return }
-
-        for (index, photo) in fresh.enumerated() {
-            scanProgress = Double(index) / Double(fresh.count)
-            do {
-                try stageForReview(scanner.scan(photo: photo.data))
-                processedPhotoIDs.insert(photo.id)
-            } catch {
-                Log.report(error)
-            }
-        }
-        scanProgress = 1
-    }
-
-    // MARK: Review
-
-    /// The queue's only entry point: `process(_:)` stages one garment at a time,
-    /// and tests stage a batch so confirmation can be exercised without a model.
-    func stageForReview(_ garments: [ScannedGarment]) {
-        pendingReview.append(contentsOf: garments)
-    }
-
-    public func choose(_ decision: ScannedGarment.Decision, for garmentID: UUID) {
-        guard let index = pendingReview.firstIndex(where: { $0.id == garmentID }) else { return }
-        pendingReview[index].decision = decision
-    }
-
-    /// Writes every confirmed decision, then clears the queue.
-    public func confirmReview() {
-        for garment in pendingReview {
-            do {
-                switch garment.decision {
-                case .new:
-                    try insert(garment)
-                case let .existing(itemID):
-                    try merge(garment, into: itemID)
-                }
-            } catch {
-                Log.report(error)
-            }
-        }
-        pendingReview = []
-        load()
-    }
-
-    /// Nothing is written, and the cut-outs written during the scan are removed
-    /// so a dismissed sheet does not leak files.
-    public func cancelReview() {
-        for garment in pendingReview {
-            try? thumbnails.delete(file: garment.cutoutFile)
-        }
-        pendingReview = []
-    }
-
-    private func insert(_ garment: ScannedGarment) throws {
-        let now = Date()
-        let item = WardrobeItem(
-            id: garment.id,
-            category: garment.category,
-            cutoutFile: garment.cutoutFile,
-            createdAt: now,
-            updatedAt: now
-        )
-        try repository.insert(
-            item,
-            fingerprint: garment.fingerprint,
-            wear: WearRecord(itemID: garment.id, wornAt: now)
-        )
-    }
-
-    private func merge(_ garment: ScannedGarment, into itemID: UUID) throws {
-        // The fingerprint is re-pointed at the item it belongs to: an item owns
-        // one per confirmed wear, and that set is what makes matching improve.
-        let fingerprint = ItemFingerprint(
-            itemID: itemID,
-            version: garment.fingerprint.version,
-            colorLab: garment.fingerprint.colorLab,
-            aspectRatio: garment.fingerprint.aspectRatio,
-            featurePrint: garment.fingerprint.featurePrint,
-            maskQuality: garment.fingerprint.maskQuality,
-            createdAt: Date()
-        )
-        try repository.recordWear(WearRecord(itemID: itemID, wornAt: Date()), fingerprint: fingerprint)
-        try thumbnails.delete(file: garment.cutoutFile)
     }
 }

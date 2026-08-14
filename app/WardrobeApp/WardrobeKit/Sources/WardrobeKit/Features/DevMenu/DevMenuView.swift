@@ -9,12 +9,20 @@ struct DevMenuView: View {
     @State private var viewModel: DevMenuViewModel
     @State private var isResetConfirmationPresented = false
     @State private var isWardrobeResetConfirmationPresented = false
+    @State private var isBulkScanPresented = false
     /// Called after an action mutates a repository, so the screen behind the sheet
     /// updates right away instead of waiting for dismissal.
     private let onStateChanged: () -> Void
+    /// Built on demand so a scan always starts from an empty queue.
+    private let makeReview: () -> GarmentReviewModel
 
-    init(viewModel: DevMenuViewModel, onStateChanged: @escaping () -> Void) {
+    init(
+        viewModel: DevMenuViewModel,
+        makeReview: @escaping () -> GarmentReviewModel,
+        onStateChanged: @escaping () -> Void
+    ) {
         _viewModel = State(wrappedValue: viewModel)
+        self.makeReview = makeReview
         self.onStateChanged = onStateChanged
     }
 
@@ -25,9 +33,10 @@ struct DevMenuView: View {
                 DevTodaySection(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
                 }
-                DevWardrobeSection {
-                    isWardrobeResetConfirmationPresented = true
-                }
+                DevWardrobeSection(
+                    onScan: { isBulkScanPresented = true },
+                    onReset: { isWardrobeResetConfirmationPresented = true }
+                )
             }
             .navigationTitle(Text(verbatim: "Dev menu"))
             #if os(iOS)
@@ -76,6 +85,9 @@ struct DevMenuView: View {
                 } message: {
                     Text(verbatim: "Deletes every wardrobe item, its wear history, and its cut-out image.")
                 }
+        }
+        .sheet(isPresented: $isBulkScanPresented, onDismiss: onStateChanged) {
+            BulkScanView(review: makeReview())
         }
         .presentationDetents([.medium, .large])
         .task { viewModel.refresh() }
@@ -143,10 +155,14 @@ private struct DevTodaySection: View {
 }
 
 private struct DevWardrobeSection: View {
+    let onScan: () -> Void
     let onReset: () -> Void
 
     var body: some View {
         Section {
+            Button(action: onScan) {
+                Text(verbatim: "Bulk scan photos")
+            }
             Button(role: .destructive, action: onReset) {
                 Text(verbatim: "Reset wardrobe")
             }
@@ -159,5 +175,10 @@ private struct DevWardrobeSection: View {
 }
 
 #Preview {
-    DevMenuView(viewModel: AppContainer().makeDevMenuViewModel(), onStateChanged: {})
+    let container = AppContainer()
+    DevMenuView(
+        viewModel: container.makeDevMenuViewModel(),
+        makeReview: { container.makeGarmentReviewModel() },
+        onStateChanged: {}
+    )
 }

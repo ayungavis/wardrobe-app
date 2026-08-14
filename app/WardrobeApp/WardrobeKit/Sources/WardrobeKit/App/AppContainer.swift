@@ -75,9 +75,17 @@ public final class AppContainer {
 
     public func makeWardrobeViewModel() -> WardrobeViewModel {
         WardrobeViewModel(
-            scanner: makeGarmentScanService(),
             thumbnails: garmentThumbnailRepository,
             repository: makeWardrobeItemRepository()
+        )
+    }
+
+    public func makeGarmentReviewModel() -> GarmentReviewModel {
+        GarmentReviewModel(
+            scanner: makeGarmentScanService(),
+            photoRepository: photoRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
         )
     }
 
@@ -101,7 +109,10 @@ public final class AppContainer {
             return try ModelContainer(for: SwiftDataWardrobeItemRepository.schema)
         } catch {
             Log.report(error)
-            // A wardrobe that cannot persist still beats a crash on launch.
+            // Last resort after the on-disk container failed: an in-memory one
+            // keeps the app usable for this session. `ModelContainer` has no
+            // non-throwing initialiser, and failing here means SwiftData itself
+            // is unusable — there is nothing left to fall back to.
             // swiftlint:disable:next force_try
             return try! ModelContainer(
                 for: SwiftDataWardrobeItemRepository.schema,

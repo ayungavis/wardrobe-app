@@ -1,12 +1,11 @@
 import Foundation
 import Observation
 
-/// The AI item review that sits in the editor drawer (PRD FR-027): what the
-/// photo appears to contain, and what the user decided about each garment.
+/// What a photo appears to contain, and what the user decided about each
+/// garment (PRD FR-027). Nothing is written until `commit` is called.
 ///
-/// Its own model rather than more state on `CaptureFlowViewModel`: the capture
-/// flow owns the challenge and the camera, this owns what was found in the
-/// photo. Nothing here is written until the checkmark commits it.
+/// One model for both callers: the editor drawer during a challenge, and the
+/// dev-menu bulk scan. Two copies of the merge rules would drift apart.
 @MainActor
 @Observable
 public final class GarmentReviewModel {
@@ -41,25 +40,53 @@ public final class GarmentReviewModel {
     public func scanIfNeeded(photoID: String?) {
         guard let photoID, scannedPhotoID != photoID else { return }
         scannedPhotoID = photoID
+        scan { [photoRepository] in try photoRepository.loadOriginal(id: photoID) }
+    }
+
+    /// Bulk scan: the picker hands over bytes directly. Results accumulate, so
+    /// a batch of photos becomes one review queue.
+    public func scan(photo: Data) {
+        scan { photo }
+    }
+
+    private func scan(_ load: @escaping () throws -> Data) {
+        let previous = scanTask
         isScanning = true
 
         scanTask = Task {
+            await previous?.value // keep a batch's results in order
             defer { isScanning = false }
             do {
-                let photo = try photoRepository.loadOriginal(id: photoID)
+                let photo = try load()
                 guard !Task.isCancelled else { return }
-                garments = try scanner.scan(photo: photo)
+                try stage(scanner.scan(photo: photo))
             } catch {
-                Log.report(error) // a failed scan must never block the editor
-                garments = []
+                Log.report(error) // a failed scan must never block the caller
             }
         }
+    }
+
+    /// Drops every pending decision and the cut-outs written for them, so a
+    /// dismissed review does not leak files.
+    public func cancel() {
+        scanTask?.cancel()
+        for garment in garments {
+            try? thumbnails.delete(file: garment.cutoutFile)
+        }
+        garments = []
+        scannedPhotoID = nil
     }
 
     /// Waits for an in-flight scan. Bounded on-device work, so the checkmark
     /// waits for it rather than dropping garments it was about to produce.
     public func finishScanning() async {
         await scanTask?.value
+    }
+
+    /// The queue's only entry point: scanning appends through it, and tests
+    /// stage a batch so commit can be exercised without a model.
+    func stage(_ garments: [ScannedGarment]) {
+        self.garments.append(contentsOf: garments)
     }
 
     public func choose(_ decision: ScannedGarment.Decision, for garmentID: UUID) {
@@ -80,7 +107,9 @@ public final class GarmentReviewModel {
 
     /// Writes every confirmed decision. Failures are reported, never thrown:
     /// wardrobe bookkeeping must not hold the daily challenge hostage.
-    public func commit(completionID: UUID, at date: Date) {
+    /// `completionID` is nil outside the daily loop — the bulk scan imports
+    /// garments that no challenge produced.
+    public func commit(completionID: UUID?, at date: Date) {
         for garment in garments {
             do {
                 switch garment.decision {
@@ -96,7 +125,7 @@ public final class GarmentReviewModel {
         garments = []
     }
 
-    private func insert(_ garment: ScannedGarment, completionID: UUID, at date: Date) throws {
+    private func insert(_ garment: ScannedGarment, completionID: UUID?, at date: Date) throws {
         try wardrobeRepository.insert(
             WardrobeItem(
                 id: garment.id,
@@ -113,7 +142,7 @@ public final class GarmentReviewModel {
     private func merge(
         _ garment: ScannedGarment,
         into itemID: UUID,
-        completionID: UUID,
+        completionID: UUID?,
         at date: Date
     ) throws {
         // Re-filed under the item it belongs to: one fingerprint per confirmed

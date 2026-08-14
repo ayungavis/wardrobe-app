@@ -3,12 +3,13 @@ import Testing
 @testable import WardrobeKit
 
 struct ActiveChallengeRepositoryTests {
-    private func makeStore() -> UserDefaultsActiveChallengeRepository {
-        UserDefaultsActiveChallengeRepository(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
+    private func makeStore() throws -> UserDefaultsActiveChallengeRepository {
+        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        return UserDefaultsActiveChallengeRepository(defaults: defaults)
     }
 
-    @Test func saveLoadClearRoundtrip() {
-        let activeRepository = makeStore()
+    @Test func saveLoadClearRoundtrip() throws {
+        let activeRepository = try makeStore()
         #expect(activeRepository.load() == nil)
 
         var challenge = ActiveChallenge(
@@ -43,7 +44,7 @@ struct FilePhotoRepositoryTests {
     }
 
     @Test func saveLoadDeleteRoundtrip() throws {
-        let activeRepository = makeStore()
+        let activeRepository = try makeStore()
         let data = Data([0xFF, 0xD8, 0xFF, 0x01, 0x02])
 
         let id = try activeRepository.saveOriginal(data)
@@ -54,7 +55,7 @@ struct FilePhotoRepositoryTests {
     }
 
     @Test func loadMissingOrInvalidIDThrows() {
-        let activeRepository = makeStore()
+        let activeRepository = try makeStore()
         #expect(throws: (any Error).self) { try activeRepository.loadOriginal(id: UUID().uuidString) }
         #expect(throws: AppError.unexpected) { try activeRepository.loadOriginal(id: "../escape") }
     }
