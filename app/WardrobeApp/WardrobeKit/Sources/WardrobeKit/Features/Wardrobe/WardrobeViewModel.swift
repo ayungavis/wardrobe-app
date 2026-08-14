@@ -9,6 +9,9 @@ public final class WardrobeViewModel {
     public private(set) var isScanning = false
     /// 0...1, drives the button's label while a batch is running.
     public private(set) var scanProgress: Double = 0
+    /// Garments waiting for the user to confirm what they are. Nothing reaches
+    /// the wardrobe until they do (FR-029).
+    public private(set) var pendingReview: [ScannedGarment] = []
 
     private var processedPhotoIDs: Set<String> = []
     private let segmentation: GarmentSegmentationService
@@ -44,6 +47,15 @@ public final class WardrobeViewModel {
         try? thumbnails.data(forFile: item.cutoutFile)
     }
 
+    public func thumbnailData(forFile file: String) -> Data? {
+        try? thumbnails.data(forFile: file)
+    }
+
+    public func thumbnailData(forItemID itemID: UUID) -> Data? {
+        guard let item = items.first(where: { $0.id == itemID }) else { return nil }
+        return thumbnailData(for: item)
+    }
+
     /// Each entry is a stable identifier plus the photo's bytes. Photos whose
     /// identifier was processed before are skipped.
     public func process(_ photos: [(id: String, data: Data)]) async {
@@ -69,6 +81,78 @@ public final class WardrobeViewModel {
         scanProgress = 1
     }
 
+    // MARK: Review
+
+    /// The queue's only entry point: `process(_:)` stages one garment at a time,
+    /// and tests stage a batch so confirmation can be exercised without a model.
+    func stageForReview(_ garments: [ScannedGarment]) {
+        pendingReview.append(contentsOf: garments)
+    }
+
+    public func choose(_ decision: ScannedGarment.Decision, for garmentID: UUID) {
+        guard let index = pendingReview.firstIndex(where: { $0.id == garmentID }) else { return }
+        pendingReview[index].decision = decision
+    }
+
+    /// Writes every confirmed decision, then clears the queue.
+    public func confirmReview() {
+        for garment in pendingReview {
+            do {
+                switch garment.decision {
+                case .new:
+                    try insert(garment)
+                case let .existing(itemID):
+                    try merge(garment, into: itemID)
+                }
+            } catch {
+                Log.report(error)
+            }
+        }
+        pendingReview = []
+        load()
+    }
+
+    /// Nothing is written, and the cut-outs written during the scan are removed
+    /// so a dismissed sheet does not leak files.
+    public func cancelReview() {
+        for garment in pendingReview {
+            try? thumbnails.delete(file: garment.cutoutFile)
+        }
+        pendingReview = []
+    }
+
+    private func insert(_ garment: ScannedGarment) throws {
+        let now = Date()
+        let item = WardrobeItem(
+            id: garment.id,
+            category: garment.category,
+            cutoutFile: garment.cutoutFile,
+            createdAt: now,
+            updatedAt: now
+        )
+        try repository.insert(
+            item,
+            fingerprint: garment.fingerprint,
+            wear: WearRecord(itemID: garment.id, wornAt: now)
+        )
+    }
+
+    private func merge(_ garment: ScannedGarment, into itemID: UUID) throws {
+        // The fingerprint is re-pointed at the item it belongs to: an item owns
+        // one per confirmed wear, and that set is what makes matching improve.
+        let fingerprint = ItemFingerprint(
+            itemID: itemID,
+            version: garment.fingerprint.version,
+            colorLab: garment.fingerprint.colorLab,
+            aspectRatio: garment.fingerprint.aspectRatio,
+            featurePrint: garment.fingerprint.featurePrint,
+            maskQuality: garment.fingerprint.maskQuality,
+            createdAt: Date()
+        )
+        try repository.recordWear(WearRecord(itemID: itemID, wornAt: Date()), fingerprint: fingerprint)
+        try thumbnails.delete(file: garment.cutoutFile)
+    }
+
     private func process(
         _ photo: (id: String, data: Data),
         known: [ItemFingerprint],
@@ -90,42 +174,28 @@ public final class WardrobeViewModel {
         }
     }
 
-    /// ponytail: matching runs for real, but its result is only logged — merging
-    /// needs the confirmation UI from task A7, and FR-029 forbids doing it
-    /// silently. Watching these lines on real photos is what calibrates the
-    /// thresholds before the UI is built.
+    /// Queues a decision instead of writing one: the user confirms first.
     private func store(
         category: GarmentCategory,
         cutout: GarmentCutout,
         known: [ItemFingerprint],
         categories: [UUID: GarmentCategory]
     ) throws {
-        let now = Date()
         let id = UUID()
-        let item = try WardrobeItem(
+        let print = fingerprint(for: id, cutout: cutout, at: Date())
+        let matches = ItemMatching.candidates(
+            for: print, category: category, among: known, categories: categories
+        )
+        Log.ui.info("Match: \(matches.count) candidates, best \(matches.first?.score ?? 0)")
+
+        try stageForReview([ScannedGarment(
             id: id,
             category: category,
             cutoutFile: thumbnails.save(cutout.image, id: id),
-            createdAt: now,
-            updatedAt: now
-        )
-        let print = fingerprint(for: id, cutout: cutout, at: now)
-        report(ItemMatching.candidates(for: print, category: category, among: known, categories: categories))
-
-        try repository.insert(
-            item,
             fingerprint: print,
-            wear: WearRecord(itemID: id, wornAt: now)
-        )
-        items.insert(item, at: 0)
-    }
-
-    private func report(_ matches: [ItemMatch]) {
-        guard let best = matches.first else {
-            Log.ui.info("Match: no candidates")
-            return
-        }
-        Log.ui.info("Match: \(matches.count) candidates, best \(best.score) \(String(describing: best.confidence))")
+            matches: matches,
+            decision: ScannedGarment.defaultDecision(for: matches)
+        )])
     }
 
     private func fingerprint(for itemID: UUID, cutout: GarmentCutout, at date: Date) -> ItemFingerprint {

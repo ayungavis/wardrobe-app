@@ -61,6 +61,11 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedWears.append(wear)
     }
 
+    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
+        storedWears.append(wear)
+        storedFingerprints.append(fingerprint)
+    }
+
     func deleteAll() throws {
         storedItems.removeAll()
         storedFingerprints.removeAll()
@@ -81,6 +86,10 @@ final class InMemoryGarmentThumbnailRepository: GarmentThumbnailRepository, @unc
     func data(forFile file: String) throws -> Data {
         guard let data = files[URL(filePath: file).lastPathComponent] else { throw AppError.unexpected }
         return data
+    }
+
+    func delete(file: String) throws {
+        files[URL(filePath: file).lastPathComponent] = nil
     }
 
     func deleteAll() throws {

@@ -13,6 +13,9 @@ public protocol GarmentThumbnailRepository: Sendable {
     @discardableResult
     func save(_ image: CGImage, id: UUID) throws -> String
     func data(forFile file: String) throws -> Data
+    /// Removes a single cut-out — used when a scanned garment turns out to be a
+    /// duplicate and its image is never needed.
+    func delete(file: String) throws
     func deleteAll() throws
 }
 
@@ -44,6 +47,12 @@ public final class FileGarmentThumbnailRepository: GarmentThumbnailRepository, @
     /// file itself survived.
     public func data(forFile file: String) throws -> Data {
         try Data(contentsOf: directory.appending(path: URL(filePath: file).lastPathComponent))
+    }
+
+    public func delete(file: String) throws {
+        let url = directory.appending(path: URL(filePath: file).lastPathComponent)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 
     public func deleteAll() throws {

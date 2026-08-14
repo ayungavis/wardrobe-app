@@ -43,6 +43,16 @@ public struct WardrobeView: View {
         }
         .background(AppColor.background)
         .task { viewModel.load() }
+        .sheet(isPresented: .constant(!viewModel.pendingReview.isEmpty)) {
+            ScanReviewSheetView(
+                garments: viewModel.pendingReview,
+                thumbnail: { viewModel.thumbnailData(forFile: $0) },
+                itemThumbnail: { viewModel.thumbnailData(forItemID: $0) },
+                onChoose: { viewModel.choose($1, for: $0) },
+                onConfirm: { viewModel.confirmReview() },
+                onCancel: { viewModel.cancelReview() }
+            )
+        }
     }
 
     private var scanButton: some View {

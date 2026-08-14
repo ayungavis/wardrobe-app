@@ -11,6 +11,9 @@ public protocol WardrobeItemRepository: AnyObject {
     /// One transaction: the item, its first fingerprint, and the wear that
     /// created it. `fingerprint` is nil until fingerprinting lands (task A5).
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws
+    /// An item the user already owns, worn again. The fingerprint is kept too —
+    /// one per confirmed wear is what makes later matching stronger (§4).
+    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws
     /// Empties all three tables. Dev-menu reset; the thumbnail files are the
     /// caller's to clean up.
     func deleteAll() throws
@@ -57,6 +60,12 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
             context.insert(ItemFingerprintEntity(fingerprint))
         }
         context.insert(WearRecordEntity(wear))
+        try context.save()
+    }
+
+    public func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
+        context.insert(WearRecordEntity(wear))
+        context.insert(ItemFingerprintEntity(fingerprint))
         try context.save()
     }
 
