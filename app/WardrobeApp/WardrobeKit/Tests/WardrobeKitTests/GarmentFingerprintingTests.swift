@@ -3,6 +3,13 @@ import Foundation
 import Testing
 @testable import WardrobeKit
 
+// ponytail: Vision fetches the feature-print model on demand, and a clean CI
+// runner has neither the asset nor a way to get it — `perform` blocks forever
+// instead of failing, which is what hung the test job for 75 minutes. The two
+// tests that call it run on our machines and on device; drop this gate if a
+// runner image ever ships the model.
+private let visionIsAvailable = ProcessInfo.processInfo.environment["CI"] == nil
+
 @MainActor
 struct GarmentFingerprintingTests {
     /// A garment-shaped patch on a transparent canvas, optionally with the
@@ -84,7 +91,8 @@ struct GarmentFingerprintingTests {
 
     // MARK: Feature print
 
-    @Test func identicalImagesHaveZeroDistance() throws {
+    @Test(.enabled(if: visionIsAvailable))
+    func identicalImagesHaveZeroDistance() throws {
         let image = try makeCutout(red: 0.2, green: 0.6, blue: 0.3)
         let print = GarmentFingerprinting.featurePrint(of: image)
 
@@ -92,7 +100,8 @@ struct GarmentFingerprintingTests {
         #expect(GarmentFingerprinting.distance(print, print) == 0)
     }
 
-    @Test func differentImagesHaveNonZeroDistance() throws {
+    @Test(.enabled(if: visionIsAvailable))
+    func differentImagesHaveNonZeroDistance() throws {
         let lhs = try GarmentFingerprinting.featurePrint(of: makeCutout(red: 0.9, green: 0.1, blue: 0.1))
         let rhs = try GarmentFingerprinting.featurePrint(
             of: makeCutout(red: 0.1, green: 0.1, blue: 0.9, size: (300, 90))
