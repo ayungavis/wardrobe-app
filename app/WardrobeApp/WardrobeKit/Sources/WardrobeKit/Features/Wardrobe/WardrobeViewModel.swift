@@ -70,9 +70,7 @@ public final class WardrobeViewModel {
         do {
             guard let result = try segmentation.segment(image) else { return }
             for (category, cutout) in segmentation.cutouts(from: result) {
-                // maskQuality lands on the fingerprint at task A5; logged until then.
-                Log.ui.info("Cut-out \(category.rawValue, privacy: .public) quality \(cutout.maskQuality)")
-                try store(category: category, cutout: cutout.image)
+                try store(category: category, cutout: cutout)
             }
             processedPhotoIDs.insert(photo.id)
         } catch {
@@ -81,22 +79,36 @@ public final class WardrobeViewModel {
     }
 
     /// ponytail: every scanned garment becomes a new item — duplicate matching
-    /// is task A6, and FR-029 requires the user to confirm a merge anyway.
-    private func store(category: GarmentCategory, cutout: CGImage) throws {
+    /// is task A6, and FR-029 requires the user to confirm a merge anyway. The
+    /// fingerprint is already recorded so that matching has history to work with
+    /// the moment it lands.
+    private func store(category: GarmentCategory, cutout: GarmentCutout) throws {
         let now = Date()
         let id = UUID()
         let item = try WardrobeItem(
             id: id,
             category: category,
-            cutoutFile: thumbnails.save(cutout, id: id),
+            cutoutFile: thumbnails.save(cutout.image, id: id),
             createdAt: now,
             updatedAt: now
         )
         try repository.insert(
             item,
-            fingerprint: nil,
+            fingerprint: fingerprint(for: id, cutout: cutout, at: now),
             wear: WearRecord(itemID: id, wornAt: now)
         )
         items.insert(item, at: 0)
+    }
+
+    private func fingerprint(for itemID: UUID, cutout: GarmentCutout, at date: Date) -> ItemFingerprint {
+        ItemFingerprint(
+            itemID: itemID,
+            version: GarmentFingerprinting.version,
+            colorLab: GarmentFingerprinting.colorSignature(of: cutout.image),
+            aspectRatio: GarmentFingerprinting.aspectRatio(of: cutout.image),
+            featurePrint: GarmentFingerprinting.featurePrint(of: cutout.image),
+            maskQuality: cutout.maskQuality,
+            createdAt: date
+        )
     }
 }

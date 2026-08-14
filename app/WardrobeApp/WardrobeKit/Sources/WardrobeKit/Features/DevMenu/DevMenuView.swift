@@ -107,6 +107,11 @@ private struct DevStateSection: View {
             } label: {
                 Text(verbatim: "Wardrobe items")
             }
+            LabeledContent {
+                Text(verbatim: "\(summary.fingerprintCount)")
+            } label: {
+                Text(verbatim: "Fingerprints")
+            }
         } header: {
             Text(verbatim: "State")
         }

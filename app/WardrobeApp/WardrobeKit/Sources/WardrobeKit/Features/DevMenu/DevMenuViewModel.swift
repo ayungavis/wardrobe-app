@@ -41,7 +41,8 @@ public final class DevMenuViewModel {
             hasCompletedToday: completedRepository.hasCompletion(on: Date(), calendar: calendar),
             hasActiveChallenge: active != nil,
             activeHasPhoto: active?.photoID != nil,
-            wardrobeItemCount: (try? wardrobeRepository.items().count) ?? 0
+            wardrobeItemCount: (try? wardrobeRepository.items().count) ?? 0,
+            fingerprintCount: (try? wardrobeRepository.fingerprints().count) ?? 0
         )
     }
 

@@ -1,9 +1,6 @@
 import CoreGraphics
 import Foundation
 
-// ponytail: a pure function, so no protocol — nothing to inject and nothing to
-// fake. Same call as ExportService; add a seam when one is actually needed.
-
 /// Puts every cut-out on the same canvas at the same scale.
 ///
 /// Raw cut-outs arrive at whatever size the garment happened to occupy in the
