@@ -34,8 +34,18 @@ public struct CaptureFlowView: View {
                 EditorView(
                     viewModel: makeEditorViewModel(viewModel.challenge),
                     onDiscard: { viewModel.discardPhoto() },
-                    onComplete: { viewModel.completeChallenge() }
+                    onComplete: { viewModel.completeChallenge() },
+                    reviewDrawer: {
+                        ItemReviewDrawerView(
+                            garments: viewModel.review.garments,
+                            isScanning: viewModel.review.isScanning,
+                            thumbnail: { viewModel.review.thumbnailData(forFile: $0) },
+                            itemThumbnail: { viewModel.review.thumbnailData(forItemID: $0) },
+                            onChoose: { viewModel.review.choose($1, for: $0) }
+                        )
+                    }
                 )
+                .task { viewModel.review.scanIfNeeded(photoID: viewModel.challenge.photoID) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

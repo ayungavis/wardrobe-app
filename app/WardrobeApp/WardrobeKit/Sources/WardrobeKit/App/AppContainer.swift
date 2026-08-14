@@ -49,7 +49,10 @@ public final class AppContainer {
             activeRepository: activeChallengeRepository,
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
-            library: Self.defaultPhotoLibrary()
+            library: Self.defaultPhotoLibrary(),
+            scanner: makeGarmentScanService(),
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
         )
     }
 

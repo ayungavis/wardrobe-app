@@ -657,6 +657,38 @@
         }
       }
     },
+    "editor.review.detected %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld garments detected"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld garmen terdeteksi"
+          }
+        }
+      }
+    },
+    "editor.review.scanning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for garments…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mencari garmen…"
+          }
+        }
+      }
+    },
     "editor.save": {
       "localizations": {
         "en": {

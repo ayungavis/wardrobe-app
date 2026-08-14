@@ -11,15 +11,20 @@ public struct EditorView: View {
 
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
+    /// The item-review drawer, supplied by the capture flow that owns the scan
+    /// results — the editor only decides where it sits.
+    private let reviewDrawer: AnyView
 
     public init(
         viewModel: EditorViewModel,
         onDiscard: @escaping () -> Void,
-        onComplete: @escaping () -> Void
+        onComplete: @escaping () -> Void,
+        @ViewBuilder reviewDrawer: () -> some View = { EmptyView() }
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.onDiscard = onDiscard
         self.onComplete = onComplete
+        self.reviewDrawer = AnyView(reviewDrawer())
     }
 
     public var body: some View {
@@ -100,6 +105,12 @@ public struct EditorView: View {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
 
             if viewModel.activeTool == nil {
+                VStack {
+                    Spacer()
+                    reviewDrawer
+                        .padding(.bottom, 96) // clears the Save/Share/✓ bar
+                }
+
                 EditorControlsView(
                     isSaving: viewModel.isSaving,
                     didSave: viewModel.didSaveToPhotos,

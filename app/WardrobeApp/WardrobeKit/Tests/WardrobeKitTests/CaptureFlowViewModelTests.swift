@@ -11,7 +11,10 @@ struct CaptureFlowViewModelTests {
         activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
         completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
         photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
-        library: FakePhotoLibrary = FakePhotoLibrary()
+        library: FakePhotoLibrary = FakePhotoLibrary(),
+        scanner: FakeGarmentScanService = FakeGarmentScanService(),
+        wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
+        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository()
     ) -> CaptureFlowViewModel {
         CaptureFlowViewModel(
             challenge: challenge,
@@ -19,7 +22,10 @@ struct CaptureFlowViewModelTests {
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository,
-            library: library
+            library: library,
+            scanner: scanner,
+            wardrobeRepository: wardrobeRepository,
+            thumbnails: thumbnails
         )
     }
 
@@ -211,12 +217,13 @@ struct CaptureFlowViewModelTests {
         )
     }
 
-    @Test func completeChallengeRecordsCompletionAndClearsActiveChallenge() {
+    @Test func completeChallengeRecordsCompletionAndClearsActiveChallenge() async {
         let activeRepository = InMemoryActiveChallengeRepository()
         let completedRepository = InMemoryCompletedChallengeRepository()
         let sut = makeEditorStageSUT(activeRepository: activeRepository, completedRepository: completedRepository)
 
         sut.completeChallenge()
+        await sut.completionTask?.value
 
         #expect(completedRepository.stored.count == 1)
         #expect(completedRepository.stored[0].card.prompt == "x")
@@ -224,21 +231,24 @@ struct CaptureFlowViewModelTests {
         #expect(sut.isCompleted)
     }
 
-    @Test func completeChallengeIsIdempotent() {
+    @Test func completeChallengeIsIdempotent() async {
         let completedRepository = InMemoryCompletedChallengeRepository()
         let sut = makeEditorStageSUT(completedRepository: completedRepository)
 
         sut.completeChallenge()
+        await sut.completionTask?.value
         sut.completeChallenge()
+        await sut.completionTask?.value
 
         #expect(completedRepository.stored.count == 1)
     }
 
-    @Test func completeChallengeWithoutPhotoRecordsNothing() {
+    @Test func completeChallengeWithoutPhotoRecordsNothing() async {
         let completedRepository = InMemoryCompletedChallengeRepository()
         let sut = makeSUT(completedRepository: completedRepository)
 
         sut.completeChallenge()
+        await sut.completionTask?.value
 
         #expect(completedRepository.stored.isEmpty)
         #expect(!sut.isCompleted)
