@@ -26,5 +26,14 @@ wardrobe-db = { path = "../db" }
 [dev-dependencies]
 tower.workspace = true
 
+# The image builds only this binary; the OpenAPI generator is a dev tool.
+[[bin]]
+name = "wardrobe-api"
+path = "src/main.rs"
+
+[[bin]]
+name = "openapi"
+path = "src/bin/openapi.rs"
+
 [lints]
 workspace = true

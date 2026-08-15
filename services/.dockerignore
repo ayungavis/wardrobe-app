@@ -1,0 +1,18 @@
+# The build context is what gets shipped to the daemon before anything runs.
+# `target/` alone is over 2 GB, so leaving it in makes every build slow for no
+# reason — the image compiles from source anyway.
+target/
+**/target/
+
+# Never let a developer's local secrets into an image layer.
+.env
+
+.git/
+.gitignore
+.dockerignore
+
+# Docs and local-only tooling contribute nothing to the binary.
+README.md
+compose.yaml
+Makefile
+openapi.json

@@ -3,12 +3,17 @@
 The Rust backend: one Cargo workspace, PostgreSQL as the transactional system of record and job
 queue, S3-compatible object storage (MinIO locally, Cloudflare R2 in production).
 
+Deployed to Railway; migrations run at start-up before the listener opens. See
+[`docs/deployment.md`](../docs/deployment.md).
+
 Schema design and the reasoning behind it: [`docs/backend-schema.md`](../docs/backend-schema.md).
 
 ## Layout
 
 ```
-compose.yaml       Postgres 17 + MinIO; the same file is used on the production VPS
+compose.yaml       Postgres 17 + MinIO for local development
+Dockerfile         production image; deployed to Railway (docs/deployment.md)
+railway.json       builder, health check, restart policy
 migrations/        sqlx migrations, forward-only
 openapi.json       generated from the handlers, committed, drift-tested
 crates/db/         schema access: the change-feed counter and the job claim

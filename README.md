@@ -124,6 +124,7 @@ A docs-only change runs nothing. One-time TestFlight credential setup: [`docs/te
 | [`docs/prd.md`](docs/prd.md)                                             | **The source of truth for product behavior.** Read first                |
 | [`docs/backend-schema.md`](docs/backend-schema.md)                       | PostgreSQL schema and why each part is shaped that way                  |
 | [`docs/api-contract.md`](docs/api-contract.md)                           | API decisions OpenAPI cannot express: auth, cursor, idempotency, errors  |
+| [`docs/deployment.md`](docs/deployment.md)                               | Deploying the API to Railway, and how to read a failed deploy           |
 | [`docs/wardrobe-generation.md`](docs/wardrobe-generation.md)             | The device/server split for detection, matching, and illustration       |
 | [`docs/garment-matching-accuracy.md`](docs/garment-matching-accuracy.md) | What to do when duplicate matching gets it wrong, in cost order         |
 | [`docs/capture-editor-share.md`](docs/capture-editor-share.md)           | The camera → editor → share slice                                       |

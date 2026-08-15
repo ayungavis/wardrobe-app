@@ -38,6 +38,11 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # the database never needs a uuid default (docs/backend-schema.md §2).
 uuid = { version = "1", features = ["serde", "v7"] }
 
+# Debug symbols are a third of the shipped binary and buy nothing in production;
+# panics still carry file and line.
+[profile.release]
+strip = "symbols"
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

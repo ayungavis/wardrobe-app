@@ -32,6 +32,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&config.database_url)
         .await?;
 
+    // Before the listener opens, so no request ever meets a half-applied
+    // schema. sqlx takes an advisory lock, so concurrent instances are safe.
+    // A failing migration takes the process down with it, which is the correct
+    // outcome: the platform keeps the previous deployment serving rather than
+    // promoting an API running against the wrong schema.
+    wardrobe_db::MIGRATOR.run(&pool).await?;
+    tracing::info!("migrations applied");
+
     let listener = TcpListener::bind(&config.bind_addr).await?;
     tracing::info!(addr = %config.bind_addr, "listening; docs at /docs");
 
