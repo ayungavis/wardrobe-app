@@ -16,3 +16,9 @@ DerivedData/
 
 # Per-developer signing override (see Config/Debug.xcconfig)
 Local.xcconfig
+
+# Rust
+services/target/
+
+# Per-developer service config (see services/.env.example)
+services/.env

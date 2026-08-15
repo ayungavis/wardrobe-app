@@ -1,0 +1,67 @@
+# Requires a macOS runner with Xcode 26+ (iOS 26 SDK).
+#
+# Path-filtered so a backend- or docs-only change does not burn three macOS
+# runners. Caveat for later: a workflow that does not run never creates its
+# check contexts, so if branch protection with required status checks is ever
+# enabled, PRs that skip this workflow will hang on "Expected — waiting for
+# status". The fix at that point is one workflow with a change-detection job and
+# per-job `if:`, because a skipped job still reports.
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths: &ios
+      - "app/**"
+      - "Makefile"
+      - ".swiftlint.yml"
+      - ".swiftformat"
+      # LFS rules decide whether the runner gets the Core ML weights or a
+      # pointer file, which is a build failure either way it goes wrong.
+      - ".gitattributes"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths: *ios
+
+jobs:
+  lint:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install swiftlint
+      - run: make ios-lint
+
+  test:
+    runs-on: macos-26
+    # A hung test binary once burned 75 minutes and told us nothing, because
+    # stdout to a pipe is block-buffered. `script` gives it a pty so every line
+    # reaches the log immediately, and --no-parallel makes the last "started"
+    # line name the test that stopped.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: script -q /dev/null make ios-test TEST_FLAGS=--no-parallel
+
+  build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      # lfs: the Core ML weights are LFS-tracked; without this the runner gets a
+      # pointer file and coremlc fails. Only the jobs that compile need them.
+      - uses: actions/checkout@v6
+        with:
+          lfs: true
+      - run: brew install xcodegen
+      - run: make ios-generate
+      - name: Resolve packages (retry on flaky release downloads)
+        run: |
+          cd app/WardrobeApp
+          for i in 1 2 3; do
+            xcodebuild -project WardrobeApp.xcodeproj -scheme WardrobeApp \
+              -resolvePackageDependencies && exit 0
+            echo "resolve attempt $i failed; retrying in 20s"
+            sleep 20
+          done
+          exit 1
+      - run: make ios-build DEST='generic/platform=iOS Simulator'

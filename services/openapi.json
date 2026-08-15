@@ -1,0 +1,165 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Wardrobe API",
+    "description": "Backend for the Wardrobe Challenge App. Session tokens are issued by the server; the client never asserts an identity of its own.",
+    "license": {
+      "name": "Proprietary"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness and readiness in one.",
+        "description": "It deliberately touches `PostgreSQL`: a health check that does not would only\nreport that this process is running, which is the least useful thing to know\nabout a service whose entire job is reading and writing a database.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "The service and its database are reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/whoami": {
+      "get": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Confirms which account a session token belongs to.",
+        "description": "The client uses it after sign-in or restore to check that its stored token is\nstill good, without having to attempt a real write to find out.",
+        "operationId": "whoami",
+        "responses": {
+          "200": {
+            "description": "The session is valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhoAmI"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, unknown, expired, or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorBody": {
+        "type": "object",
+        "description": "The single error shape every endpoint returns.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable, matchable identifier — part of the contract.",
+            "example": "unauthenticated"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable and safe to display.",
+            "example": "Authentication is required for this request."
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "`ok` when the process is up and the database answers.",
+            "example": "ok"
+          }
+        }
+      },
+      "WhoAmI": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "sessionId"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account this session belongs to."
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "session": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Session token from POST /v1/sessions/*. Sent as `Authorization: Bearer <token>`."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness and readiness"
+    },
+    {
+      "name": "session",
+      "description": "Session lifecycle and identity"
+    }
+  ]
+}
