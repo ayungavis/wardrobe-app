@@ -80,6 +80,14 @@ public final class AppContainer {
         )
     }
 
+    public func makeWardrobeItemDetailViewModel(itemID: UUID) -> WardrobeItemDetailViewModel {
+        WardrobeItemDetailViewModel(
+            itemID: itemID,
+            repository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
+        )
+    }
+
     public func makeGarmentReviewModel() -> GarmentReviewModel {
         GarmentReviewModel(
             scanner: makeGarmentScanService(),

@@ -14,6 +14,9 @@ public protocol WardrobeItemRepository: AnyObject {
     /// An item the user already owns, worn again. The fingerprint is kept too —
     /// one per confirmed wear is what makes later matching stronger (§4).
     func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws
+    /// One item and everything derived from it — its fingerprints and its wear
+    /// records — in one transaction. The cut-out file is the caller's to remove.
+    func delete(itemID: UUID) throws
     /// Empties all three tables. Dev-menu reset; the thumbnail files are the
     /// caller's to clean up.
     func deleteAll() throws
@@ -66,6 +69,15 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     public func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
         context.insert(WearRecordEntity(wear))
         context.insert(ItemFingerprintEntity(fingerprint))
+        try context.save()
+    }
+
+    public func delete(itemID: UUID) throws {
+        // One save for all three, so a failure leaves the item whole rather than
+        // stripped of the wear history that gives it meaning.
+        try context.delete(model: WardrobeItemEntity.self, where: #Predicate { $0.id == itemID })
+        try context.delete(model: ItemFingerprintEntity.self, where: #Predicate { $0.itemID == itemID })
+        try context.delete(model: WearRecordEntity.self, where: #Predicate { $0.itemID == itemID })
         try context.save()
     }
 

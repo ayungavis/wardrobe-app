@@ -6,9 +6,11 @@ import SwiftUI
 public struct WardrobeView: View {
     @State private var viewModel: WardrobeViewModel
     @State private var filter: CategoryFilter = .all
+    private let container: AppContainer
 
-    public init(viewModel: WardrobeViewModel) {
+    public init(viewModel: WardrobeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
+        self.container = container
     }
 
     enum CategoryFilter: CaseIterable {
@@ -45,6 +47,14 @@ public struct WardrobeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.background)
             .navigationTitle(Text("tab.wardrobe", bundle: .module))
+            // Navigating by id rather than by a copy of the item: the detail
+            // screen re-reads, so it can never render a stale snapshot.
+            .navigationDestination(for: UUID.self) { itemID in
+                WardrobeItemDetailView(
+                    viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID),
+                    onDeleted: { viewModel.load() }
+                )
+            }
         }
         .task { viewModel.load() }
     }
@@ -77,7 +87,10 @@ public struct WardrobeView: View {
                         // ponytail: reads the file on each body pass; fine for a
                         // few dozen items, revisit when the wardrobe outgrows a
                         // screenful.
-                        WardrobeItemCellView(item: item, data: viewModel.thumbnailData(for: item))
+                        NavigationLink(value: item.id) {
+                            WardrobeItemCellView(item: item, data: viewModel.thumbnailData(for: item))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(Spacing.lg)
@@ -97,5 +110,6 @@ private extension WardrobeView.CategoryFilter {
 }
 
 #Preview {
-    WardrobeView(viewModel: AppContainer().makeWardrobeViewModel())
+    let container = AppContainer()
+    WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
 }
