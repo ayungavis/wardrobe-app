@@ -66,6 +66,12 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedFingerprints.append(fingerprint)
     }
 
+    func delete(itemID: UUID) throws {
+        storedItems.removeAll { $0.id == itemID }
+        storedFingerprints.removeAll { $0.itemID == itemID }
+        storedWears.removeAll { $0.itemID == itemID }
+    }
+
     func deleteAll() throws {
         storedItems.removeAll()
         storedFingerprints.removeAll()
