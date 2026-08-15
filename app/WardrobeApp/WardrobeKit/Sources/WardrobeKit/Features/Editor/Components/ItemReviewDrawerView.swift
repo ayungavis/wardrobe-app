@@ -14,6 +14,12 @@ struct ItemReviewDrawerView: View {
     let onChoose: (UUID, ScannedGarment.Decision) -> Void
 
     @State private var isExpanded = false
+    /// Measured height of the rows, so the drawer can hug short content and
+    /// stop growing at the ceiling.
+    @State private var contentHeight: CGFloat = 0
+
+    /// The drawer must never swallow the canvas the user came here for.
+    private static let maxRowsHeight: CGFloat = 320
 
     var body: some View {
         if isScanning || !garments.isEmpty {
@@ -55,21 +61,33 @@ struct ItemReviewDrawerView: View {
         .disabled(isScanning)
     }
 
+    /// Grows with the number of detected garments, up to a ceiling, and scrolls
+    /// beyond it.
+    ///
+    /// The height is measured rather than merely capped: a `ScrollView` is
+    /// greedy along its scroll axis, so bounding it would make the drawer that
+    /// tall even for a single garment. What is measured is the *content* — its
+    /// intrinsic height depends only on the available width, never on the height
+    /// handed to the scroll view, so the layout converges instead of oscillating.
     private var rows: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            ForEach(garments) { garment in
-                ScannedGarmentRowView(
-                    garment: garment,
-                    scannedImage: thumbnail(garment.cutoutFile),
-                    candidateImage: itemThumbnail
-                ) { decision in
-                    onChoose(garment.id, decision)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                ForEach(garments) { garment in
+                    ScannedGarmentRowView(
+                        garment: garment,
+                        scannedImage: thumbnail(garment.cutoutFile),
+                        candidateImage: itemThumbnail
+                    ) { decision in
+                        onChoose(garment.id, decision)
+                    }
                 }
             }
+            .padding(Spacing.md)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
-        .padding(Spacing.md)
-        // ponytail: fixed ceiling instead of a measured one — two garments per
-        // photo is the norm, and the drawer must never swallow the canvas.
-        .frame(maxHeight: 320)
+        .frame(height: min(contentHeight, Self.maxRowsHeight))
+        // Rubber-banding on a drawer that is not scrolling would suggest there
+        // is more to see when there is not.
+        .scrollDisabled(contentHeight <= Self.maxRowsHeight)
     }
 }
