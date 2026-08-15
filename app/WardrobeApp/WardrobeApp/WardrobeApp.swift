@@ -12,7 +12,19 @@ struct WardrobeAppApp: App {
 
     var body: some Scene {
         WindowGroup {
+//           ZStack{
+//                Image("appBG")
+//                    .resizable()
+//                    .ignoresSafeArea()
+//                RootView(container: container)
+//            }
             RootView(container: container)
+                //.background(Color.red.ignoresSafeArea())
+//                .background(
+//                                Image("appBG")
+//                                    .resizable()
+//                                    .ignoresSafeArea()
+//                            )
         }
     }
 
@@ -34,3 +46,4 @@ struct WardrobeAppApp: App {
         Log.errorReporter = { SentrySDK.capture(error: $0) }
     }
 }
+

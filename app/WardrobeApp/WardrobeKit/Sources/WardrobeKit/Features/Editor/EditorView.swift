@@ -26,7 +26,7 @@ public struct EditorView: View {
         @Bindable var viewModel = viewModel
 
         ZStack {
-            AppColor.mediaBackground.ignoresSafeArea()
+            //AppColor.mediaBackground.ignoresSafeArea()
             content
         }
         .environment(\.colorScheme, .dark)

@@ -15,24 +15,27 @@ public struct ChallengeView: View {
         @Bindable var viewModel = viewModel
 
         NavigationStack {
-            Group {
-                if viewModel.hasCompletedToday {
-                    CompletedTodayView()
-                } else if let active = viewModel.activeChallenge {
-                    ActiveChallengeStateView(
-                        challenge: active,
-                        onResume: { viewModel.resume() },
-                        onAbandon: { viewModel.requestAbandon() }
-                    )
-                } else {
-                    deckContent
+            ZStack {
+                Image("appBG", bundle: .module)
+                    .resizable()
+                    .ignoresSafeArea()
+
+                Group {
+                    if viewModel.hasCompletedToday {
+                        CompletedTodayView()
+                    } else if let active = viewModel.activeChallenge {
+                        ActiveChallengeStateView(
+                            challenge: active,
+                            onResume: { viewModel.resume() },
+                            onAbandon: { viewModel.requestAbandon() }
+                        )
+                    } else {
+                        deckContent
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColor.background)
-            .navigationTitle(Text("tab.challenge", bundle: .module))
-            // Long-press anywhere on this screen opens the dev menu. `including:`
-            // reads a process constant, so view identity never changes.
+            //.navigationTitle(Text("tab.challenge", bundle: .module))
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 1).onEnded { _ in
                     isDevMenuPresented = true
@@ -117,16 +120,17 @@ public struct ChallengeView: View {
         // ponytail: paged TabView as the stacked-carousel stand-in; revisit
         // when the real card-deck design lands (FR-007 also needs non-swipe
         // browsing buttons for VoiceOver).
-        TabView {
-            ForEach(cards) { card in
-                ChallengeCardView(card: card) {
-                    viewModel.accept(card)
-                }
-                .padding(.horizontal, Spacing.xl)
-            }
+        ChallengeDeckView(cards: cards) { card in
+            viewModel.accept(card)
         }
-        #if os(iOS)
-        .tabViewStyle(.page)
-        #endif
+        .padding(.horizontal, Spacing.xl)
     }
+}
+
+#Preview {
+    let container = AppContainer()
+    ChallengeView(
+        viewModel: container.makeChallengeViewModel(),
+        container: container
+    )
 }
