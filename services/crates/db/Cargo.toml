@@ -1,0 +1,19 @@
+[package]
+name = "wardrobe-db"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+chrono.workspace = true
+rust_decimal.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

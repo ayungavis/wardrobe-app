@@ -1,87 +1,37 @@
-//
-//  WardrobeViewModel.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 11/08/26.
-//
-
-
 import Foundation
-import UIKit
+import Observation
 
+/// The wardrobe grid. Filling it is the challenge loop's job (PRD §17) and the
+/// dev-menu bulk scan's — this only reads.
 @MainActor
-final class WardrobeViewModel: ObservableObject {
-    
-    @Published var items: [ClothingItem] = []
-    @Published var isScanning: Bool = false
-    @Published var scanProgress: Double = 0.0 // 0.0 - 1.0
-    @Published var processedPhotos: [ProcessedPhoto] = []
-    
-    private var processedPhotoIDs: Set<String> = []
-    private let garmentSegmentation = GarmentSegmentationService()
-    private let thumbnailStore = ThumbnailStore()
-    
-    func processSelectedPhotos(_ entries: [(id: String, image: UIImage)]) async {
-        isScanning = true
-        defer { isScanning = false }
-        
-        print("📸 Picker returned \(entries.count) total photo(s)")
-        
-        let newEntries = entries.filter { !processedPhotoIDs.contains($0.id) }
-        let skippedCount = entries.count - newEntries.count
+@Observable
+public final class WardrobeViewModel {
+    public private(set) var items: [WardrobeItem] = []
 
-            print("✅ \(newEntries.count) new photo(s) to process")
-            print("⏭️ \(skippedCount) photo(s) skipped — already processed before")
-        
-        let total = newEntries.count
-        guard total > 0 else {
-            print("🛑 Nothing new to process, stopping here")
-                    return
-            } // everything was already processed, nothing new to do
+    private let thumbnails: GarmentThumbnailRepository
+    private let repository: WardrobeItemRepository
 
-            for (index, entry) in newEntries.enumerated() {
-                scanProgress = Double(index) / Double(total)
-                print("⚙️ Processing photo \(index + 1)/\(total) — id: \(entry.id)")
-            
-                do {
-                    guard let (classMap, uprightImage) = try garmentSegmentation.segment(entry.image) else {
-                        print("⚠️ Segmentation returned nil for photo id: \(entry.id)")
-                        continue
-                    }
-                    let cutouts = garmentSegmentation.cutoutAll(classMap: classMap, uprightImage: uprightImage)
-
-                    if let cutout = cutouts[.top] {
-                        items.append(makeClothingItem(category: "top", croppedImage: cutout))
-                    }
-                    if let cutout = cutouts[.bottom] {
-                        items.append(makeClothingItem(category: "bottom", croppedImage: cutout))
-                    }
-
-                    processedPhotoIDs.insert(entry.id)
-                    print("✅ Finished photo id: \(entry.id) — now marked as processed")
-                    
-            } catch {
-                print("⚠️ Error processing photo \(index): \(error)")
-                continue
-            }
-        }
-        print("🏁 Done. Total processed IDs so far: \(processedPhotoIDs.count)")
-        scanProgress = 1.0
+    public init(thumbnails: GarmentThumbnailRepository, repository: WardrobeItemRepository) {
+        self.thumbnails = thumbnails
+        self.repository = repository
     }
-    
-    private func makeClothingItem(category: String, croppedImage: UIImage) -> ClothingItem {
-        let id = UUID()
-        let path = thumbnailStore.save(croppedImage, id: id) ?? ""
-        
-        return ClothingItem(
-            id: id,
-            assetLocalIdentifier: "", // no longer tracking a specific PHAsset
-            category: category,
-            subcategory: "unclassified",
-            dominantColor: nil,
-            dateWorn: Date(),
-            croppedThumbnailPath: path
-        )
+
+    public func load() {
+        do {
+            let loaded = try repository.items()
+            items = loaded
+            let missing = loaded.count { (try? thumbnails.data(forFile: $0.cutoutFile)) == nil }
+            if missing > 0 {
+                // Loud on purpose: a silent grey tile is how the stale-path bug
+                // stayed invisible until someone reinstalled the app.
+                Log.ui.error("Wardrobe: \(missing) of \(loaded.count) items have no image on disk")
+            }
+        } catch {
+            Log.report(error)
+        }
+    }
+
+    public func thumbnailData(for item: WardrobeItem) -> Data? {
+        try? thumbnails.data(forFile: item.cutoutFile)
     }
 }
-

@@ -8,12 +8,26 @@ struct DevMenuView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DevMenuViewModel
     @State private var isResetConfirmationPresented = false
+    @State private var isWardrobeResetConfirmationPresented = false
+    @State private var isBulkScanPresented = false
+    @State private var isBenchmarkPresented = false
     /// Called after an action mutates a repository, so the screen behind the sheet
     /// updates right away instead of waiting for dismissal.
     private let onStateChanged: () -> Void
+    /// Built on demand so a scan always starts from an empty queue.
+    private let makeReview: () -> GarmentReviewModel
+    /// Same reason: every benchmark run starts from an empty set of labels.
+    private let makeBenchmark: () -> MatchBenchmarkViewModel
 
-    init(viewModel: DevMenuViewModel, onStateChanged: @escaping () -> Void) {
+    init(
+        viewModel: DevMenuViewModel,
+        makeReview: @escaping () -> GarmentReviewModel,
+        makeBenchmark: @escaping () -> MatchBenchmarkViewModel,
+        onStateChanged: @escaping () -> Void
+    ) {
         _viewModel = State(wrappedValue: viewModel)
+        self.makeReview = makeReview
+        self.makeBenchmark = makeBenchmark
         self.onStateChanged = onStateChanged
     }
 
@@ -24,6 +38,11 @@ struct DevMenuView: View {
                 DevTodaySection(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
                 }
+                DevWardrobeSection(
+                    onScan: { isBulkScanPresented = true },
+                    onBenchmark: { isBenchmarkPresented = true },
+                    onReset: { isWardrobeResetConfirmationPresented = true }
+                )
             }
             .navigationTitle(Text(verbatim: "Dev menu"))
             #if os(iOS)
@@ -55,6 +74,29 @@ struct DevMenuView: View {
                 } message: {
                     Text(verbatim: "Deletes today's completion, the active challenge, and their photos.")
                 }
+                .confirmationDialog(
+                    Text(verbatim: "Reset wardrobe?"),
+                    isPresented: $isWardrobeResetConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button(role: .destructive) {
+                        viewModel.resetWardrobe()
+                        onStateChanged()
+                    } label: {
+                        Text(verbatim: "Reset")
+                    }
+                    Button(role: .cancel) {} label: {
+                        Text("common.cancel", bundle: .module)
+                    }
+                } message: {
+                    Text(verbatim: "Deletes every wardrobe item, its wear history, and its cut-out image.")
+                }
+        }
+        .sheet(isPresented: $isBulkScanPresented, onDismiss: onStateChanged) {
+            BulkScanView(review: makeReview())
+        }
+        .sheet(isPresented: $isBenchmarkPresented) {
+            MatchBenchmarkView(viewModel: makeBenchmark())
         }
         .presentationDetents([.medium, .large])
         .task { viewModel.refresh() }
@@ -80,6 +122,16 @@ private struct DevStateSection: View {
                 Text(verbatim: activeDescription)
             } label: {
                 Text(verbatim: "Active challenge")
+            }
+            LabeledContent {
+                Text(verbatim: "\(summary.wardrobeItemCount)")
+            } label: {
+                Text(verbatim: "Wardrobe items")
+            }
+            LabeledContent {
+                Text(verbatim: "\(summary.fingerprintCount)")
+            } label: {
+                Text(verbatim: "Fingerprints")
             }
         } header: {
             Text(verbatim: "State")
@@ -111,6 +163,36 @@ private struct DevTodaySection: View {
     }
 }
 
+private struct DevWardrobeSection: View {
+    let onScan: () -> Void
+    let onBenchmark: () -> Void
+    let onReset: () -> Void
+
+    var body: some View {
+        Section {
+            Button(action: onScan) {
+                Text(verbatim: "Bulk scan photos")
+            }
+            Button(action: onBenchmark) {
+                Text(verbatim: "Match benchmark")
+            }
+            Button(role: .destructive, action: onReset) {
+                Text(verbatim: "Reset wardrobe")
+            }
+        } header: {
+            Text(verbatim: "Wardrobe")
+        } footer: {
+            Text(verbatim: "Clears every scanned garment so you can start from an empty wardrobe.")
+        }
+    }
+}
+
 #Preview {
-    DevMenuView(viewModel: AppContainer().makeDevMenuViewModel(), onStateChanged: {})
+    let container = AppContainer()
+    DevMenuView(
+        viewModel: container.makeDevMenuViewModel(),
+        makeReview: { container.makeGarmentReviewModel() },
+        makeBenchmark: { container.makeMatchBenchmarkViewModel() },
+        onStateChanged: {}
+    )
 }

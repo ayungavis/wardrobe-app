@@ -1,0 +1,53 @@
+# Linux, because the backend has no Apple dependency and an ubuntu runner is
+# both faster and cheaper than the macOS ones the iOS workflow needs.
+#
+# Same caveat as ios.yml: a path-filtered workflow that does not run never
+# creates its check contexts, so enabling required status checks later needs a
+# change-detection job with per-job `if:` instead of these filters.
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths: &backend
+      - "services/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths: *backend
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wardrobe
+          POSTGRES_PASSWORD: wardrobe
+          POSTGRES_DB: wardrobe
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U wardrobe -d wardrobe"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://wardrobe:wardrobe@localhost:5433/wardrobe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # sqlx::test creates and drops a database per test, so no migrate step is
+      # needed here — the migrations run inside the tests themselves.
+      - run: cargo test --workspace

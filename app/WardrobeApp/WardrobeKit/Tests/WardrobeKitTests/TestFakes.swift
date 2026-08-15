@@ -35,6 +35,90 @@ final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, 
     }
 }
 
+@MainActor
+final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
+    var storedItems: [WardrobeItem] = []
+    var storedFingerprints: [ItemFingerprint] = []
+    var storedWears: [WearRecord] = []
+
+    func items() throws -> [WardrobeItem] {
+        storedItems.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func fingerprints() throws -> [ItemFingerprint] {
+        storedFingerprints
+    }
+
+    func wears(for itemID: UUID) throws -> [WearRecord] {
+        storedWears.filter { $0.itemID == itemID }
+    }
+
+    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
+        storedItems.append(item)
+        if let fingerprint {
+            storedFingerprints.append(fingerprint)
+        }
+        storedWears.append(wear)
+    }
+
+    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
+        storedWears.append(wear)
+        storedFingerprints.append(fingerprint)
+    }
+
+    func delete(itemID: UUID) throws {
+        storedItems.removeAll { $0.id == itemID }
+        storedFingerprints.removeAll { $0.itemID == itemID }
+        storedWears.removeAll { $0.itemID == itemID }
+    }
+
+    func deleteAll() throws {
+        storedItems.removeAll()
+        storedFingerprints.removeAll()
+        storedWears.removeAll()
+    }
+}
+
+final class InMemoryGarmentThumbnailRepository: GarmentThumbnailRepository, @unchecked Sendable {
+    var files: [String: Data] = [:]
+    private(set) var deleteAllCount = 0
+
+    func save(_: CGImage, id: UUID) throws -> String {
+        let file = "\(id.uuidString).png"
+        files[file] = Data([0x01])
+        return file
+    }
+
+    func data(forFile file: String) throws -> Data {
+        guard let data = files[URL(filePath: file).lastPathComponent] else { throw AppError.unexpected }
+        return data
+    }
+
+    func delete(file: String) throws {
+        files[URL(filePath: file).lastPathComponent] = nil
+    }
+
+    func deleteAll() throws {
+        deleteAllCount += 1
+        files.removeAll()
+    }
+}
+
+@MainActor
+final class FakeGarmentScanService: GarmentScanService {
+    var result: [ScannedGarment] = []
+    var error: Error?
+    private(set) var scannedPhotos: [Data] = []
+
+    func scan(photo: Data) throws -> [ScannedGarment] {
+        scannedPhotos.append(photo)
+        if let error {
+            throw error
+        }
+        return result
+    }
+}
+
 /// An actor, mirroring the real browser's isolation, so tests exercise the
 /// same async boundaries.
 actor FakePhotoLibrary: PhotoLibraryService {

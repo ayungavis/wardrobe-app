@@ -28,7 +28,7 @@ public struct RootView: View {
                     }
                     
                     Tab {
-                        WardrobeView()
+                        WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
                     } label: {
                         Label {
                             Text("tab.wardrobe", bundle: .module)

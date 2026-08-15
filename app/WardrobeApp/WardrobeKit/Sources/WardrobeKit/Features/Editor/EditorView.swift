@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Story-style editor: full-bleed photo on black, tool rail on the right,
 /// send arrow bottom-right (Mobbin ref: Instagram "Creating a story").
-public struct EditorView: View {
+public struct EditorView<ReviewDrawer: View>: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: EditorViewModel
     @State private var canvasSize: CGSize = .zero
@@ -11,15 +11,21 @@ public struct EditorView: View {
 
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
+    /// The item-review drawer, supplied by the capture flow that owns the scan
+    /// results — the editor only decides where it sits. Generic rather than
+    /// `AnyView`: type erasure here would cost SwiftUI its diffing for nothing.
+    private let reviewDrawer: ReviewDrawer
 
     public init(
         viewModel: EditorViewModel,
         onDiscard: @escaping () -> Void,
-        onComplete: @escaping () -> Void
+        onComplete: @escaping () -> Void,
+        @ViewBuilder reviewDrawer: () -> ReviewDrawer
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.onDiscard = onDiscard
         self.onComplete = onComplete
+        self.reviewDrawer = reviewDrawer()
     }
 
     public var body: some View {
@@ -100,6 +106,12 @@ public struct EditorView: View {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
 
             if viewModel.activeTool == nil {
+                VStack {
+                    Spacer()
+                    reviewDrawer
+                        .padding(.bottom, 96) // clears the Save/Share/✓ bar
+                }
+
                 EditorControlsView(
                     isSaving: viewModel.isSaving,
                     didSave: viewModel.didSaveToPhotos,
