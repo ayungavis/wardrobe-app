@@ -1,12 +1,14 @@
 import Sentry
 import SwiftUI
 import WardrobeKit
+import DesignSystem
 
 @main
 struct WardrobeAppApp: App {
     private let container = AppContainer()
 
     init() {
+        FontRegistration.registerCustomFonts()
         Self.startSentryIfConfigured()
     }
 

@@ -5,21 +5,43 @@ public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
     @State private var isDevMenuPresented = DevMode.opensOnLaunch
     private let container: AppContainer
-
+    
+    private let backgroundStickers: [StickerPlacement] = [
+        // paste these directly from Figma: sticker's X, Y, Width, Height, and the SCREEN frame's total W/H
+        StickerPlacement("StampElement", figmaX: 284, figmaY: 56, figmaWidth: 142, figmaHeight: 162, frameWidth: 375, frameHeight: 812),
+        StickerPlacement("StampDetail", figmaX: 38, figmaY: 752, figmaWidth: 104, figmaHeight: 120, frameWidth: 375, frameHeight: 812),
+        StickerPlacement("Kancing2", figmaX: -18, figmaY: 257, figmaWidth: 104, figmaHeight: 120, frameWidth: 375, frameHeight: 812),
+    ]
+    
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
     }
-
+    
     public var body: some View {
         @Bindable var viewModel = viewModel
-
+        
         NavigationStack {
             ZStack {
                 Image("appBG", bundle: .module)
                     .resizable()
                     .ignoresSafeArea()
-
+                
+                GeometryReader { screenGeo in
+                    let sw = screenGeo.size.width
+                    let sh = screenGeo.size.height
+                    
+                    ForEach(backgroundStickers) { sticker in
+                        Image(sticker.imageName, bundle: .module)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: sw * sticker.widthFraction)
+                            .rotationEffect(.degrees(sticker.rotation))
+                            .position(x: sw * sticker.x, y: sh * sticker.y)
+                    }
+                }
+                
+                
                 Group {
                     if viewModel.hasCompletedToday {
                         CompletedTodayView()
@@ -72,7 +94,7 @@ public struct ChallengeView: View {
         } message: {
             Text("challenge.abandon.confirm.message", bundle: .module)
         }
-        #if os(iOS)
+#if os(iOS)
         .fullScreenCover(
             isPresented: $viewModel.isCaptureFlowPresented,
             onDismiss: { viewModel.refreshActiveChallenge() },
@@ -85,9 +107,9 @@ public struct ChallengeView: View {
                 }
             }
         )
-        #endif
+#endif
     }
-
+    
     @ViewBuilder
     private var deckContent: some View {
         switch viewModel.deck {
@@ -99,7 +121,7 @@ public struct ChallengeView: View {
             deckView(cards)
         }
     }
-
+    
     private func errorView(_ error: AppError) -> some View {
         ContentUnavailableView {
             Label {
@@ -117,7 +139,7 @@ public struct ChallengeView: View {
             }
         }
     }
-
+    
     private func deckView(_ cards: [ChallengeCard]) -> some View {
         // ponytail: paged TabView as the stacked-carousel stand-in; revisit
         // when the real card-deck design lands (FR-007 also needs non-swipe
@@ -131,6 +153,7 @@ public struct ChallengeView: View {
 
 #Preview {
     let container = AppContainer()
+    let _ = FontRegistration.registerCustomFonts()
     ChallengeView(
         viewModel: container.makeChallengeViewModel(),
         container: container

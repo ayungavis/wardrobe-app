@@ -14,4 +14,5 @@ public enum AppColor {
     // system appearance — like every story-style editor.
     public static let mediaBackground = Color("mediaBackground", bundle: .module)
     public static let onMedia = Color("onMedia", bundle: .module)
+    public static let pink = Color("appPink", bundle: .module)
 }

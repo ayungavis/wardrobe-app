@@ -162,4 +162,8 @@ public final class AppContainer {
             NoopPhotoLibrarySaveService()
         #endif
     }
+    
+    public func makeCameraService() -> CameraService {
+        cameraService
+    }
 }
