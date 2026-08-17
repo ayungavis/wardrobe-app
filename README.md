@@ -75,7 +75,7 @@ make backend-validate  # fmt + clippy -D warnings + tests
 ```
 
 With the API running: <http://localhost:8080/docs> is Swagger UI and
-<http://localhost:8080/health> reports whether the service *and its database* are reachable.
+<http://localhost:8080/health> reports whether the service _and its database_ are reachable.
 
 `services/.env` is created from `.env.example` on first use. Local ports are deliberately **not** the defaults — Postgres is on **5433** and MinIO on **9100/9101**, because a system Postgres on 5432 is common enough that sharing it would be the first thing every new machine tripped over.
 
@@ -85,50 +85,45 @@ The queue worker is not written yet, and the API so far serves health, identity,
 
 ## Commands
 
-| Command                | What it does                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| `make`                 | List every target with its description                                          |
-| `make ios-generate`    | Regenerate `WardrobeApp.xcodeproj` (run after clone / editing `project.yml`)    |
-| `make ios-format`      | SwiftFormat the whole repo                                                      |
-| `make ios-lint`        | SwiftLint in strict mode                                                        |
-| `make ios-test`        | Unit tests via `swift test` — no simulator needed                               |
-| `make ios-build`       | Build for iPhone simulator (full log: `/tmp/wardrobeapp-build.log`)             |
-| `make ios-run`         | Build + install + launch on the booted simulator                                |
-| `make ios-validate`    | format → lint → test → build                                                    |
-| `make backend-up`      | Start Postgres and MinIO                                                        |
-| `make backend-down`    | Stop them                                                                       |
-| `make backend-migrate` | Apply migrations                                                                |
-| `make backend-reset`   | Drop and rebuild the database from empty                                        |
-| `make backend-run`     | Serve the API — Swagger UI at `/docs`                                           |
-| `make backend-openapi` | Regenerate `services/openapi.json` from the handlers                            |
-| `make backend-test`    | `cargo test` (starts the containers it needs)                                   |
-| `make backend-validate`| fmt → clippy → test                                                             |
-| `make validate`        | Both sides. **Must pass before every PR.**                                      |
+| Command                 | What it does                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `make`                  | List every target with its description                                       |
+| `make ios-generate`     | Regenerate `WardrobeApp.xcodeproj` (run after clone / editing `project.yml`) |
+| `make ios-format`       | SwiftFormat the whole repo                                                   |
+| `make ios-lint`         | SwiftLint in strict mode                                                     |
+| `make ios-test`         | Unit tests via `swift test` — no simulator needed                            |
+| `make ios-build`        | Build for iPhone simulator (full log: `/tmp/wardrobeapp-build.log`)          |
+| `make ios-run`          | Build + install + launch on the booted simulator                             |
+| `make ios-validate`     | format → lint → test → build                                                 |
+| `make backend-up`       | Start Postgres and MinIO                                                     |
+| `make backend-down`     | Stop them                                                                    |
+| `make backend-migrate`  | Apply migrations                                                             |
+| `make backend-reset`    | Drop and rebuild the database from empty                                     |
+| `make backend-run`      | Serve the API — Swagger UI at `/docs`                                        |
+| `make backend-openapi`  | Regenerate `services/openapi.json` from the handlers                         |
+| `make backend-test`     | `cargo test` (starts the containers it needs)                                |
+| `make backend-validate` | fmt → clippy → test                                                          |
+| `make validate`         | Both sides. **Must pass before every PR.**                                   |
 
 ## CI
 
 GitHub Actions is split by path, so a change to one side never runs the other's jobs:
 
-| Workflow                             | Fires on                                                             |
-| ------------------------------------ | -------------------------------------------------------------------- |
-| `.github/workflows/ios.yml`          | `app/**`, `Makefile`, lint/format config, `.gitattributes`           |
-| `.github/workflows/backend.yml`      | `services/**`                                                        |
-| `.github/workflows/testflight.yml`   | Same paths as iOS, on push to `main` — auto-deploys to TestFlight     |
+| Workflow                           | Fires on                                                          |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `.github/workflows/ios.yml`        | `app/**`, `Makefile`, lint/format config, `.gitattributes`        |
+| `.github/workflows/backend.yml`    | `services/**`                                                     |
+| `.github/workflows/testflight.yml` | Same paths as iOS, on push to `main` — auto-deploys to TestFlight |
 
 A docs-only change runs nothing. One-time TestFlight credential setup: [`docs/testflight-setup.md`](docs/testflight-setup.md).
 
 ## Documents
 
-| Document                                                                 | What it covers                                                          |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| [`docs/prd.md`](docs/prd.md)                                             | **The source of truth for product behavior.** Read first                |
-| [`docs/backend-schema.md`](docs/backend-schema.md)                       | PostgreSQL schema and why each part is shaped that way                  |
-| [`docs/api-contract.md`](docs/api-contract.md)                           | API decisions OpenAPI cannot express: auth, cursor, idempotency, errors  |
-| [`docs/deployment.md`](docs/deployment.md)                               | Deploying the API to Railway, and how to read a failed deploy           |
-| [`docs/wardrobe-generation.md`](docs/wardrobe-generation.md)             | The device/server split for detection, matching, and illustration       |
-| [`docs/garment-matching-accuracy.md`](docs/garment-matching-accuracy.md) | What to do when duplicate matching gets it wrong, in cost order         |
-| [`docs/capture-editor-share.md`](docs/capture-editor-share.md)           | The camera → editor → share slice                                       |
-| [`docs/testflight-setup.md`](docs/testflight-setup.md)                   | One-time App Store Connect credential setup                             |
+| Document                                               | What it covers                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| [`docs/prd.md`](docs/prd.md)                           | **The source of truth for product behavior.** Read first      |
+| [`docs/deployment.md`](docs/deployment.md)             | Deploying the API to Railway, and how to read a failed deploy |
+| [`docs/testflight-setup.md`](docs/testflight-setup.md) | One-time App Store Connect credential setup                   |
 
 ## Technical notes
 
@@ -156,7 +151,7 @@ A docs-only change runs nothing. One-time TestFlight credential setup: [`docs/te
 | Xcode: "Signing for WardrobeApp requires a development team" | Set your team — see _Getting started ▸ iOS ▸ Signing_                                                                                                   |
 | Simulator: "Requires a newer version of iOS"                 | Simulator runtime is older than the deployment target — update the runtime (Xcode ▸ Settings ▸ Components) or lower `deploymentTarget` in `project.yml` |
 | `make ios-build` fails with no obvious error                 | Full log is at `/tmp/wardrobeapp-build.log`                                                                                                             |
-| Project won't open / files missing in Xcode                  | Re-run `make ios-generate` — the `.xcodeproj` is generated and gitignored                                                                                |
+| Project won't open / files missing in Xcode                  | Re-run `make ios-generate` — the `.xcodeproj` is generated and gitignored                                                                               |
 | `make backend-up`: "port is already allocated"               | Something else holds 5433 or 9100 — change the port in `services/.env`, then `make backend-down && make backend-up`                                     |
 | `make backend-*`: "Cannot connect to the Docker daemon"      | Docker Desktop is not running                                                                                                                           |
-| `make backend-migrate`: `sqlx: command not found`            | `cargo install sqlx-cli --no-default-features --features postgres,rustls`                                                                                |
+| `make backend-migrate`: `sqlx: command not found`            | `cargo install sqlx-cli --no-default-features --features postgres,rustls`                                                                               |
