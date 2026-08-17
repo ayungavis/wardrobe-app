@@ -1047,6 +1047,22 @@
         }
       }
     },
+    "error.documentFromNewerApp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This edit was made in a newer version of the app. Update to open it — nothing has been lost."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editan ini dibuat di versi aplikasi yang lebih baru. Perbarui untuk membukanya — tidak ada yang hilang."
+          }
+        }
+      }
+    },
     "error.exportFailed" : {
       "localizations" : {
         "en" : {

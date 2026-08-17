@@ -10,6 +10,7 @@ public enum AppError: Error, Equatable, Sendable {
     case photoImportFailed
     case exportFailed
     case photoSaveFailed
+    case documentFromNewerApp
 
     /// Localized message safe to show in UI.
     public var userMessage: String {
@@ -28,6 +29,8 @@ public enum AppError: Error, Equatable, Sendable {
             String(localized: "error.exportFailed", bundle: .module)
         case .photoSaveFailed:
             String(localized: "error.photoSaveFailed", bundle: .module)
+        case .documentFromNewerApp:
+            String(localized: "error.documentFromNewerApp", bundle: .module)
         }
     }
 
