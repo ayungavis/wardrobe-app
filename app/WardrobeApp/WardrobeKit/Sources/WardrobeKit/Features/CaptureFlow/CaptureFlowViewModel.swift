@@ -73,9 +73,13 @@ public final class CaptureFlowViewModel {
     }
 
     static func initialStage(challenge: ActiveChallenge, permission: CameraPermission) -> CaptureStage {
+        // Resume where the photo actually is (FR-017). A capture that never got
+        // framed reopens the crop step rather than skipping past it — the crop
+        // in the draft is what says the step is done, so no extra flag is
+        // persisted to say the same thing twice.
         if challenge.photoID != nil {
-            return .editor
-        } // resume straight to editor (FR-017)
+            return challenge.draft.crop == nil ? .crop : .editor
+        }
         switch permission {
         case .granted: return .camera
         case .notDetermined: return .consent // FR-013: explain before the system prompt
@@ -98,7 +102,8 @@ public final class CaptureFlowViewModel {
         switch stage {
         case .consent, .denied, .camera:
             stage = Self.initialStage(challenge: challenge, permission: camera.permission)
-        case .editor:
+        case .crop, .editor:
+            // A photo already exists; camera permission cannot un-take it.
             break
         }
     }
@@ -197,18 +202,29 @@ public final class CaptureFlowViewModel {
         focusPoint = point
     }
 
-    /// Ordering matters: file write first, then persist photoID, then editor.
-    /// A failed write leaves nothing persisted (FR-016).
+    /// Ordering matters: file write first, then persist photoID, then the crop
+    /// step. A failed write leaves nothing persisted (FR-016).
     private func persistPhoto(_ data: Data) {
         do {
             let id = try photoRepository.saveOriginal(data)
             challenge.photoID = id
             activeRepository.save(challenge)
-            stage = .editor
+            stage = .crop
         } catch {
             Log.report(error)
             alertError = .captureFailed
         }
+    }
+
+    /// **Use Crop** (FR-083): the framing is stored as an instruction, not as a
+    /// second image file. The editor's preview and the exporter both already
+    /// read `draft.crop`, so the original stays the only photo on disk and is
+    /// never overwritten (FR-092).
+    public func useCrop(_ crop: CropSpec) {
+        guard challenge.photoID != nil else { return }
+        challenge.draft.crop = crop
+        activeRepository.save(challenge)
+        stage = .editor
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)

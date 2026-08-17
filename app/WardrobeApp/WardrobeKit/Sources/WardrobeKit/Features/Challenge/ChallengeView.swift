@@ -77,7 +77,8 @@ public struct ChallengeView: View {
                 if let active = viewModel.activeChallenge {
                     CaptureFlowView(
                         viewModel: container.makeCaptureFlowViewModel(challenge: active),
-                        makeEditorViewModel: { container.makeEditorViewModel(challenge: $0) }
+                        makeEditorViewModel: { container.makeEditorViewModel(challenge: $0) },
+                        makeCropViewModel: { container.makeCropViewModel(photoID: $0) }
                     )
                 }
             }

@@ -51,9 +51,19 @@ struct CaptureFlowViewModelTests {
         }
     }
 
-    @Test func initialStageIsEditorWhenPhotoExists() {
+    /// FR-083: a capture that was never framed reopens the crop step rather
+    /// than skipping past it.
+    @Test func initialStageIsCropWhenThePhotoIsNotFramedYet() {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
+        #expect(makeSUT(challenge: challenge).stage == .crop)
+    }
+
+    /// The crop in the draft is what says the step is done — no second flag.
+    @Test func initialStageIsEditorOnceTheCropExists() {
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = UUID().uuidString
+        challenge.draft.crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
         #expect(makeSUT(challenge: challenge).stage == .editor)
     }
 
@@ -100,6 +110,7 @@ struct CaptureFlowViewModelTests {
         camera.permission = .denied
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
+        challenge.draft.crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
         let sut = makeSUT(challenge: challenge, camera: camera)
 
         sut.recheckPermission()
@@ -107,9 +118,9 @@ struct CaptureFlowViewModelTests {
         #expect(sut.stage == .editor)
     }
 
-    // MARK: Capture — straight to editor (FR-016, story-style)
+    // MARK: Capture — hands off to the crop step (FR-016)
 
-    @Test func captureSuccessPersistsPhotoThenEditor() async {
+    @Test func captureSuccessPersistsPhotoThenCrop() async {
         let camera = FakeCameraService()
         camera.permission = .granted
         let photo = Data([0xAB, 0xCD])
@@ -125,7 +136,7 @@ struct CaptureFlowViewModelTests {
         #expect(savedID != nil)
         #expect(photoRepository.saved.values.first == photo)
         #expect(activeRepository.stored?.photoID == savedID)
-        #expect(sut.stage == .editor)
+        #expect(sut.stage == .crop)
         #expect(!sut.isCapturing)
     }
 
@@ -178,7 +189,10 @@ struct CaptureFlowViewModelTests {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         let photoID = UUID().uuidString
         challenge.photoID = photoID
-        challenge.draft = EditDraft(texts: [TextItem(content: "hi")])
+        challenge.draft = EditDraft(
+            crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75)),
+            texts: [TextItem(content: "hi")]
+        )
         let activeRepository = InMemoryActiveChallengeRepository()
         activeRepository.stored = challenge
         let photoRepository = SpyPhotoRepository()
@@ -252,5 +266,55 @@ struct CaptureFlowViewModelTests {
 
         #expect(completedRepository.stored.isEmpty)
         #expect(!sut.isCompleted)
+    }
+
+    // MARK: Crop step (FR-083)
+
+    /// Use Crop stores an instruction, not a second image: the original stays
+    /// the only photo on disk, and the editor and exporter both read the draft.
+    @Test func useCropStoresTheFramingAndOpensTheEditor() {
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = UUID().uuidString
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(
+            challenge: challenge,
+            activeRepository: activeRepository,
+            photoRepository: photoRepository
+        )
+        let crop = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.6, height: 0.45))
+
+        sut.useCrop(crop)
+
+        #expect(sut.stage == .editor)
+        #expect(activeRepository.stored?.draft.crop == crop)
+        #expect(photoRepository.saved.isEmpty, "cropping must not write a second photo")
+    }
+
+    /// Nothing to frame means nothing to store.
+    @Test func useCropWithoutAPhotoDoesNothing() {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = makeSUT(activeRepository: activeRepository)
+
+        sut.useCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75)))
+
+        #expect(sut.stage != .editor)
+        #expect(activeRepository.stored == nil)
+    }
+
+    /// Retake from the crop step is the same discard the editor uses, so the
+    /// photo goes with it.
+    @Test func retakeFromCropDeletesThePhotoAndReturnsToCamera() {
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        let photoID = UUID().uuidString
+        challenge.photoID = photoID
+        let photoRepository = SpyPhotoRepository()
+        let sut = makeSUT(challenge: challenge, photoRepository: photoRepository)
+        #expect(sut.stage == .crop)
+
+        sut.discardPhoto()
+
+        #expect(photoRepository.deleted == [photoID])
+        #expect(sut.stage == .camera)
     }
 }

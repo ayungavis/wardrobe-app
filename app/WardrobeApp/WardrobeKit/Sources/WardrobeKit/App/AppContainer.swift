@@ -73,6 +73,10 @@ public final class AppContainer {
         )
     }
 
+    public func makeCropViewModel(photoID: String) -> CropViewModel {
+        CropViewModel(photoID: photoID, photoRepository: photoRepository)
+    }
+
     public func makeWardrobeViewModel() -> WardrobeViewModel {
         WardrobeViewModel(
             thumbnails: garmentThumbnailRepository,
