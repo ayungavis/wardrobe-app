@@ -166,4 +166,13 @@ public final class AppContainer {
     public func makeCameraService() -> CameraService {
         cameraService
     }
+    
+    public func makeHistoryViewModel() -> HistoryViewModel {
+        HistoryViewModel(
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
+        )
+    }
 }

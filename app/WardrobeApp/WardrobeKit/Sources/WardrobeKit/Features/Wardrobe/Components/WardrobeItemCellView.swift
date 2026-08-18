@@ -22,10 +22,11 @@ struct WardrobeItemCellView: View {
                 }
                 
                 Text("\(wearCount)x")
-                    .font(AppFont.caption.bold())
+                    .font(AppFont.title.bold())
+                    .stroke(color: .white, width: 3)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(.white))
+                    //.background(Capsule().fill(.white))
                     .padding(Spacing.sm)
             }
             

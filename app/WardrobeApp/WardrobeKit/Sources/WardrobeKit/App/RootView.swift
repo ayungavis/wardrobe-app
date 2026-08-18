@@ -38,7 +38,7 @@ public struct RootView: View {
                     }
                     
                     Tab {
-                        HistoryView()
+                        HistoryView(viewModel: container.makeHistoryViewModel(), container: container)
                     } label: {
                         Label {
                             Text("tab.history", bundle: .module)

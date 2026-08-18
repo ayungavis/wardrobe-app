@@ -45,4 +45,5 @@ public final class WardrobeViewModel {
     public func wearCount(for item: WardrobeItem) -> Int {
             wearCounts[item.id] ?? 0
         }
+    
 }

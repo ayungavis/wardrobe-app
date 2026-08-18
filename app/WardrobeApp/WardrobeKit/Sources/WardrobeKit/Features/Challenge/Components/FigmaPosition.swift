@@ -12,6 +12,7 @@ struct FigmaPosition {
     let x: CGFloat            // fraction 0-1, relative to its container
     let y: CGFloat
     let widthFraction: CGFloat
+    let heightFraction: CGFloat
     let rotation: Double      // degrees, 0 if none
 
     init(
@@ -26,6 +27,7 @@ struct FigmaPosition {
         self.x = (figmaX + figmaWidth / 2) / frameWidth
         self.y = (figmaY + figmaHeight / 2) / frameHeight
         self.widthFraction = figmaWidth / frameWidth
+        self.heightFraction = figmaWidth / frameWidth
         self.rotation = rotation
     }
 }
