@@ -1,4 +1,5 @@
 import CoreGraphics
+import DesignSystem
 import SwiftUI
 #if os(iOS)
     import UIKit
@@ -16,11 +17,16 @@ struct EditorCanvasView: View {
     @Binding var canvasSize: CGSize
     @State private var interactingLayerID: UUID?
     @State private var isOverDeleteTarget = false
+    /// What the current gesture last landed on. Transient like the two above —
+    /// it means nothing once the finger lifts.
+    @State private var snap: CanvasSnap?
 
     var body: some View {
         CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
             .gesture(backgroundTap)
             .overlay { layers }
+            .overlay { guides }
+            .overlay(alignment: .top) { snapBadges }
             .overlay { drawingSurface }
             .overlay(alignment: .bottom) { deleteTarget }
     }
@@ -55,7 +61,7 @@ struct EditorCanvasView: View {
                         isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
                         onSelect: { select(layer.id) },
                         onDoubleTap: { beginEditing(layer) },
-                        onDragChanged: { dragChanged(layer.id, to: $0) },
+                        onSnapChanged: { snapChanged(layer.id, to: $0) },
                         onTransformEnded: { transformEnded(layer.id, to: $0) },
                         onDelete: { viewModel.removeLayer(id: layer.id) }
                     )
@@ -64,6 +70,42 @@ struct EditorCanvasView: View {
                     .zIndex(Double(index))
                 }
             }
+        }
+    }
+
+    /// Suppressed over the delete target: a layer about to be thrown away has
+    /// nothing to align to.
+    @ViewBuilder
+    private var guides: some View {
+        if let snap, !isOverDeleteTarget {
+            CanvasGuidesView(alignment: snap.alignment)
+        }
+    }
+
+    @ViewBuilder
+    private var snapBadges: some View {
+        if let snap, !isOverDeleteTarget {
+            VStack(spacing: Spacing.sm) {
+                if let degrees = snap.snappedRotationDegrees {
+                    SnapBadgeView(
+                        systemName: "arrow.clockwise",
+                        value: Text(
+                            "editor.snap.degrees \(CanvasSnapping.readableDegrees(degrees))",
+                            bundle: .module
+                        )
+                    )
+                }
+                if let scale = snap.snappedScale {
+                    SnapBadgeView(
+                        systemName: "arrow.up.left.and.arrow.down.right",
+                        value: Text(
+                            "editor.snap.scale \(Int((scale * 100).rounded()))",
+                            bundle: .module
+                        )
+                    )
+                }
+            }
+            .padding(.top, Spacing.xxl)
         }
     }
 
@@ -109,11 +151,22 @@ struct EditorCanvasView: View {
         viewModel.beginEditingText(draft)
     }
 
-    private func dragChanged(_ id: UUID, to position: CGPoint) {
+    private func snapChanged(_ id: UUID, to snap: CanvasSnap) {
         interactingLayerID = id
         select(id)
 
-        let isOver = CanvasGeometry.isOverDeleteTarget(position)
+        // Edge-triggered: feedback belongs to the moment something latches on,
+        // not to every frame it stays there.
+        let landedOnSomething = (snap.alignment != .none && self.snap?.alignment == CanvasAlignment.none)
+            || (snap.snappedRotationDegrees != nil
+                && snap.snappedRotationDegrees != self.snap?.snappedRotationDegrees)
+            || (snap.snappedScale != nil && snap.snappedScale != self.snap?.snappedScale)
+        self.snap = snap
+        if landedOnSomething {
+            CanvasHaptics.selectionChanged()
+        }
+
+        let isOver = CanvasGeometry.isOverDeleteTarget(snap.transform.position)
         guard isOver != isOverDeleteTarget else { return }
         isOverDeleteTarget = isOver
         if isOver {
@@ -125,6 +178,7 @@ struct EditorCanvasView: View {
         let shouldDelete = isOverDeleteTarget && interactingLayerID == id
         interactingLayerID = nil
         isOverDeleteTarget = false
+        snap = nil
 
         if shouldDelete {
             CanvasHaptics.deleted()

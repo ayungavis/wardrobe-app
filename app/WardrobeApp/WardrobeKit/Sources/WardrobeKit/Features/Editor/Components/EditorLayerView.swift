@@ -17,8 +17,9 @@ struct EditorLayerView: View {
     let isOverDeleteTarget: Bool
     let onSelect: () -> Void
     let onDoubleTap: () -> Void
-    /// Reports the live centre so the canvas can light up the delete target.
-    let onDragChanged: (CGPoint) -> Void
+    /// Reports the live snap so the canvas can light up the delete target and
+    /// show the guides and badges.
+    let onSnapChanged: (CanvasSnap) -> Void
     let onTransformEnded: (ElementTransform) -> Void
     let onDelete: () -> Void
 
@@ -26,18 +27,18 @@ struct EditorLayerView: View {
     @GestureState private var gesture = TransientTransform()
     @State private var contentSize: CGSize = .zero
 
-    private var liveTransform: ElementTransform {
-        ElementTransform(
-            position: CanvasGeometry.position(
-                layer.transform.position, translatedBy: gesture.translation, in: canvasSize
-            ),
-            scale: ElementTransform.clampedScale(layer.transform.scale * gesture.magnification),
-            rotationDegrees: layer.transform.rotationDegrees + gesture.rotationDegrees
+    private var liveSnap: CanvasSnap {
+        CanvasSnapping.snap(
+            committed: layer.transform,
+            translation: gesture.translation,
+            magnification: gesture.magnification,
+            rotationDelta: gesture.rotationDegrees,
+            canvasSize: canvasSize
         )
     }
 
     var body: some View {
-        let transform = liveTransform
+        let transform = liveSnap.transform
 
         LayerContentView(content: layer.content, canvasSize: canvasSize, photo: photo)
             .onGeometryChange(for: CGSize.self) { proxy in
@@ -57,6 +58,7 @@ struct EditorLayerView: View {
             .gesture(transformGesture, including: layer.isLocked ? .subviews : .all)
             .accessibilityElement()
             .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(accessibilityValue)
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             .accessibilityAction(named: Text("editor.layer.select", bundle: .module), onSelect)
             .accessibilityAction(named: Text("editor.layer.delete", bundle: .module), onDelete)
@@ -82,6 +84,28 @@ struct EditorLayerView: View {
             Text("editor.layer.photo", bundle: .module)
         case .drawing:
             Text("editor.layer.drawing", bundle: .module)
+        }
+    }
+
+    /// §19: the guides and badges cannot be the only way to know a layer is
+    /// aligned, so the same alignment they draw is also what VoiceOver reads —
+    /// from one function, so the two can never say different things.
+    private var accessibilityValue: Text {
+        let percent = Int((layer.transform.scale * 100).rounded())
+        let degrees = CanvasSnapping.readableDegrees(layer.transform.rotationDegrees)
+
+        guard let alignment = alignmentPhrase else {
+            return Text("editor.layer.transform \(percent) \(degrees)", bundle: .module)
+        }
+        return Text("editor.layer.transformAligned \(percent) \(degrees) \(alignment)", bundle: .module)
+    }
+
+    private var alignmentPhrase: String? {
+        switch CanvasSnapping.alignment(of: layer.transform.position, in: canvasSize) {
+        case .none: nil
+        case .centredHorizontally: LocalizedKey.resolve("editor.layer.aligned.horizontally")
+        case .centredVertically: LocalizedKey.resolve("editor.layer.aligned.vertically")
+        case .centred: LocalizedKey.resolve("editor.layer.aligned.both")
         }
     }
 
@@ -113,10 +137,10 @@ struct EditorLayerView: View {
                 state.rotationDegrees = value.second?.second?.rotation.degrees ?? 0
             }
             .onChanged { value in
-                onDragChanged(proposedTransform(for: value).position)
+                onSnapChanged(proposedSnap(for: value))
             }
             .onEnded { value in
-                onTransformEnded(settled(proposedTransform(for: value)))
+                onTransformEnded(settled(proposedSnap(for: value).transform))
             }
     }
 
@@ -125,19 +149,15 @@ struct EditorLayerView: View {
     >.Value
 
     /// Read from the gesture value rather than from `@GestureState`, whose
-    /// update is not ordered against these callbacks.
-    private func proposedTransform(for value: TransformValue) -> ElementTransform {
-        ElementTransform(
-            position: CanvasGeometry.position(
-                layer.transform.position,
-                translatedBy: value.first?.translation ?? .zero,
-                in: canvasSize
-            ),
-            scale: ElementTransform.clampedScale(
-                layer.transform.scale * (value.second?.first?.magnification ?? 1)
-            ),
-            rotationDegrees: layer.transform.rotationDegrees
-                + (value.second?.second?.rotation.degrees ?? 0)
+    /// update is not ordered against these callbacks — but composed by the same
+    /// function as the drawn one, so the two cannot drift apart.
+    private func proposedSnap(for value: TransformValue) -> CanvasSnap {
+        CanvasSnapping.snap(
+            committed: layer.transform,
+            translation: value.first?.translation ?? .zero,
+            magnification: value.second?.first?.magnification ?? 1,
+            rotationDelta: value.second?.second?.rotation.degrees ?? 0,
+            canvasSize: canvasSize
         )
     }
 

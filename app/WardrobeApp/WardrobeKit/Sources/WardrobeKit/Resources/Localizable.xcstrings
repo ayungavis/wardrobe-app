@@ -1496,6 +1496,57 @@
         }
       }
     },
+    "editor.layer.aligned.both": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "centred"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "di tengah"
+          }
+        }
+      }
+    },
+    "editor.layer.aligned.horizontally": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "centred horizontally"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "di tengah mendatar"
+          }
+        }
+      }
+    },
+    "editor.layer.aligned.vertically": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "centred vertically"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "di tengah tegak"
+          }
+        }
+      }
+    },
     "editor.layer.delete": {
       "localizations": {
         "en": {
@@ -1572,6 +1623,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stiker"
+          }
+        }
+      }
+    },
+    "editor.layer.transform %lld %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld percent, %2$lld degrees"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld persen, %2$lld derajat"
+          }
+        }
+      }
+    },
+    "editor.layer.transformAligned %lld %lld %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld percent, %2$lld degrees, %3$@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld persen, %2$lld derajat, %3$@"
           }
         }
       }
@@ -1669,6 +1752,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bagikan"
+          }
+        }
+      }
+    },
+    "editor.snap.degrees %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld°"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld°"
+          }
+        }
+      }
+    },
+    "editor.snap.scale %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
           }
         }
       }
