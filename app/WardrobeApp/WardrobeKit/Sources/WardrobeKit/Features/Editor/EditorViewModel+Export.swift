@@ -8,18 +8,26 @@ import Foundation
 // the file.
 
 public extension EditorViewModel {
+    /// PRD §17: duplicate export actions have to be prevented, and the pill is
+    /// where that is visible.
+    var isExporting: Bool {
+        if case .loading = exportState {
+            return true
+        }
+        return false
+    }
+
     func beginExport() {
         guard case let .loaded(data) = originalData else { return }
         exportTask?.cancel()
         exportState = .loading
-        didSaveToPhotos = false
         isExportPresented = true
 
         let document = document
         exportTask = Task {
             do {
                 let start = ContinuousClock.now
-                let photo = try ExportService.render(original: data, document: document)
+                let photo = try await ExportService.render(original: data, document: document)
                 try Task.checkCancellation()
                 Log.ui.info(
                     "Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
@@ -34,19 +42,6 @@ public extension EditorViewModel {
         }
     }
 
-    func saveToPhotos() {
-        guard case let .loaded(photo) = exportState else { return }
-        saveTask = Task {
-            do {
-                try await librarySaver.save(photo.data)
-                didSaveToPhotos = true
-            } catch {
-                Log.report(error)
-                alertError = .photoSaveFailed
-            }
-        }
-    }
-
     /// Save-pill path: render + save to the library in one step, no sheet.
     func saveDirectly() {
         guard case let .loaded(data) = originalData, !isSaving, !didSaveToPhotos else { return }
@@ -56,7 +51,7 @@ public extension EditorViewModel {
         saveTask = Task {
             defer { isSaving = false }
             do {
-                let photo = try ExportService.render(original: data, document: document)
+                let photo = try await ExportService.render(original: data, document: document)
                 try Task.checkCancellation()
                 try await librarySaver.save(photo)
                 didSaveToPhotos = true
@@ -64,7 +59,9 @@ public extension EditorViewModel {
                 // Ignore cancellation.
             } catch {
                 Log.report(error)
-                alertError = .photoSaveFailed
+                // Kept typed rather than flattened: a refused permission and a
+                // failed write ask the user for different things.
+                alertError = error as? AppError ?? .photoSaveFailed
             }
         }
     }

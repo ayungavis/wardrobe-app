@@ -271,9 +271,15 @@ public final class EditorViewModel {
         write(document)
     }
 
+    /// Called by `persistDocument` for an edit and by `restore` for an undo —
+    /// every path that actually changes the document, and nothing else.
     func write(_ document: EditorDocument) {
         challenge.document = document
         activeRepository.save(challenge)
+        // "Saved" claims the library holds what the canvas shows. Changing the
+        // canvas ends that claim, which is also what lets someone save again
+        // after an edit instead of the pill being spent for the session.
+        didSaveToPhotos = false
     }
 
     // MARK: Canvas layers (FR-085 select/transform, FR-087 delete)

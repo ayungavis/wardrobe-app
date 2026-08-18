@@ -9,6 +9,7 @@ public struct EditorView<ReviewDrawer: View>: View {
     @State private var canvasSize: CGSize = .zero
     @State private var isDiscardConfirmPresented = false
 
+    private let isCompleting: Bool
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
     /// The item-review drawer, supplied by the capture flow that owns the scan
@@ -18,11 +19,13 @@ public struct EditorView<ReviewDrawer: View>: View {
 
     public init(
         viewModel: EditorViewModel,
+        isCompleting: Bool,
         onDiscard: @escaping () -> Void,
         onComplete: @escaping () -> Void,
         @ViewBuilder reviewDrawer: () -> ReviewDrawer
     ) {
         _viewModel = State(wrappedValue: viewModel)
+        self.isCompleting = isCompleting
         self.onDiscard = onDiscard
         self.onComplete = onComplete
         self.reviewDrawer = reviewDrawer()
@@ -144,6 +147,8 @@ public struct EditorView<ReviewDrawer: View>: View {
                 EditorControlsView(
                     isSaving: viewModel.isSaving,
                     didSave: viewModel.didSaveToPhotos,
+                    isExporting: viewModel.isExporting,
+                    isCompleting: isCompleting,
                     onClose: { isDiscardConfirmPresented = true },
                     canUndo: viewModel.canUndo,
                     canRedo: viewModel.canRedo,

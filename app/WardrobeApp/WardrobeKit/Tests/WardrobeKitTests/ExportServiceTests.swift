@@ -45,14 +45,14 @@ struct ExportServiceTests {
         return props
     }
 
-    @Test func exportStripsEXIFAndGPS() throws {
+    @Test func exportStripsEXIFAndGPS() async throws {
         let original = try makeJPEGWithMetadata()
 
         // Sanity: source really contains the metadata we planted.
         let sourceProps = try properties(of: original)
         #expect(sourceProps[kCGImagePropertyGPSDictionary] != nil)
 
-        let exported = try ExportService.render(original: original, document: EditorDocument(photoID: "photo-1"))
+        let exported = try await ExportService.render(original: original, document: EditorDocument(photoID: "photo-1"))
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
@@ -69,17 +69,17 @@ struct ExportServiceTests {
         EditorDocument.fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))),
         EditorDocument.fixture(texts: [TextItem(content: "OOTD")]),
     ])
-    func exportAlwaysUsesStoryCanvasSize(document: EditorDocument) throws {
+    func exportAlwaysUsesStoryCanvasSize(document: EditorDocument) async throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 100, height: 200)
 
-        let exported = try ExportService.render(original: original, document: document)
+        let exported = try await ExportService.render(original: original, document: document)
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyPixelWidth] as? Int == Int(StoryCanvas.exportSize.width))
         #expect(props[kCGImagePropertyPixelHeight] as? Int == Int(StoryCanvas.exportSize.height))
     }
 
-    @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() throws {
+    @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() async throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 200, height: 200)
         let document = EditorDocument.fixture(
             texts: [TextItem(
@@ -96,7 +96,7 @@ struct ExportServiceTests {
             )]
         )
 
-        let exported = try ExportService.render(original: original, document: document)
+        let exported = try await ExportService.render(original: original, document: document)
         let props = try properties(of: exported)
 
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)

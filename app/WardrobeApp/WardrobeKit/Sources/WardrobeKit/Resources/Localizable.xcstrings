@@ -3711,6 +3711,22 @@
         }
       }
     },
+    "error.photoAccessDenied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos access is off. Turn on “Add Photos Only” for this app in Settings, then try again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akses Photos mati. Nyalakan “Tambah Foto Saja” untuk aplikasi ini di Pengaturan, lalu coba lagi."
+          }
+        }
+      }
+    },
     "error.photoImportFailed": {
       "localizations": {
         "en": {

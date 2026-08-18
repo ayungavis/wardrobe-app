@@ -28,7 +28,9 @@ public final class CaptureFlowViewModel {
 
     /// Set once the checkmark commits — the flow's cover closes on it.
     public private(set) var isCompleted = false
-    private var isCompleting = false
+    /// Read by the editor so the ✓ can show the wait for the garment scan
+    /// rather than looking inert.
+    public private(set) var isCompleting = false
 
     /// The AI item review shown in the editor drawer (FR-027).
     public let review: GarmentReviewModel

@@ -10,6 +10,7 @@ public enum AppError: Error, Equatable, Sendable {
     case photoImportFailed
     case exportFailed
     case photoSaveFailed
+    case photoAccessDenied
     case documentFromNewerApp
 
     /// Localized message safe to show in UI.
@@ -29,6 +30,8 @@ public enum AppError: Error, Equatable, Sendable {
             String(localized: "error.exportFailed", bundle: .module)
         case .photoSaveFailed:
             String(localized: "error.photoSaveFailed", bundle: .module)
+        case .photoAccessDenied:
+            String(localized: "error.photoAccessDenied", bundle: .module)
         case .documentFromNewerApp:
             String(localized: "error.documentFromNewerApp", bundle: .module)
         }
