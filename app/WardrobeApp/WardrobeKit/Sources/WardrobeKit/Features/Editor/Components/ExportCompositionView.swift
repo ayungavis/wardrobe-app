@@ -19,13 +19,13 @@ struct ExportCompositionView: View {
                 .clipped()
 
             ForEach(stickers) { item in
-                StickerLabelView(item: item, fontSize: TextRendering.stickerFontSize(for: item, in: size))
+                StickerLabelView(emoji: item.emoji, fontSize: TextRendering.stickerFontSize(for: item, in: size))
                     .rotationEffect(.degrees(item.rotationDegrees))
                     .position(x: item.position.x * size.width, y: item.position.y * size.height)
             }
 
             ForEach(texts) { item in
-                TextItemLabelView(item: item, fontSize: TextRendering.fontSize(for: item, in: size))
+                TextItemLabelView(item: TextContent(item), fontSize: TextRendering.fontSize(for: item, in: size))
                     .rotationEffect(.degrees(item.rotationDegrees))
                     .position(x: item.position.x * size.width, y: item.position.y * size.height)
             }

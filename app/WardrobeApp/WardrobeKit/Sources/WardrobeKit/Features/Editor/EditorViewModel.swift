@@ -15,7 +15,22 @@ public final class EditorViewModel {
     /// Derived from `previewImage` + the committed crop. Stored (not computed)
     /// so moving an overlay never re-crops the image on the render path.
     public private(set) var croppedPreviewImage: CGImage?
-    public private(set) var draft: EditDraft
+    /// The layered canvas (FR-084) — what every edit actually changes.
+    public private(set) var document: EditorDocument
+    /// What still gets stored and exported. Computed, so it can never drift
+    /// from the document the way a second stored copy would.
+    ///
+    /// ponytail: the document rides inside `EditDraft` for now, which cannot
+    /// carry lock flags, the canvas background, or drawings. The stage that
+    /// stores documents in their own right replaces this; until then the
+    /// projection is lossless because those three do not exist yet.
+    public var draft: EditDraft {
+        EditDraft(projecting: document)
+    }
+
+    /// Canvas selection. UI state, deliberately not part of the document —
+    /// which layer someone is holding means nothing on their other phone.
+    public private(set) var selectedLayerID: UUID?
     public private(set) var activeTool: Tool?
     public private(set) var exportState: Loadable<ExportedPhoto> = .idle
     public var isExportPresented = false
@@ -42,7 +57,7 @@ public final class EditorViewModel {
         self.activeRepository = activeRepository
         self.photoRepository = photoRepository
         self.librarySaver = librarySaver
-        draft = challenge.draft
+        document = EditorDocument(migrating: challenge.draft, photoID: challenge.photoID)
     }
 
     public func onAppear() {
@@ -88,7 +103,7 @@ public final class EditorViewModel {
             croppedPreviewImage = nil
             return
         }
-        guard let crop = draft.crop else {
+        guard let crop = document.photoCrop else {
             croppedPreviewImage = previewImage
             return
         }
@@ -104,7 +119,7 @@ public final class EditorViewModel {
     // MARK: Tools (FR-019: cancel restores last committed state)
 
     public func beginCrop() {
-        activeTool = .crop(draft.crop ?? CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
+        activeTool = .crop(document.photoCrop ?? CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
     }
 
     public func beginNewText(at position: CGPoint = CGPoint(x: 0.5, y: 0.5)) {
@@ -128,22 +143,21 @@ public final class EditorViewModel {
     public func commitTool() {
         switch activeTool {
         case let .crop(spec):
-            draft.crop = spec
+            document.photoCrop = spec
             updateCroppedPreview()
         case let .text(item, _):
-            let trimmed = item.content.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                draft.texts.removeAll { $0.id == item.id }
-            } else if let index = draft.texts.firstIndex(where: { $0.id == item.id }) {
-                draft.texts[index] = item
+            // Trimmed only to decide whether anything was written; what gets
+            // stored is what the user typed.
+            if item.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                document.removeLayer(id: item.id)
             } else {
-                draft.texts.append(item)
+                document.upsertText(item)
             }
         case nil:
             return
         }
         activeTool = nil
-        persistDraft()
+        persistDocument()
     }
 
     public func cancelTool() {
@@ -152,69 +166,46 @@ public final class EditorViewModel {
 
     public func removeWorkingText() {
         guard case let .text(item, _) = activeTool else { return }
-        draft.texts.removeAll { $0.id == item.id }
+        document.removeLayer(id: item.id)
         activeTool = nil
-        persistDraft()
+        persistDocument()
     }
 
-    private func persistDraft() {
+    private func persistDocument() {
         challenge.draft = draft
         activeRepository.save(challenge)
     }
 
-    // MARK: Direct manipulation on committed overlays (story-style drag/pinch)
+    // MARK: Canvas layers (FR-085 select/transform, FR-087 delete)
 
-    public func moveText(id: UUID, to position: CGPoint) {
-        guard let index = draft.texts.firstIndex(where: { $0.id == id }) else { return }
-        draft.texts[index].position = position.clampedToUnit()
+    public func select(_ id: UUID?) {
+        selectedLayerID = id
     }
 
-    public func scaleText(id: UUID, to scale: CGFloat) {
-        guard let index = draft.texts.firstIndex(where: { $0.id == id }) else { return }
-        draft.texts[index].scale = min(3, max(0.5, scale))
+    /// One write per gesture. The canvas renders the live transform itself, so
+    /// the document only ever sees the settled one — which is also what makes
+    /// "an interrupted transform restores the last committed state" true by
+    /// construction rather than by cleanup.
+    public func commitTransform(layerID: UUID, to transform: ElementTransform) {
+        document.updateTransform(ofLayer: layerID, to: transform)
+        persistDocument()
     }
 
-    public func rotateText(id: UUID, to degrees: Double) {
-        guard let index = draft.texts.firstIndex(where: { $0.id == id }) else { return }
-        draft.texts[index].rotationDegrees = degrees
-    }
-
-    public func removeText(id: UUID) {
-        draft.texts.removeAll { $0.id == id }
-        persistDraft()
+    public func removeLayer(id: UUID) {
+        document.removeLayer(id: id)
+        if selectedLayerID == id {
+            selectedLayerID = nil
+        }
+        persistDocument()
     }
 
     // MARK: Stickers (PRD FR-019)
 
     public func addSticker(_ emoji: String) {
-        draft.stickers.append(StickerItem(emoji: emoji))
+        document.appendSticker(emoji)
+        selectedLayerID = document.layers.last?.id
         isStickerPickerPresented = false
-        persistDraft()
-    }
-
-    public func moveSticker(id: UUID, to position: CGPoint) {
-        guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
-        draft.stickers[index].position = position.clampedToUnit()
-    }
-
-    public func scaleSticker(id: UUID, to scale: CGFloat) {
-        guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
-        draft.stickers[index].scale = min(4, max(0.5, scale))
-    }
-
-    public func rotateSticker(id: UUID, to degrees: Double) {
-        guard let index = draft.stickers.firstIndex(where: { $0.id == id }) else { return }
-        draft.stickers[index].rotationDegrees = degrees
-    }
-
-    public func removeSticker(id: UUID) {
-        draft.stickers.removeAll { $0.id == id }
-        persistDraft()
-    }
-
-    /// Persist once when the gesture ends — not on every frame.
-    public func finishDirectManipulation() {
-        persistDraft()
+        persistDocument()
     }
 
     // MARK: Export / save / share (FR-031/032 — independent of completion)
@@ -276,11 +267,5 @@ public final class EditorViewModel {
                 alertError = .photoSaveFailed
             }
         }
-    }
-}
-
-private extension CGPoint {
-    func clampedToUnit() -> CGPoint {
-        CGPoint(x: min(1, max(0, x)), y: min(1, max(0, y)))
     }
 }

@@ -5,49 +5,25 @@ import Testing
 
 @MainActor
 struct CaptureFlowViewModelTests {
-    private func makeSUT(
-        challenge: ActiveChallenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast),
-        camera: FakeCameraService = FakeCameraService(),
-        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
-        completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
-        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
-        library: FakePhotoLibrary = FakePhotoLibrary(),
-        scanner: FakeGarmentScanService = FakeGarmentScanService(),
-        wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
-        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository()
-    ) -> CaptureFlowViewModel {
-        CaptureFlowViewModel(
-            challenge: challenge,
-            camera: camera,
-            activeRepository: activeRepository,
-            completedRepository: completedRepository,
-            photoRepository: photoRepository,
-            library: library,
-            scanner: scanner,
-            wardrobeRepository: wardrobeRepository,
-            thumbnails: thumbnails
-        )
-    }
-
     // MARK: Initial stage (FR-013/014/017)
 
     @Test func initialStageIsConsentWhenNotDetermined() {
         let camera = FakeCameraService()
         camera.permission = .notDetermined
-        #expect(makeSUT(camera: camera).stage == .consent)
+        #expect(makeCaptureFlowSUT(camera: camera).stage == .consent)
     }
 
     @Test func initialStageIsCameraWhenGranted() {
         let camera = FakeCameraService()
         camera.permission = .granted
-        #expect(makeSUT(camera: camera).stage == .camera)
+        #expect(makeCaptureFlowSUT(camera: camera).stage == .camera)
     }
 
     @Test func initialStageIsDeniedWhenDeniedOrRestricted() {
         for permission in [CameraPermission.denied, .restricted] {
             let camera = FakeCameraService()
             camera.permission = permission
-            #expect(makeSUT(camera: camera).stage == .denied)
+            #expect(makeCaptureFlowSUT(camera: camera).stage == .denied)
         }
     }
 
@@ -56,7 +32,7 @@ struct CaptureFlowViewModelTests {
     @Test func initialStageIsCropWhenThePhotoIsNotFramedYet() {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
-        #expect(makeSUT(challenge: challenge).stage == .crop)
+        #expect(makeCaptureFlowSUT(challenge: challenge).stage == .crop)
     }
 
     /// The crop in the draft is what says the step is done — no second flag.
@@ -64,7 +40,7 @@ struct CaptureFlowViewModelTests {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
         challenge.draft.crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
-        #expect(makeSUT(challenge: challenge).stage == .editor)
+        #expect(makeCaptureFlowSUT(challenge: challenge).stage == .editor)
     }
 
     // MARK: Consent (FR-013)
@@ -72,7 +48,7 @@ struct CaptureFlowViewModelTests {
     @Test func consentContinueGrantedGoesToCamera() async {
         let camera = FakeCameraService()
         camera.permissionAfterRequest = .granted
-        let sut = makeSUT(camera: camera)
+        let sut = makeCaptureFlowSUT(camera: camera)
 
         sut.consentContinue()
         await sut.consentTask?.value
@@ -83,7 +59,7 @@ struct CaptureFlowViewModelTests {
     @Test func consentContinueDeniedGoesToDenied() async {
         let camera = FakeCameraService()
         camera.permissionAfterRequest = .denied
-        let sut = makeSUT(camera: camera)
+        let sut = makeCaptureFlowSUT(camera: camera)
 
         sut.consentContinue()
         await sut.consentTask?.value
@@ -96,7 +72,7 @@ struct CaptureFlowViewModelTests {
     @Test func recheckFlipsCameraToDeniedAfterRevocation() {
         let camera = FakeCameraService()
         camera.permission = .granted
-        let sut = makeSUT(camera: camera)
+        let sut = makeCaptureFlowSUT(camera: camera)
         #expect(sut.stage == .camera)
 
         camera.permission = .denied
@@ -111,7 +87,7 @@ struct CaptureFlowViewModelTests {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = UUID().uuidString
         challenge.draft.crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
-        let sut = makeSUT(challenge: challenge, camera: camera)
+        let sut = makeCaptureFlowSUT(challenge: challenge, camera: camera)
 
         sut.recheckPermission()
 
@@ -127,7 +103,7 @@ struct CaptureFlowViewModelTests {
         camera.captureResult = .success(photo)
         let activeRepository = InMemoryActiveChallengeRepository()
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
+        let sut = makeCaptureFlowSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
 
         sut.capture()
         await sut.captureTask?.value
@@ -144,7 +120,7 @@ struct CaptureFlowViewModelTests {
         let camera = FakeCameraService()
         camera.permission = .granted
         camera.captureResult = .failure(AppError.captureFailed)
-        let sut = makeSUT(camera: camera)
+        let sut = makeCaptureFlowSUT(camera: camera)
 
         sut.capture()
         await sut.captureTask?.value
@@ -159,7 +135,7 @@ struct CaptureFlowViewModelTests {
         let activeRepository = InMemoryActiveChallengeRepository()
         let photoRepository = SpyPhotoRepository()
         photoRepository.saveError = AppError.unexpected
-        let sut = makeSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
+        let sut = makeCaptureFlowSUT(camera: camera, activeRepository: activeRepository, photoRepository: photoRepository)
 
         sut.capture()
         await sut.captureTask?.value
@@ -173,7 +149,7 @@ struct CaptureFlowViewModelTests {
         let camera = FakeCameraService()
         camera.permission = .granted
         camera.startError = AppError.cameraUnavailable
-        let sut = makeSUT(camera: camera)
+        let sut = makeCaptureFlowSUT(camera: camera)
 
         sut.cameraAppeared()
         await sut.sessionTask?.value
@@ -196,7 +172,7 @@ struct CaptureFlowViewModelTests {
         let activeRepository = InMemoryActiveChallengeRepository()
         activeRepository.stored = challenge
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(
+        let sut = makeCaptureFlowSUT(
             challenge: challenge,
             camera: camera,
             activeRepository: activeRepository,
@@ -212,62 +188,6 @@ struct CaptureFlowViewModelTests {
         #expect(sut.stage == .camera)
     }
 
-    // MARK: Completion (FR-012/029/030)
-
-    private func makeEditorStageSUT(
-        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
-        completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository()
-    ) -> CaptureFlowViewModel {
-        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString
-        activeRepository.stored = challenge
-        let camera = FakeCameraService()
-        camera.permission = .granted
-        return makeSUT(
-            challenge: challenge,
-            camera: camera,
-            activeRepository: activeRepository,
-            completedRepository: completedRepository
-        )
-    }
-
-    @Test func completeChallengeRecordsCompletionAndClearsActiveChallenge() async {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let completedRepository = InMemoryCompletedChallengeRepository()
-        let sut = makeEditorStageSUT(activeRepository: activeRepository, completedRepository: completedRepository)
-
-        sut.completeChallenge()
-        await sut.completionTask?.value
-
-        #expect(completedRepository.stored.count == 1)
-        #expect(completedRepository.stored[0].card.prompt == "x")
-        #expect(activeRepository.stored == nil)
-        #expect(sut.isCompleted)
-    }
-
-    @Test func completeChallengeIsIdempotent() async {
-        let completedRepository = InMemoryCompletedChallengeRepository()
-        let sut = makeEditorStageSUT(completedRepository: completedRepository)
-
-        sut.completeChallenge()
-        await sut.completionTask?.value
-        sut.completeChallenge()
-        await sut.completionTask?.value
-
-        #expect(completedRepository.stored.count == 1)
-    }
-
-    @Test func completeChallengeWithoutPhotoRecordsNothing() async {
-        let completedRepository = InMemoryCompletedChallengeRepository()
-        let sut = makeSUT(completedRepository: completedRepository)
-
-        sut.completeChallenge()
-        await sut.completionTask?.value
-
-        #expect(completedRepository.stored.isEmpty)
-        #expect(!sut.isCompleted)
-    }
-
     // MARK: Crop step (FR-083)
 
     /// Use Crop stores an instruction, not a second image: the original stays
@@ -277,7 +197,7 @@ struct CaptureFlowViewModelTests {
         challenge.photoID = UUID().uuidString
         let activeRepository = InMemoryActiveChallengeRepository()
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(
+        let sut = makeCaptureFlowSUT(
             challenge: challenge,
             activeRepository: activeRepository,
             photoRepository: photoRepository
@@ -294,7 +214,7 @@ struct CaptureFlowViewModelTests {
     /// Nothing to frame means nothing to store.
     @Test func useCropWithoutAPhotoDoesNothing() {
         let activeRepository = InMemoryActiveChallengeRepository()
-        let sut = makeSUT(activeRepository: activeRepository)
+        let sut = makeCaptureFlowSUT(activeRepository: activeRepository)
 
         sut.useCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75)))
 
@@ -309,7 +229,7 @@ struct CaptureFlowViewModelTests {
         let photoID = UUID().uuidString
         challenge.photoID = photoID
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(challenge: challenge, photoRepository: photoRepository)
+        let sut = makeCaptureFlowSUT(challenge: challenge, photoRepository: photoRepository)
         #expect(sut.stage == .crop)
 
         sut.discardPhoto()

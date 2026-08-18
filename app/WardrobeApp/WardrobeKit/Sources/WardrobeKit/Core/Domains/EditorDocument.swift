@@ -54,30 +54,45 @@ public extension EditorDocument {
     /// and `CompletedChallenge` on people's phones, so without this path the
     /// port would erase work they have already done.
     ///
-    /// Order is decided here rather than inherited: the current editor draws
-    /// texts and stickers in two separate loops, so their relative z-order was
-    /// never actually stated. Photo at the bottom, then texts, then stickers.
-    init(migrating draft: EditDraft, photoID: String) {
-        var layers = [EditorLayer(content: .photo(PhotoContent(photoID: photoID, crop: draft.crop)))]
+    /// Order is **read off the existing renderers, not chosen**: both
+    /// `EditorCanvasView` and `ExportCompositionView` draw stickers first and
+    /// texts over them, so that is the z-order a migrated draft must keep.
+    /// Getting it backwards would silently reshuffle work people have already
+    /// done.
+    ///
+    /// Ids carry across, so a layer is still the same thing it was in the
+    /// draft — that is what makes the projection back to `EditDraft` a
+    /// round trip rather than a copy.
+    ///
+    /// `photoID` is optional because a draft can exist before a capture does;
+    /// with no photo there is simply no photo layer to build.
+    init(migrating draft: EditDraft, photoID: String?) {
+        var layers: [EditorLayer] = []
 
-        layers += draft.texts.map { text in
-            EditorLayer(
-                content: .text(TextContent(text)),
-                transform: ElementTransform(
-                    position: text.position,
-                    scale: text.scale,
-                    rotationDegrees: text.rotationDegrees
-                )
-            )
+        if let photoID {
+            layers.append(EditorLayer(content: .photo(PhotoContent(photoID: photoID, crop: draft.crop))))
         }
 
         layers += draft.stickers.map { sticker in
             EditorLayer(
+                id: sticker.id,
                 content: .sticker(StickerContent(emoji: sticker.emoji)),
                 transform: ElementTransform(
                     position: sticker.position,
                     scale: sticker.scale,
                     rotationDegrees: sticker.rotationDegrees
+                )
+            )
+        }
+
+        layers += draft.texts.map { text in
+            EditorLayer(
+                id: text.id,
+                content: .text(TextContent(text)),
+                transform: ElementTransform(
+                    position: text.position,
+                    scale: text.scale,
+                    rotationDegrees: text.rotationDegrees
                 )
             )
         }
@@ -154,6 +169,25 @@ public struct ElementTransform: Equatable, Codable, Sendable {
     public var rotationDegrees: Double
 
     public static let identity = ElementTransform()
+
+    /// One range for every layer kind. The flat draft clamped text to 0.5…3 and
+    /// stickers to 0.5…4; a single transform shared by photos, text, stickers,
+    /// and drawings gets a single range rather than a third one.
+    ///
+    /// It lives on the model, not on the canvas, because it is what makes a
+    /// stored document sane — whoever writes the transform, the bound holds.
+    public static let scaleRange: ClosedRange<CGFloat> = 0.3 ... 5
+
+    public static func clampedScale(_ scale: CGFloat) -> CGFloat {
+        guard scale.isFinite else { return 1 }
+        return min(max(scale, scaleRange.lowerBound), scaleRange.upperBound)
+    }
+
+    public func clamped() -> ElementTransform {
+        var clamped = self
+        clamped.scale = Self.clampedScale(scale)
+        return clamped
+    }
 
     public init(
         position: CGPoint = CGPoint(x: 0.5, y: 0.5),

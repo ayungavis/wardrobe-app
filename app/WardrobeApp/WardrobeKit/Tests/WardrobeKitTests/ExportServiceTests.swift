@@ -102,4 +102,19 @@ struct ExportServiceTests {
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
     }
+
+    /// The canvas draws a layer at its base size and scales the view; the
+    /// exporter multiplies the size instead. They only agree because these two
+    /// are the same number — if they ever stop being, the preview stops
+    /// matching the file people share.
+    @Test func theCanvasBaseSizeAndTheExportedSizeAreTheSameMath() {
+        let size = CGSize(width: 1080, height: 1920)
+        let text = TextItem(content: "OOTD", scale: 1.7)
+        let sticker = StickerItem(emoji: "🔥", scale: 0.4)
+
+        #expect(TextRendering.fontSize(for: text, in: size)
+            == TextRendering.baseFontSize(in: size) * text.scale)
+        #expect(TextRendering.stickerFontSize(for: sticker, in: size)
+            == TextRendering.baseStickerFontSize(in: size) * sticker.scale)
+    }
 }

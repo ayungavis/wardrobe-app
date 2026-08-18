@@ -57,12 +57,29 @@ public enum ExportService {
 }
 
 /// Shared text layout math so the editor preview and the export stay WYSIWYG.
+///
+/// The two sides now reach the same pixels by different routes: the canvas
+/// renders a layer at its **base** size and applies `scale` as a `scaleEffect`,
+/// while the export bakes `scale` into the font size. That is only safe because
+/// the sizes below are the same number either way — `fontSize` *is*
+/// `baseFontSize` times the scale, and every dimension in `TextItemLabelView`
+/// (padding, shadow radius) is a multiple of the font size, so scaling the view
+/// and scaling the size produce the same layout. A test pins the identity.
 enum TextRendering {
+    /// The size a layer draws at before its transform is applied.
+    static func baseFontSize(in size: CGSize) -> CGFloat {
+        0.08 * min(size.width, size.height)
+    }
+
+    static func baseStickerFontSize(in size: CGSize) -> CGFloat {
+        0.15 * min(size.width, size.height)
+    }
+
     static func fontSize(for item: TextItem, in size: CGSize) -> CGFloat {
-        0.08 * min(size.width, size.height) * item.scale
+        baseFontSize(in: size) * item.scale
     }
 
     static func stickerFontSize(for item: StickerItem, in size: CGSize) -> CGFloat {
-        0.15 * min(size.width, size.height) * item.scale
+        baseStickerFontSize(in: size) * item.scale
     }
 }

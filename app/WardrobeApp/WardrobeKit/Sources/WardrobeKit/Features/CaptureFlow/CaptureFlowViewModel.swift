@@ -249,7 +249,11 @@ public final class CaptureFlowViewModel {
         let completion = CompletedChallenge(
             card: challenge.card,
             photoID: photoID,
-            draft: challenge.draft,
+            // Read back rather than trusted: the editor owns a separate copy of
+            // the challenge and saves its edits to the repository, so this
+            // value copy has been stale ever since the editor opened. Taking
+            // the local one here silently dropped every text and sticker at ✓.
+            draft: activeRepository.load()?.draft ?? challenge.draft,
             completedAt: now
         )
 

@@ -3,8 +3,12 @@ import SwiftUI
 
 /// Shared rendering for text overlays — used by the canvas, the composer
 /// preview, and the export composition so all three stay WYSIWYG.
+///
+/// Takes the layer's content rather than a whole `TextItem`: placement belongs
+/// to whoever positions the view, and passing it here would let the two
+/// disagree.
 struct TextItemLabelView: View {
-    let item: TextItem
+    let item: TextContent
     let fontSize: CGFloat
 
     var body: some View {

@@ -144,7 +144,9 @@ struct EditorDocumentTests {
         #expect(photo.crop == crop)
     }
 
-    @Test func migrationKeepsTextsThenStickersInOrder() {
+    /// The order is read off the renderers, not chosen: `EditorCanvasView` and
+    /// `ExportCompositionView` both draw stickers first and texts over them.
+    @Test func migrationKeepsStickersBelowTextsInOrder() {
         let draft = EditDraft(
             texts: [TextItem(content: "first"), TextItem(content: "second")],
             stickers: [StickerItem(emoji: "✨")]
@@ -160,7 +162,7 @@ struct EditorDocumentTests {
             case .drawing: "drawing"
             }
         }
-        #expect(kinds == ["photo", "text", "text", "sticker"])
+        #expect(kinds == ["photo", "sticker", "text", "text"])
     }
 
     /// Transform and styling are the work the user actually did; losing them in
