@@ -78,7 +78,7 @@ public final class CaptureFlowViewModel {
         // in the draft is what says the step is done, so no extra flag is
         // persisted to say the same thing twice.
         if challenge.photoID != nil {
-            return challenge.draft.crop == nil ? .crop : .editor
+            return challenge.document.photoCrop == nil ? .crop : .editor
         }
         switch permission {
         case .granted: return .camera
@@ -208,6 +208,9 @@ public final class CaptureFlowViewModel {
         do {
             let id = try photoRepository.saveOriginal(data)
             challenge.photoID = id
+            // The photo layer is born with the photo — the crop step and the
+            // editor both write into it rather than creating it later.
+            challenge.document = EditorDocument(photoID: id)
             activeRepository.save(challenge)
             stage = .crop
         } catch {
@@ -222,7 +225,7 @@ public final class CaptureFlowViewModel {
     /// never overwritten (FR-092).
     public func useCrop(_ crop: CropSpec) {
         guard challenge.photoID != nil else { return }
-        challenge.draft.crop = crop
+        challenge.document.photoCrop = crop
         activeRepository.save(challenge)
         stage = .editor
     }
@@ -253,7 +256,7 @@ public final class CaptureFlowViewModel {
             // the challenge and saves its edits to the repository, so this
             // value copy has been stale ever since the editor opened. Taking
             // the local one here silently dropped every text and sticker at ✓.
-            draft: activeRepository.load()?.draft ?? challenge.draft,
+            document: activeRepository.load()?.document ?? challenge.document,
             completedAt: now
         )
 
@@ -279,7 +282,7 @@ public final class CaptureFlowViewModel {
             }
         }
         challenge.photoID = nil
-        challenge.draft = EditDraft()
+        challenge.document = EditorDocument(layers: [])
         activeRepository.save(challenge)
         stage = .camera
     }

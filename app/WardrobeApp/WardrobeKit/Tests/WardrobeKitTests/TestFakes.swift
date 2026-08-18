@@ -254,3 +254,51 @@ final class FakeCameraService: CameraService {
         try captureResult.get()
     }
 }
+
+// MARK: - Document fixtures and readers
+
+extension EditorDocument {
+    /// Builds a document from the flat shape tests already read well in.
+    /// Routed through the migration on purpose rather than reimplementing it —
+    /// the migration has its own tests, so a break there fails loudly at the
+    /// source instead of quietly here.
+    static func fixture(
+        photoID: String? = "photo-1",
+        crop: CropSpec? = nil,
+        texts: [TextItem] = [],
+        stickers: [StickerItem] = [],
+        background: CanvasBackground = .white
+    ) -> EditorDocument {
+        var document = EditorDocument(
+            migrating: EditDraft(crop: crop, texts: texts, stickers: stickers),
+            photoID: photoID
+        )
+        document.background = background
+        return document
+    }
+
+    var textContents: [String] {
+        layers.compactMap(\.textItem).map(\.content)
+    }
+
+    var textItems: [TextItem] {
+        layers.compactMap(\.textItem)
+    }
+
+    var stickerItems: [StickerItem] {
+        layers.compactMap { layer in
+            guard case let .sticker(sticker) = layer.content else { return nil }
+            return StickerItem(
+                id: layer.id,
+                emoji: sticker.emoji,
+                position: layer.transform.position,
+                scale: layer.transform.scale,
+                rotationDegrees: layer.transform.rotationDegrees
+            )
+        }
+    }
+
+    var stickerEmojis: [String] {
+        stickerItems.map(\.emoji)
+    }
+}

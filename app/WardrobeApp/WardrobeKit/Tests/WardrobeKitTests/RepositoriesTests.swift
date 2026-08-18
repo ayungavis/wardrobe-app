@@ -16,9 +16,13 @@ struct ActiveChallengeRepositoryTests {
             card: ChallengeCard(prompt: "Wear red."),
             acceptedAt: Date(timeIntervalSince1970: 1000)
         )
-        challenge.photoID = UUID().uuidString
-        challenge.draft.texts.append(TextItem(content: "OOTD"))
-        challenge.draft.crop = CropSpec(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8))
+        let photoID = UUID().uuidString
+        challenge.photoID = photoID
+        challenge.document = .fixture(
+            photoID: photoID,
+            crop: CropSpec(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)),
+            texts: [TextItem(content: "OOTD")]
+        )
 
         activeRepository.save(challenge)
         #expect(activeRepository.load() == challenge)
@@ -27,12 +31,12 @@ struct ActiveChallengeRepositoryTests {
         #expect(activeRepository.load() == nil)
     }
 
-    @Test func hasDraftWorkReflectsPhotoAndDraft() {
+    @Test func hasDraftWorkReflectsPhotoAndCanvas() {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         #expect(!challenge.hasDraftWork)
-        challenge.draft.texts = [TextItem(content: "hi")]
+        challenge.document = .fixture(photoID: nil, texts: [TextItem(content: "hi")])
         #expect(challenge.hasDraftWork)
-        challenge.draft.texts = []
+        challenge.document = EditorDocument(layers: [])
         challenge.photoID = "abc"
         #expect(challenge.hasDraftWork)
     }

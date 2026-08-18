@@ -33,15 +33,15 @@ struct CaptureFlowCompletionTests {
         )
 
         // What the editor writes while the capture flow is not looking.
-        activeRepository.stored?.draft = EditDraft(
+        activeRepository.stored?.document = .fixture(
             texts: [TextItem(content: "my outfit")], stickers: [StickerItem(emoji: "✨")]
         )
 
         sut.completeChallenge()
         await sut.completionTask?.value
 
-        #expect(completedRepository.stored.first?.draft.texts.map(\.content) == ["my outfit"])
-        #expect(completedRepository.stored.first?.draft.stickers.map(\.emoji) == ["✨"])
+        #expect(completedRepository.stored.first?.document.textContents == ["my outfit"])
+        #expect(completedRepository.stored.first?.document.stickerEmojis == ["✨"])
     }
 
     @Test func completeChallengeIsIdempotent() async {

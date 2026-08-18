@@ -348,9 +348,3 @@ public struct StickerContent: Equatable, Codable, Sendable {
         self.emoji = emoji
     }
 }
-
-/// The fixed background palette (FR-091). Users pick from it; they cannot add
-/// to it, which is what keeps the editor bounded.
-public enum CanvasBackground: String, CaseIterable, Codable, Sendable {
-    case white, cream, blush, lavender, sky, mint, sunset, midnight
-}

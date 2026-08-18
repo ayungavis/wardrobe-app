@@ -52,7 +52,7 @@ struct ExportServiceTests {
         let sourceProps = try properties(of: original)
         #expect(sourceProps[kCGImagePropertyGPSDictionary] != nil)
 
-        let exported = try ExportService.render(original: original, draft: EditDraft())
+        let exported = try ExportService.render(original: original, document: EditorDocument(photoID: "photo-1"))
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
@@ -65,14 +65,14 @@ struct ExportServiceTests {
     /// The editor canvas is 9:16, so every export is — crop or no crop,
     /// overlays or none. What you see is what gets saved and shared.
     @Test(arguments: [
-        EditDraft(),
-        EditDraft(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))),
-        EditDraft(texts: [TextItem(content: "OOTD")]),
+        EditorDocument.fixture(),
+        EditorDocument.fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))),
+        EditorDocument.fixture(texts: [TextItem(content: "OOTD")]),
     ])
-    func exportAlwaysUsesStoryCanvasSize(draft: EditDraft) throws {
+    func exportAlwaysUsesStoryCanvasSize(document: EditorDocument) throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 100, height: 200)
 
-        let exported = try ExportService.render(original: original, draft: draft)
+        let exported = try ExportService.render(original: original, document: document)
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyPixelWidth] as? Int == Int(StoryCanvas.exportSize.width))
@@ -81,7 +81,7 @@ struct ExportServiceTests {
 
     @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 200, height: 200)
-        let draft = EditDraft(
+        let document = EditorDocument.fixture(
             texts: [TextItem(
                 content: "OOTD",
                 rotationDegrees: -12,
@@ -96,25 +96,10 @@ struct ExportServiceTests {
             )]
         )
 
-        let exported = try ExportService.render(original: original, draft: draft)
+        let exported = try ExportService.render(original: original, document: document)
         let props = try properties(of: exported)
 
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
-    }
-
-    /// The canvas draws a layer at its base size and scales the view; the
-    /// exporter multiplies the size instead. They only agree because these two
-    /// are the same number — if they ever stop being, the preview stops
-    /// matching the file people share.
-    @Test func theCanvasBaseSizeAndTheExportedSizeAreTheSameMath() {
-        let size = CGSize(width: 1080, height: 1920)
-        let text = TextItem(content: "OOTD", scale: 1.7)
-        let sticker = StickerItem(emoji: "🔥", scale: 0.4)
-
-        #expect(TextRendering.fontSize(for: text, in: size)
-            == TextRendering.baseFontSize(in: size) * text.scale)
-        #expect(TextRendering.stickerFontSize(for: sticker, in: size)
-            == TextRendering.baseStickerFontSize(in: size) * sticker.scale)
     }
 }

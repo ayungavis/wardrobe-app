@@ -18,7 +18,15 @@ public final class UserDefaultsActiveChallengeRepository: ActiveChallengeReposit
 
     public func load() -> ActiveChallenge? {
         guard let data = defaults.data(forKey: Self.key) else { return nil }
-        return try? JSONDecoder().decode(ActiveChallenge.self, from: data)
+        do {
+            return try JSONDecoder().decode(ActiveChallenge.self, from: data)
+        } catch {
+            // Reported rather than swallowed: a challenge written by a newer
+            // app throws `documentFromNewerApp`, and returning a silent nil
+            // makes an in-progress challenge look like it never existed.
+            Log.report(error)
+            return nil
+        }
     }
 
     public func save(_ challenge: ActiveChallenge) {

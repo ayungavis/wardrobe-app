@@ -140,51 +140,49 @@ struct EditorDocumentEditingTests {
         #expect(document.layers.count == 1)
     }
 
-    // MARK: Round trip through the stored draft
+    // MARK: Reading the pre-canvas shape
 
-    /// The editor works on a document but still stores an `EditDraft`, so this
-    /// has to be a round trip rather than a copy — including the ids, which are
-    /// what keeps a layer the same layer across a save.
-    @Test func draftToDocumentAndBackIsIdentity() {
-        let draft = EditDraft(
-            crop: CropSpec(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.6)),
-            texts: [
-                TextItem(
-                    content: "OOTD", position: CGPoint(x: 0.25, y: 0.75), scale: 1.8,
-                    rotationDegrees: 12, colorName: TextColor.pink.rawValue, hasBackground: true,
-                    fontName: TextFontStyle.serif.rawValue,
-                    alignmentName: TextAlignmentStyle.leading.rawValue
-                ),
-                TextItem(content: "second"),
-            ],
-            stickers: [StickerItem(emoji: "✨", position: CGPoint(x: 0.9, y: 0.1), scale: 2)]
+    /// `EditDraft` is still sitting inside challenges on people's phones, so
+    /// this read path is permanent, not transitional. Everything the flat
+    /// shape could express has to survive it.
+    @Test func aStoredFlatDraftMigratesWithEverythingIntact() throws {
+        let text = TextItem(
+            content: "OOTD", position: CGPoint(x: 0.25, y: 0.75), scale: 1.8,
+            rotationDegrees: 12, colorName: TextColor.pink.rawValue, hasBackground: true,
+            fontName: TextFontStyle.serif.rawValue,
+            alignmentName: TextAlignmentStyle.leading.rawValue
+        )
+        let sticker = StickerItem(emoji: "✨", position: CGPoint(x: 0.9, y: 0.1), scale: 2)
+        let crop = CropSpec(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.6))
+
+        let document = EditorDocument(
+            migrating: EditDraft(crop: crop, texts: [text], stickers: [sticker]),
+            photoID: "photo-1"
         )
 
-        let restored = EditDraft(projecting: EditorDocument(migrating: draft, photoID: "photo-1"))
-
-        #expect(restored == draft)
+        #expect(document.photoCrop == crop)
+        let restoredText = try #require(document.layers.compactMap(\.textItem).first)
+        #expect(restoredText == text)
+        guard case let .sticker(restoredSticker) = document.layers[1].content else {
+            Issue.record("stickers sit below texts")
+            return
+        }
+        #expect(restoredSticker.emoji == sticker.emoji)
+        #expect(document.layers[1].id == sticker.id)
+        #expect(document.layers[1].transform.scale == 2)
     }
 
-    @Test func theRoundTripSurvivesAnEmptyDraft() {
-        let restored = EditDraft(projecting: EditorDocument(migrating: EditDraft(), photoID: "photo-1"))
+    @Test func aDraftWithNothingInItBecomesJustThePhoto() {
+        let document = EditorDocument(migrating: EditDraft(), photoID: "photo-1")
 
-        #expect(restored == EditDraft())
+        #expect(document.layers.count == 1)
+        #expect(document.photoCrop == nil)
     }
 
-    /// Drawings have no home in the flat draft. Saying so here means the day it
-    /// starts losing them is the day this test changes, not a silent morning.
-    @Test func theProjectionDropsWhatTheFlatDraftCannotHold() {
-        let document = EditorDocument(layers: [
-            EditorLayer(content: .photo(PhotoContent(photoID: "photo-1"))),
-            EditorLayer(content: .drawing(DrawingContent(strokes: [
-                DrawingStroke(points: [DrawingPoint(unitX: 0.1, unitY: 0.2)]),
-            ]))),
-            EditorLayer(content: .text(TextContent(content: "kept"))),
-        ])
+    /// A challenge that never got a photo has no photo layer to build.
+    @Test func aDraftWithNoPhotoMigratesToNoPhotoLayer() {
+        let document = EditorDocument(migrating: EditDraft(), photoID: nil)
 
-        let draft = EditDraft(projecting: document)
-
-        #expect(draft.texts.map(\.content) == ["kept"])
-        #expect(draft.stickers.isEmpty)
+        #expect(document.layers.isEmpty)
     }
 }

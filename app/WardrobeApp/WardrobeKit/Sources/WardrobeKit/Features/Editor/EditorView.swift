@@ -43,6 +43,20 @@ public struct EditorView<ReviewDrawer: View>: View {
         .sheet(isPresented: $viewModel.isStickerPickerPresented) {
             StickerPickerView { viewModel.addSticker($0) }
         }
+        .sheet(isPresented: $viewModel.isBackgroundPickerPresented) {
+            BackgroundPickerView(
+                selected: viewModel.document.background,
+                onPick: viewModel.setBackground
+            )
+            // Short enough that the canvas stays readable behind it, and opaque
+            // rather than material so the swatches are judged against the
+            // background they will actually produce.
+            .presentationDetents([.height(230)])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(30)
+            .presentationBackground(AppColor.mediaSurface)
+            .preferredColorScheme(.dark)
+        }
         .confirmationDialog(
             Text("editor.discard.title", bundle: .module),
             isPresented: $isDiscardConfirmPresented,
@@ -119,6 +133,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                     onText: { viewModel.beginNewText() },
                     onSticker: { viewModel.isStickerPickerPresented = true },
                     onCrop: viewModel.beginCrop,
+                    onBackground: { viewModel.isBackgroundPickerPresented = true },
                     onSave: viewModel.saveDirectly,
                     onShare: viewModel.beginExport,
                     onComplete: onComplete

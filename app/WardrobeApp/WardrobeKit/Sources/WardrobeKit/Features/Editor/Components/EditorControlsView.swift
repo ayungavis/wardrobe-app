@@ -10,6 +10,7 @@ struct EditorControlsView: View {
     let onText: () -> Void
     let onSticker: () -> Void
     let onCrop: () -> Void
+    let onBackground: () -> Void
     let onSave: () -> Void
     let onShare: () -> Void
     let onComplete: () -> Void
@@ -45,6 +46,9 @@ struct EditorControlsView: View {
                 .accessibilityLabel(Text("editor.tool.sticker", bundle: .module))
             MediaCircleButtonView(systemName: "crop", action: onCrop)
                 .accessibilityLabel(Text("editor.tool.crop", bundle: .module))
+            MediaCircleButtonView(systemName: "paintpalette", action: onBackground)
+                .accessibilityLabel(Text("editor.tool.background", bundle: .module))
+                .accessibilityIdentifier("editor.tool.background")
         }
     }
 

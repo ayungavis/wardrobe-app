@@ -30,9 +30,27 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         self.calendar = calendar
     }
 
+    /// Decoded one entry at a time on purpose. Decoding the array in one go
+    /// means a single unreadable completion takes the **whole history** with
+    /// it — and `append` then writes the truncated array straight back over
+    /// the original, permanently. Per entry, one bad record costs one record.
+    ///
+    /// ponytail: a skipped entry is dropped rather than preserved verbatim.
+    /// Keeping its raw JSON needs a passthrough type; it comes back from the
+    /// server once sync exists, and the server is the system of record for
+    /// confirmed documents (FR-096).
     public func load() -> [CompletedChallenge] {
         guard let data = defaults.data(forKey: Self.key) else { return [] }
-        return (try? JSONDecoder().decode([CompletedChallenge].self, from: data)) ?? []
+        guard let entries = try? JSONDecoder().decode([LenientEntry<CompletedChallenge>].self, from: data) else {
+            Log.report(AppError.unexpected)
+            return []
+        }
+
+        let completions = entries.compactMap(\.value)
+        if completions.count != entries.count {
+            Log.report(AppError.unexpected)
+        }
+        return completions
     }
 
     public func append(_ completion: CompletedChallenge) {
@@ -57,5 +75,15 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
             return
         }
         defaults.set(data, forKey: Self.key)
+    }
+}
+
+/// Decodes what it can and reports `nil` for what it cannot, so one unreadable
+/// element cannot fail the array around it.
+private struct LenientEntry<Value: Decodable>: Decodable {
+    let value: Value?
+
+    init(from decoder: Decoder) throws {
+        value = try? Value(from: decoder)
     }
 }

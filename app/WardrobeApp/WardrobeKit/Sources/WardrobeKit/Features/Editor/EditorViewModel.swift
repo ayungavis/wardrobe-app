@@ -15,18 +15,10 @@ public final class EditorViewModel {
     /// Derived from `previewImage` + the committed crop. Stored (not computed)
     /// so moving an overlay never re-crops the image on the render path.
     public private(set) var croppedPreviewImage: CGImage?
-    /// The layered canvas (FR-084) — what every edit actually changes.
+    /// The layered canvas (FR-084) — what every edit changes, what gets
+    /// stored, and what the exporter renders. One shape, so there is nothing
+    /// to keep in step.
     public private(set) var document: EditorDocument
-    /// What still gets stored and exported. Computed, so it can never drift
-    /// from the document the way a second stored copy would.
-    ///
-    /// ponytail: the document rides inside `EditDraft` for now, which cannot
-    /// carry lock flags, the canvas background, or drawings. The stage that
-    /// stores documents in their own right replaces this; until then the
-    /// projection is lossless because those three do not exist yet.
-    public var draft: EditDraft {
-        EditDraft(projecting: document)
-    }
 
     /// Canvas selection. UI state, deliberately not part of the document —
     /// which layer someone is holding means nothing on their other phone.
@@ -35,6 +27,7 @@ public final class EditorViewModel {
     public private(set) var exportState: Loadable<ExportedPhoto> = .idle
     public var isExportPresented = false
     public var isStickerPickerPresented = false
+    public var isBackgroundPickerPresented = false
     public var alertError: AppError?
     public private(set) var didSaveToPhotos = false
     public private(set) var isSaving = false
@@ -57,7 +50,7 @@ public final class EditorViewModel {
         self.activeRepository = activeRepository
         self.photoRepository = photoRepository
         self.librarySaver = librarySaver
-        document = EditorDocument(migrating: challenge.draft, photoID: challenge.photoID)
+        document = challenge.document
     }
 
     public func onAppear() {
@@ -172,7 +165,7 @@ public final class EditorViewModel {
     }
 
     private func persistDocument() {
-        challenge.draft = draft
+        challenge.document = document
         activeRepository.save(challenge)
     }
 
@@ -199,6 +192,14 @@ public final class EditorViewModel {
         persistDocument()
     }
 
+    /// FR-091. The picker stays open so the choice can be compared against the
+    /// canvas behind it, which is the whole reason to have swatches.
+    public func setBackground(_ background: CanvasBackground) {
+        guard document.background != background else { return }
+        document.background = background
+        persistDocument()
+    }
+
     // MARK: Stickers (PRD FR-019)
 
     public func addSticker(_ emoji: String) {
@@ -217,11 +218,11 @@ public final class EditorViewModel {
         didSaveToPhotos = false
         isExportPresented = true
 
-        let draft = draft
+        let document = document
         exportTask = Task {
             do {
                 let start = ContinuousClock.now
-                let photo = try ExportService.render(original: data, draft: draft)
+                let photo = try ExportService.render(original: data, document: document)
                 try Task.checkCancellation()
                 Log.ui.info("Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms")
                 exportState = .loaded(ExportedPhoto(data: photo))
@@ -252,11 +253,11 @@ public final class EditorViewModel {
         guard case let .loaded(data) = originalData, !isSaving, !didSaveToPhotos else { return }
         isSaving = true
 
-        let draft = draft
+        let document = document
         saveTask = Task {
             defer { isSaving = false }
             do {
-                let photo = try ExportService.render(original: data, draft: draft)
+                let photo = try ExportService.render(original: data, document: document)
                 try Task.checkCancellation()
                 try await librarySaver.save(photo)
                 didSaveToPhotos = true

@@ -18,13 +18,13 @@ public enum ExportService {
     /// shows — and re-encodes through `CGImageDestination` writing zero source
     /// properties. Save and Share both come through here, so the file always
     /// matches the preview.
-    public static func render(original: Data, draft: EditDraft) throws -> Data {
+    public static func render(original: Data, document: EditorDocument) throws -> Data {
         // Orientation-corrected, metadata-free decode.
         guard var image = ImageDecoding.downsampledImage(from: original, maxPixel: maxOutputPixel) else {
             throw AppError.exportFailed
         }
 
-        if let crop = draft.crop {
+        if let crop = document.photoCrop {
             let rect = CGRect(
                 x: crop.rect.origin.x * CGFloat(image.width),
                 y: crop.rect.origin.y * CGFloat(image.height),
@@ -37,7 +37,7 @@ public enum ExportService {
 
         let size = StoryCanvas.exportSize
         let renderer = ImageRenderer(
-            content: ExportCompositionView(image: image, texts: draft.texts, stickers: draft.stickers, size: size)
+            content: DocumentCanvasView(document: document, photo: image, size: size)
         )
         renderer.proposedSize = ProposedViewSize(size)
         guard let rendered = renderer.cgImage else { throw AppError.exportFailed }
@@ -56,30 +56,15 @@ public enum ExportService {
     }
 }
 
-/// Shared text layout math so the editor preview and the export stay WYSIWYG.
-///
-/// The two sides now reach the same pixels by different routes: the canvas
-/// renders a layer at its **base** size and applies `scale` as a `scaleEffect`,
-/// while the export bakes `scale` into the font size. That is only safe because
-/// the sizes below are the same number either way — `fontSize` *is*
-/// `baseFontSize` times the scale, and every dimension in `TextItemLabelView`
-/// (padding, shadow radius) is a multiple of the font size, so scaling the view
-/// and scaling the size produce the same layout. A test pins the identity.
+/// Shared layer sizing. A layer draws at its base size and its transform is
+/// applied on top — on the canvas and in the export alike, through the same
+/// modifier, so there is nothing left for the two to disagree about.
 enum TextRendering {
-    /// The size a layer draws at before its transform is applied.
     static func baseFontSize(in size: CGSize) -> CGFloat {
         0.08 * min(size.width, size.height)
     }
 
     static func baseStickerFontSize(in size: CGSize) -> CGFloat {
         0.15 * min(size.width, size.height)
-    }
-
-    static func fontSize(for item: TextItem, in size: CGSize) -> CGFloat {
-        baseFontSize(in: size) * item.scale
-    }
-
-    static func stickerFontSize(for item: StickerItem, in size: CGSize) -> CGFloat {
-        baseStickerFontSize(in: size) * item.scale
     }
 }

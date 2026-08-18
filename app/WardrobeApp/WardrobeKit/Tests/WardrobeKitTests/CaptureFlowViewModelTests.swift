@@ -35,11 +35,14 @@ struct CaptureFlowViewModelTests {
         #expect(makeCaptureFlowSUT(challenge: challenge).stage == .crop)
     }
 
-    /// The crop in the draft is what says the step is done — no second flag.
+    /// The crop on the photo layer is what says the step is done — no second flag.
     @Test func initialStageIsEditorOnceTheCropExists() {
+        let photoID = UUID().uuidString
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString
-        challenge.draft.crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
+        challenge.photoID = photoID
+        challenge.document = EditorDocument(
+            photoID: photoID, crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
+        )
         #expect(makeCaptureFlowSUT(challenge: challenge).stage == .editor)
     }
 
@@ -84,9 +87,12 @@ struct CaptureFlowViewModelTests {
     @Test func recheckDoesNotTouchEditor() {
         let camera = FakeCameraService()
         camera.permission = .denied
+        let photoID = UUID().uuidString
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString
-        challenge.draft.crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
+        challenge.photoID = photoID
+        challenge.document = EditorDocument(
+            photoID: photoID, crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75))
+        )
         let sut = makeCaptureFlowSUT(challenge: challenge, camera: camera)
 
         sut.recheckPermission()
@@ -165,7 +171,8 @@ struct CaptureFlowViewModelTests {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         let photoID = UUID().uuidString
         challenge.photoID = photoID
-        challenge.draft = EditDraft(
+        challenge.document = .fixture(
+            photoID: photoID,
             crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75)),
             texts: [TextItem(content: "hi")]
         )
@@ -184,17 +191,19 @@ struct CaptureFlowViewModelTests {
 
         #expect(photoRepository.deleted == [photoID])
         #expect(activeRepository.stored?.photoID == nil)
-        #expect(activeRepository.stored?.draft.isEmpty == true)
+        #expect(activeRepository.stored?.document.layers.isEmpty == true)
         #expect(sut.stage == .camera)
     }
 
     // MARK: Crop step (FR-083)
 
     /// Use Crop stores an instruction, not a second image: the original stays
-    /// the only photo on disk, and the editor and exporter both read the draft.
+    /// the only photo on disk, and the editor and exporter both read the document.
     @Test func useCropStoresTheFramingAndOpensTheEditor() {
+        let photoID = UUID().uuidString
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString
+        challenge.photoID = photoID
+        challenge.document = EditorDocument(photoID: photoID)
         let activeRepository = InMemoryActiveChallengeRepository()
         let photoRepository = SpyPhotoRepository()
         let sut = makeCaptureFlowSUT(
@@ -207,7 +216,7 @@ struct CaptureFlowViewModelTests {
         sut.useCrop(crop)
 
         #expect(sut.stage == .editor)
-        #expect(activeRepository.stored?.draft.crop == crop)
+        #expect(activeRepository.stored?.document.photoCrop == crop)
         #expect(photoRepository.saved.isEmpty, "cropping must not write a second photo")
     }
 

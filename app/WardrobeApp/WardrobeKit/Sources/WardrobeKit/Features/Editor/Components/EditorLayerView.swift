@@ -12,6 +12,7 @@ import SwiftUI
 struct EditorLayerView: View {
     let layer: EditorLayer
     let canvasSize: CGSize
+    let photo: CGImage?
     let isSelected: Bool
     let isOverDeleteTarget: Bool
     let onSelect: () -> Void
@@ -38,7 +39,7 @@ struct EditorLayerView: View {
     var body: some View {
         let transform = liveTransform
 
-        LayerContentView(content: layer.content, canvasSize: canvasSize)
+        LayerContentView(content: layer.content, canvasSize: canvasSize, photo: photo)
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size
             } action: { newSize in
@@ -46,9 +47,8 @@ struct EditorLayerView: View {
             }
             .contentShape(Rectangle())
             .overlay { selectionChrome(scale: transform.scale) }
-            .scaleEffect(transform.scale * (isOverDeleteTarget ? 0.82 : 1))
-            .rotationEffect(.degrees(transform.rotationDegrees))
-            .position(CanvasGeometry.point(for: transform.position, in: canvasSize))
+            .scaleEffect(isOverDeleteTarget ? 0.82 : 1)
+            .canvasLayerTransform(transform, in: canvasSize)
             .opacity(isOverDeleteTarget ? 0.48 : 1)
             .animation(settleAnimation, value: isOverDeleteTarget)
             .animation(settleAnimation, value: layer.transform)

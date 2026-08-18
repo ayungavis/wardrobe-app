@@ -1,5 +1,4 @@
 import CoreGraphics
-import DesignSystem
 import SwiftUI
 #if os(iOS)
     import UIKit
@@ -19,7 +18,7 @@ struct EditorCanvasView: View {
     @State private var isOverDeleteTarget = false
 
     var body: some View {
-        CanvasPhotoLayer(image: viewModel.croppedPreviewImage, canvasSize: $canvasSize)
+        CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
             .gesture(backgroundTap)
             .overlay { layers }
             .overlay(alignment: .bottom) { deleteTarget }
@@ -50,6 +49,7 @@ struct EditorCanvasView: View {
                     EditorLayerView(
                         layer: layer,
                         canvasSize: canvasSize,
+                        photo: viewModel.croppedPreviewImage,
                         isSelected: viewModel.selectedLayerID == layer.id,
                         isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
                         onSelect: { select(layer.id) },
@@ -74,12 +74,10 @@ struct EditorCanvasView: View {
         }
     }
 
-    /// The photo is the canvas background until it gets a polaroid frame, and
-    /// the text open in the composer is drawn by the composer instead.
+    /// Only the text open in the composer is skipped — the composer draws it
+    /// instead. The photo is a layer like any other now that it has a frame to
+    /// sit in (FR-092).
     private func isInteractive(_ layer: EditorLayer) -> Bool {
-        if case .photo = layer.content {
-            return false
-        }
         if case let .text(working, _) = viewModel.activeTool, working.id == layer.id {
             return false
         }
@@ -125,28 +123,19 @@ struct EditorCanvasView: View {
     }
 }
 
-/// The story frame: a 9:16 window with the photo aspect-filled into it, the
-/// same framing the camera preview showed and the same one the export uses.
+/// The 9:16 window the document is arranged inside, and the only thing that
+/// measures it.
 ///
-/// Takes a plain value rather than the view model so moving a layer never
-/// invalidates (or re-decodes) the image layer.
-private struct CanvasPhotoLayer: View {
-    let image: CGImage?
+/// The rounded corner is editor chrome — the exported picture is square-edged,
+/// because the corner belongs to the screen, not to the photograph.
+private struct CanvasFrameView: View {
+    let background: CanvasBackground
     @Binding var canvasSize: CGSize
 
     var body: some View {
         Color.clear
             .aspectRatio(StoryCanvas.aspectRatio, contentMode: .fit)
-            .overlay {
-                if let image {
-                    Image(decorative: image, scale: 1)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    ProgressView()
-                        .tint(AppColor.onMedia)
-                }
-            }
+            .background(CanvasBackgroundView(background: background))
             .clipShape(.rect(cornerRadius: 12))
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size
