@@ -46,7 +46,7 @@ struct EditorLayerView: View {
             } action: { newSize in
                 contentSize = newSize
             }
-            .contentShape(Rectangle())
+            .contentShape(LayerHitShape(content: layer.content, referenceWidth: canvasSize.width))
             .overlay { selectionChrome(scale: transform.scale) }
             .scaleEffect(isOverDeleteTarget ? 0.82 : 1)
             .canvasLayerTransform(transform, in: canvasSize)

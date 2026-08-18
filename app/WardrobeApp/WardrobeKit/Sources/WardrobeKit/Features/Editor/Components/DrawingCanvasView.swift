@@ -22,44 +22,18 @@ struct DrawingCanvasView: View {
     }
 
     private func draw(_ stroke: DrawingStroke, in context: inout GraphicsContext, size: CGSize) {
-        let points = stroke.points.map { point in
-            CGPoint(x: point.unitX * size.width, y: point.unitY * size.height)
-        }
-        guard let first = points.first else { return }
+        let lineWidth = DrawingPath.lineWidth(for: stroke, referenceWidth: referenceWidth)
+        let path = DrawingPath.path(for: stroke, in: size, dotWidth: lineWidth)
 
-        let lineWidth = max(1, CGFloat(stroke.width.ratio) * referenceWidth)
-
-        // A tap is a dot, not a line of zero length.
-        guard points.count > 1 else {
-            context.fill(
-                Path(ellipseIn: CGRect(
-                    x: first.x - lineWidth / 2, y: first.y - lineWidth / 2,
-                    width: lineWidth, height: lineWidth
-                )),
-                with: .color(stroke.color.color)
+        // A single sample is already a filled dot; anything longer is a line.
+        if stroke.points.count > 1 {
+            context.stroke(
+                path,
+                with: .color(stroke.color.color),
+                style: DrawingPath.strokeStyle(lineWidth: lineWidth)
             )
-            return
+        } else {
+            context.fill(path, with: .color(stroke.color.color))
         }
-
-        // Midpoint quadratics: each sample becomes a control point and the curve
-        // passes through the midpoints, which smooths finger jitter without
-        // needing to know anything about the samples ahead.
-        var path = Path()
-        path.move(to: first)
-        for index in 1 ..< points.count {
-            let previous = points[index - 1]
-            let current = points[index]
-            let midpoint = CGPoint(x: (previous.x + current.x) / 2, y: (previous.y + current.y) / 2)
-            path.addQuadCurve(to: midpoint, control: previous)
-        }
-        if let last = points.last {
-            path.addLine(to: last)
-        }
-
-        context.stroke(
-            path,
-            with: .color(stroke.color.color),
-            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
-        )
     }
 }
