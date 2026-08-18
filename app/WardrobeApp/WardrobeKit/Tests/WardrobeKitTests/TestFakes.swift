@@ -21,6 +21,13 @@ final class InMemoryActiveChallengeRepository: ActiveChallengeRepository, @unche
     func clear() {
         stored = nil
     }
+
+    /// Nothing is ever in flight here, so there is nothing to wait for and
+    /// nothing that can fail.
+    func flush() async {}
+    var didFailToPersist: Bool {
+        false
+    }
 }
 
 final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, @unchecked Sendable {

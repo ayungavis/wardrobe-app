@@ -6,6 +6,18 @@ import Foundation
 /// limit — `history`, `write(_:)`, and `updateCroppedPreview()` are internal
 /// for the same reason, since `private` is file-scoped in Swift.
 public extension EditorViewModel {
+    /// Whether the draft is currently failing to reach the disk. Read straight
+    /// from the store, so it states what is true now rather than what once was.
+    var didFailToPersistDraft: Bool {
+        activeRepository.didFailToPersist
+    }
+
+    /// Makes every coalesced draft write land. The editor is the only screen
+    /// that edits the document, so leaving it is a boundary worth flushing at.
+    func flush() async {
+        await activeRepository.flush()
+    }
+
     var canUndo: Bool {
         history.canUndo
     }

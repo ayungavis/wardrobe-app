@@ -39,6 +39,7 @@ public struct CaptureFlowView: View {
                 EditorView(
                     viewModel: makeEditorViewModel(viewModel.challenge),
                     isCompleting: viewModel.isCompleting,
+                    didResumeDraft: viewModel.didResumeDraft,
                     onDiscard: { viewModel.discardPhoto() },
                     onComplete: { viewModel.completeChallenge() },
                     reviewDrawer: {

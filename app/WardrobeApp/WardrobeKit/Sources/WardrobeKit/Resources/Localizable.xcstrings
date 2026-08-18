@@ -1128,6 +1128,38 @@
         }
       }
     },
+    "editor.draft.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your draft is not being saved"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draf kamu tidak sedang disimpan"
+          }
+        }
+      }
+    },
+    "editor.draft.restored": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draft restored — kept on this device only"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draf dipulihkan — hanya tersimpan di perangkat ini"
+          }
+        }
+      }
+    },
     "editor.drawing.clear": {
       "localizations": {
         "en": {

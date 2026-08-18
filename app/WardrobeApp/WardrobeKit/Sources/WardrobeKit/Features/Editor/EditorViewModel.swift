@@ -42,7 +42,7 @@ public final class EditorViewModel {
     public internal(set) var isSaving = false
 
     private var challenge: ActiveChallenge
-    private let activeRepository: ActiveChallengeRepository
+    let activeRepository: ActiveChallengeRepository
     private let photoRepository: PhotoRepository
     let librarySaver: PhotoLibrarySaveService
     private let preferencesRepository: AccountPreferencesRepository

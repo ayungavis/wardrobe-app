@@ -14,7 +14,7 @@ public final class AppContainer {
 
     public init(
         challengeRepository: ChallengeRepository = MockChallengeRepository(),
-        activeChallengeRepository: ActiveChallengeRepository = UserDefaultsActiveChallengeRepository(),
+        activeChallengeRepository: ActiveChallengeRepository = FileActiveChallengeRepository(),
         completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
@@ -34,6 +34,12 @@ public final class AppContainer {
         #else
             SampleCameraService()
         #endif
+    }
+
+    /// Makes the in-progress draft durable. Called when the app leaves the
+    /// screen, which is the last moment it is certain to get.
+    public func flushDrafts() async {
+        await activeChallengeRepository.flush()
     }
 
     public func makeChallengeViewModel() -> ChallengeViewModel {

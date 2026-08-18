@@ -246,4 +246,50 @@ struct CaptureFlowViewModelTests {
         #expect(photoRepository.deleted == [photoID])
         #expect(sut.stage == .camera)
     }
+
+    // MARK: Restored draft (§17)
+
+    /// Landing straight in the editor can only mean the challenge came off disk
+    /// with the crop already committed — which is exactly what the restored
+    /// notice states, so no separate flag is persisted to say it twice.
+    @Test func aChallengeThatArrivesMidEditIsMarkedRestored() {
+        let photoID = UUID().uuidString
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = photoID
+        // The crop is stored on the photo layer, so the document has to have one
+        // — setting it on an empty document is a no-op by design.
+        challenge.document = EditorDocument(photoID: photoID)
+        challenge.document.photoCrop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1))
+        let camera = FakeCameraService()
+        camera.permission = .granted
+
+        let sut = makeCaptureFlowSUT(challenge: challenge, camera: camera)
+
+        #expect(sut.stage == .editor)
+        #expect(sut.didResumeDraft)
+    }
+
+    @Test func aFreshlyAcceptedChallengeIsNotRestored() {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+
+        let sut = makeCaptureFlowSUT(camera: camera)
+
+        #expect(sut.stage == .camera)
+        #expect(!sut.didResumeDraft)
+    }
+
+    /// A photo taken but never framed reopens the crop step, and that is not a
+    /// restored draft either — the work has not reached the canvas yet.
+    @Test func aPhotoWaitingToBeCroppedIsNotRestored() {
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = UUID().uuidString
+        let camera = FakeCameraService()
+        camera.permission = .granted
+
+        let sut = makeCaptureFlowSUT(challenge: challenge, camera: camera)
+
+        #expect(sut.stage == .crop)
+        #expect(!sut.didResumeDraft)
+    }
 }

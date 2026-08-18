@@ -31,6 +31,10 @@ public final class CaptureFlowViewModel {
     /// Read by the editor so the ✓ can show the wait for the garment scan
     /// rather than looking inert.
     public private(set) var isCompleting = false
+    /// True when this session opened onto work that was already there, rather
+    /// than work it created. Read by the editor to state that a device-only
+    /// draft was restored (§17).
+    public private(set) var didResumeDraft = false
 
     /// The AI item review shown in the editor drawer (FR-027).
     public let review: GarmentReviewModel
@@ -71,6 +75,11 @@ public final class CaptureFlowViewModel {
             thumbnails: thumbnails
         )
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
+        // Landing straight in the editor can only mean the challenge came off
+        // disk with the crop already committed — which is exactly the "restored
+        // draft" §17 wants stated. No extra flag is persisted to say what the
+        // stage already says.
+        didResumeDraft = stage == .editor
         syncCameraState()
     }
 

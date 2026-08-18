@@ -5,11 +5,17 @@ import SwiftUI
 /// send arrow bottom-right (Mobbin ref: Instagram "Creating a story").
 public struct EditorView<ReviewDrawer: View>: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @State private var viewModel: EditorViewModel
     @State private var canvasSize: CGSize = .zero
     @State private var isDiscardConfirmPresented = false
+    /// Seeded from `didResumeDraft` on appear so dismissing it sticks for the
+    /// life of this editor session.
+    @State private var isRestoredNoticeVisible = false
 
     private let isCompleting: Bool
+    private let didResumeDraft: Bool
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
     /// The item-review drawer, supplied by the capture flow that owns the scan
@@ -20,12 +26,14 @@ public struct EditorView<ReviewDrawer: View>: View {
     public init(
         viewModel: EditorViewModel,
         isCompleting: Bool,
+        didResumeDraft: Bool,
         onDiscard: @escaping () -> Void,
         onComplete: @escaping () -> Void,
         @ViewBuilder reviewDrawer: () -> ReviewDrawer
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
+        self.didResumeDraft = didResumeDraft
         self.onDiscard = onDiscard
         self.onComplete = onComplete
         self.reviewDrawer = reviewDrawer()
@@ -40,6 +48,10 @@ public struct EditorView<ReviewDrawer: View>: View {
         }
         .environment(\.colorScheme, .dark)
         .task { viewModel.onAppear() }
+        .task(id: didResumeDraft) { await showRestoredNotice() }
+        // Leaving the editor is the other moment a coalesced write has to
+        // be made to land.
+        .onDisappear { Task { await viewModel.flush() } }
         .sheet(isPresented: $viewModel.isExportPresented) {
             ExportSheetView(viewModel: viewModel)
         }
@@ -128,6 +140,32 @@ public struct EditorView<ReviewDrawer: View>: View {
         }
     }
 
+    /// News about the past, so it leaves on its own — long enough to read the
+    /// longer of the two translations, and no longer.
+    ///
+    /// Not while VoiceOver is running: content that vanishes after four seconds
+    /// is content that may never have finished being spoken. It is a small
+    /// element in the top corner blocking nothing, so letting it sit until the
+    /// editor closes costs nothing either.
+    private func showRestoredNotice() async {
+        guard didResumeDraft else { return }
+        withAnimation(reduceMotion ? nil : .snappy) { isRestoredNoticeVisible = true }
+        guard !voiceOverEnabled else { return }
+
+        try? await Task.sleep(for: .seconds(4))
+        guard !Task.isCancelled else { return }
+        withAnimation(reduceMotion ? nil : .snappy) { isRestoredNoticeVisible = false }
+    }
+
+    /// A failure outranks the restoration notice: one is bad news still
+    /// happening, the other a note about the past.
+    private var draftBannerKind: DraftBannerView.Kind? {
+        if viewModel.didFailToPersistDraft {
+            return .writeFailed
+        }
+        return isRestoredNoticeVisible ? .restored : nil
+    }
+
     private var canvasStage: some View {
         ZStack {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
@@ -142,6 +180,20 @@ public struct EditorView<ReviewDrawer: View>: View {
                     Spacer()
                     reviewDrawer
                         .padding(.bottom, 96) // clears the Save/Share/✓ bar
+                }
+
+                if let banner = draftBannerKind {
+                    VStack {
+                        HStack {
+                            DraftBannerView(kind: banner)
+                                .transition(.opacity)
+                            Spacer(minLength: Spacing.xxl)
+                        }
+                        // Clears the close button it sits under.
+                        .padding(.top, 60)
+                        Spacer()
+                    }
+                    .padding(Spacing.lg)
                 }
 
                 EditorControlsView(
