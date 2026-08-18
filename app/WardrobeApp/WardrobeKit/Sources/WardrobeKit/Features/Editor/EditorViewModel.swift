@@ -23,11 +23,14 @@ public final class EditorViewModel {
     /// The layered canvas (FR-084) — what every edit changes, what gets
     /// stored, and what the exporter renders. One shape, so there is nothing
     /// to keep in step.
-    public private(set) var document: EditorDocument
+    ///
+    /// `internal(set)` rather than `private(set)` only because this type spans
+    /// three files; nothing outside `EditorViewModel*.swift` writes it.
+    public internal(set) var document: EditorDocument
 
     /// Canvas selection. UI state, deliberately not part of the document —
     /// which layer someone is holding means nothing on their other phone.
-    public private(set) var selectedLayerID: UUID?
+    public internal(set) var selectedLayerID: UUID?
     public private(set) var activeTool: Tool?
     public internal(set) var exportState: Loadable<ExportedPhoto> = .idle
     public var isExportPresented = false
@@ -100,7 +103,7 @@ public final class EditorViewModel {
 
     /// Recomputes the cropped preview. Called only when its inputs change —
     /// after the photo loads and after a crop is committed.
-    private func updateCroppedPreview() {
+    func updateCroppedPreview() {
         guard let previewImage else {
             croppedPreviewImage = nil
             return
@@ -121,6 +124,11 @@ public final class EditorViewModel {
     // MARK: Tools (FR-019: cancel restores last committed state)
 
     /// The pen survives between sessions; the strokes do not.
+    /// Session-scoped, in memory, never encoded into the challenge — the
+    /// stack is the one part of editing that must not outlive the session
+    /// (PRD §18.1).
+    var history = DocumentHistory()
+
     public private(set) var pen = DrawingPen()
 
     public func beginDrawing() {
@@ -248,7 +256,22 @@ public final class EditorViewModel {
         persistDocument()
     }
 
-    private func persistDocument() {
+    /// The one choke point every edit already goes through, which is what lets
+    /// undo cover all of them without any of them knowing it exists:
+    /// `challenge.document` still holds the document as it was before the edit.
+    ///
+    /// The guard matters twice over. A mutation the document refused — a
+    /// transform on a locked layer, a reorder that resolved to the same order —
+    /// must not eat an undo step that then does nothing when pressed, and it
+    /// must not pay for a JSON encode either.
+    func persistDocument() {
+        guard challenge.document != document else { return }
+
+        history.record(challenge.document)
+        write(document)
+    }
+
+    func write(_ document: EditorDocument) {
         challenge.document = document
         activeRepository.save(challenge)
     }
@@ -282,50 +305,6 @@ public final class EditorViewModel {
         guard document.background != background else { return }
         document.background = background
         persistDocument()
-    }
-
-    // MARK: Layer panel (FR-090 reorder, FR-086 lock, §19 discrete adjustment)
-
-    public func moveLayer(id: UUID, _ move: EditorDocument.LayerMove) {
-        document.moveLayer(id: id, move)
-        persistDocument()
-    }
-
-    /// The panel's drag, as an order rather than a move — see
-    /// `reorderLayers(topFirstIDs:)` for why that distinction is the fix and
-    /// not a preference.
-    ///
-    /// Selection is deliberately left alone: with an order there is no "the
-    /// layer that moved" to select, and reaching for one is what put the
-    /// selection on an untouched layer while the delta version was misfiring.
-    public func reorderLayers(topFirstIDs ids: [UUID]) {
-        let before = document.layers.map(\.id)
-        document.reorderLayers(topFirstIDs: ids)
-        guard document.layers.map(\.id) != before else { return }
-
-        persistDocument()
-    }
-
-    /// Locking selects, because the panel is the only way back to a locked
-    /// layer — the canvas ignores its gestures (FR-086).
-    public func setLock(_ isLocked: Bool, ofLayer id: UUID) {
-        document.setLock(isLocked, ofLayer: id)
-        selectedLayerID = id
-        persistDocument()
-    }
-
-    public func duplicateLayer(id: UUID) {
-        guard let copy = document.duplicateLayer(id: id) else { return }
-        selectedLayerID = copy
-        persistDocument()
-    }
-
-    /// §19's discrete adjustment. Routed through `commitTransform` so it
-    /// inherits the locked-layer refusal and the scale bound rather than
-    /// repeating them.
-    func step(_ step: LayerStep, layerID: UUID) {
-        guard let layer = document.layer(id: layerID) else { return }
-        commitTransform(layerID: layerID, to: LayerStep.apply(step, to: layer.transform))
     }
 
     // MARK: Stickers (PRD FR-019)

@@ -4,6 +4,10 @@ import Foundation
 
 final class InMemoryActiveChallengeRepository: ActiveChallengeRepository, @unchecked Sendable {
     var stored: ActiveChallenge?
+    /// Counted, not just recorded: an edit the document refused must not reach
+    /// the store at all, and only a count can tell that apart from a write that
+    /// happened to store the same value.
+    private(set) var saveCount = 0
 
     func load() -> ActiveChallenge? {
         stored
@@ -11,6 +15,7 @@ final class InMemoryActiveChallengeRepository: ActiveChallengeRepository, @unche
 
     func save(_ challenge: ActiveChallenge) {
         stored = challenge
+        saveCount += 1
     }
 
     func clear() {

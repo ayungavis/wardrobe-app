@@ -7,6 +7,10 @@ struct EditorControlsView: View {
     let isSaving: Bool
     let didSave: Bool
     let onClose: () -> Void
+    let canUndo: Bool
+    let canRedo: Bool
+    let onUndo: () -> Void
+    let onRedo: () -> Void
     let onText: () -> Void
     let onSticker: () -> Void
     let onCrop: () -> Void
@@ -22,6 +26,12 @@ struct EditorControlsView: View {
             HStack(alignment: .top) {
                 MediaCircleButtonView(systemName: "xmark", action: onClose)
                     .accessibilityLabel(Text("common.close", bundle: .module))
+
+                Spacer()
+
+                HistoryControlsView(
+                    canUndo: canUndo, canRedo: canRedo, onUndo: onUndo, onRedo: onRedo
+                )
 
                 Spacer()
 

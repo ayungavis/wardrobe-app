@@ -2108,6 +2108,38 @@
         }
       }
     },
+    "editor.redo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redo"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ulangi"
+          }
+        }
+      }
+    },
+    "editor.redo.hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restores the last undone change"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengembalikan perubahan yang dibatalkan"
+          }
+        }
+      }
+    },
     "editor.review.detected %lld": {
       "localizations": {
         "en": {
@@ -3563,6 +3595,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Teks"
+          }
+        }
+      }
+    },
+    "editor.undo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batalkan"
+          }
+        }
+      }
+    },
+    "editor.undo.hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reverses the last change to the canvas"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Membatalkan perubahan terakhir di kanvas"
           }
         }
       }
