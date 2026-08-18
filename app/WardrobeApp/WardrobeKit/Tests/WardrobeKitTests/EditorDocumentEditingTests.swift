@@ -170,7 +170,7 @@ struct EditorDocumentEditingTests {
             Issue.record("stickers sit below texts")
             return
         }
-        #expect(restoredSticker.emoji == sticker.emoji)
+        #expect(restoredSticker.art == StickerArt(legacyEmoji: sticker.emoji))
         #expect(document.layers[1].id == sticker.id)
         #expect(document.layers[1].transform.scale == 2)
     }

@@ -40,6 +40,7 @@ public final class EditorViewModel {
     private let activeRepository: ActiveChallengeRepository
     private let photoRepository: PhotoRepository
     private let librarySaver: PhotoLibrarySaveService
+    private let preferencesRepository: AccountPreferencesRepository
     private(set) var loadTask: Task<Void, Never>?
     private(set) var exportTask: Task<Void, Never>?
     private(set) var saveTask: Task<Void, Never>?
@@ -48,12 +49,14 @@ public final class EditorViewModel {
         challenge: ActiveChallenge,
         activeRepository: ActiveChallengeRepository,
         photoRepository: PhotoRepository,
-        librarySaver: PhotoLibrarySaveService
+        librarySaver: PhotoLibrarySaveService,
+        preferencesRepository: AccountPreferencesRepository
     ) {
         self.challenge = challenge
         self.activeRepository = activeRepository
         self.photoRepository = photoRepository
         self.librarySaver = librarySaver
+        self.preferencesRepository = preferencesRepository
         document = challenge.document
     }
 
@@ -215,11 +218,26 @@ public final class EditorViewModel {
 
     // MARK: Stickers (PRD FR-019)
 
-    public func addSticker(_ emoji: String) {
-        document.appendSticker(emoji)
+    /// Recently used ids, newest first, with anything the catalogue no longer
+    /// ships filtered out (FR-099).
+    public var recentStickerIDs: [String] {
+        preferencesRepository.load().knownRecentStickerIDs
+    }
+
+    public func addSticker(_ entry: StickerCatalogueEntry) {
+        document.appendSticker(.catalogue(entry.id))
         selectedLayerID = document.layers.last?.id
         isStickerPickerPresented = false
         persistDocument()
+        rememberSticker(entry.id)
+    }
+
+    /// Written after the document, never before: a preference is convenience,
+    /// and FR-099 is explicit that it must never block a core action.
+    private func rememberSticker(_ id: String) {
+        var preferences = preferencesRepository.load()
+        preferences.remember(stickerID: id)
+        preferencesRepository.save(preferences)
     }
 
     // MARK: Export / save / share (FR-031/032 — independent of completion)

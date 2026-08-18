@@ -68,7 +68,7 @@ public enum TextColor: String, CaseIterable, Sendable {
     }
 
     public var name: String {
-        String(localized: String.LocalizationValue(Self.nameKey(for: self)), bundle: .module)
+        LocalizedKey.resolve(Self.nameKey(for: self))
     }
 
     /// Assembled at runtime, so the extractor never sees these keys in source
@@ -98,7 +98,7 @@ public enum TextBackgroundStyle: String, CaseIterable, Sendable {
     }
 
     public var name: String {
-        String(localized: String.LocalizationValue("editor.text.background.\(rawValue)"), bundle: .module)
+        LocalizedKey.resolve("editor.text.background.\(rawValue)")
     }
 }
 
@@ -133,7 +133,7 @@ public enum TextFontStyle: String, CaseIterable, Sendable {
     /// the raw values to match would have turned every stored `"classic"` into
     /// a serif overnight, so the labels moved instead.
     public var name: String {
-        String(localized: String.LocalizationValue(Self.nameKey(for: self)), bundle: .module)
+        LocalizedKey.resolve(Self.nameKey(for: self))
     }
 
     static func nameKey(for style: TextFontStyle) -> String {

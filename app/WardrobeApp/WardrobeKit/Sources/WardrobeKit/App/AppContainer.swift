@@ -9,6 +9,7 @@ public final class AppContainer {
     private let activeChallengeRepository: ActiveChallengeRepository
     private let completedChallengeRepository: CompletedChallengeRepository
     private let photoRepository: PhotoRepository
+    let preferencesRepository: AccountPreferencesRepository
     private let cameraService: CameraService
 
     public init(
@@ -16,12 +17,14 @@ public final class AppContainer {
         activeChallengeRepository: ActiveChallengeRepository = UserDefaultsActiveChallengeRepository(),
         completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
         photoRepository: PhotoRepository = FilePhotoRepository(),
+        preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
         self.activeChallengeRepository = activeChallengeRepository
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
+        self.preferencesRepository = preferencesRepository
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -69,7 +72,8 @@ public final class AppContainer {
             challenge: challenge,
             activeRepository: activeChallengeRepository,
             photoRepository: photoRepository,
-            librarySaver: Self.defaultLibrarySaver()
+            librarySaver: Self.defaultLibrarySaver(),
+            preferencesRepository: preferencesRepository
         )
     }
 

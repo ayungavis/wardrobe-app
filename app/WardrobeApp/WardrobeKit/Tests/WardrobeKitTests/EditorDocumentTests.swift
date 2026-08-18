@@ -267,7 +267,11 @@ struct EditorDocumentTests {
         let content = try #require(layers.first?["content"] as? [String: Any])
 
         #expect(content["kind"] as? String == "sticker")
-        #expect((content["value"] as? [String: Any])?["emoji"] as? String == "✨")
+        // The layer tag is frozen; what the sticker itself stores is pinned in
+        // StickerCatalogueTests, which owns that shape.
+        let art = try #require((content["value"] as? [String: Any])?["art"] as? [String: Any])
+        #expect(art["kind"] as? String == "catalogue")
+        #expect(art["value"] as? String == "emoji.sparkles")
     }
 
     /// A layer kind this build has never heard of is the same situation as a

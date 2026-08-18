@@ -42,10 +42,13 @@ struct EditorControlsView: View {
         VStack(spacing: Spacing.md) {
             MediaCircleButtonView(systemName: "textformat", action: onText)
                 .accessibilityLabel(Text("editor.addText", bundle: .module))
+                .accessibilityIdentifier("editor.tool.text")
             MediaCircleButtonView(systemName: "face.smiling", action: onSticker)
                 .accessibilityLabel(Text("editor.tool.sticker", bundle: .module))
+                .accessibilityIdentifier("editor.tool.sticker")
             MediaCircleButtonView(systemName: "crop", action: onCrop)
                 .accessibilityLabel(Text("editor.tool.crop", bundle: .module))
+                .accessibilityIdentifier("editor.tool.crop")
             MediaCircleButtonView(systemName: "paintpalette", action: onBackground)
                 .accessibilityLabel(Text("editor.tool.background", bundle: .module))
                 .accessibilityIdentifier("editor.tool.background")

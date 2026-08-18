@@ -41,7 +41,14 @@ public struct EditorView<ReviewDrawer: View>: View {
             ExportSheetView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.isStickerPickerPresented) {
-            StickerPickerView { viewModel.addSticker($0) }
+            StickerPickerView(recentIDs: viewModel.recentStickerIDs) { viewModel.addSticker($0) }
+                // Half height so the canvas stays in view, and draggable to
+                // full for browsing the whole catalogue.
+                .presentationDetents([.fraction(0.48), .large])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(30)
+                .presentationBackground(AppColor.mediaSurface)
+                .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $viewModel.isBackgroundPickerPresented) {
             BackgroundPickerView(

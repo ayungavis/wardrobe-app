@@ -118,16 +118,32 @@ struct EditorViewModelTests {
     @Test func addStickerAppendsCenteredAndPersists() throws {
         let activeRepository = InMemoryActiveChallengeRepository()
         let sut = try makeEditorSUT(activeRepository: activeRepository)
+        let entry = try #require(StickerCatalogue.entry(id: "emoji.fire"))
 
         sut.isStickerPickerPresented = true
-        sut.addSticker("🔥")
+        sut.addSticker(entry)
 
-        #expect(sut.document.stickerEmojis == ["🔥"])
-        #expect(sut.document.stickerItems[0].position == CGPoint(x: 0.5, y: 0.5))
-        #expect(activeRepository.stored?.document.stickerItems.count == 1)
+        #expect(sut.document.stickerArts == [.catalogue("emoji.fire")])
+        #expect(sut.document.layers.last?.transform.position == CGPoint(x: 0.5, y: 0.5))
+        #expect(activeRepository.stored?.document.stickerArts.count == 1)
         #expect(!sut.isStickerPickerPresented)
         // Selected on arrival, so it can be placed without hunting for it.
         #expect(sut.selectedLayerID == sut.document.layers.last?.id)
+    }
+
+    /// FR-099: the preference is written, and written *after* the document —
+    /// convenience must never be able to block the edit.
+    @Test func pickingAStickerRemembersItAsRecent() throws {
+        let preferences = InMemoryAccountPreferencesRepository()
+        let sut = try makeEditorSUT(preferencesRepository: preferences)
+
+        try sut.addSticker(#require(StickerCatalogue.entry(id: "sticker.heart")))
+        try sut.addSticker(#require(StickerCatalogue.entry(id: "emoji.fire")))
+        try sut.addSticker(#require(StickerCatalogue.entry(id: "sticker.heart")))
+
+        // Newest first, and picking the same one twice does not duplicate it.
+        #expect(preferences.stored.recentStickerIDs == ["sticker.heart", "emoji.fire"])
+        #expect(sut.recentStickerIDs == ["sticker.heart", "emoji.fire"])
     }
 
     // MARK: Derived preview cache (perf guard)

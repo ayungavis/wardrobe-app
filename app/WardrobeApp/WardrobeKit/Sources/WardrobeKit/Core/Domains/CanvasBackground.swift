@@ -38,7 +38,7 @@ public enum CanvasBackground: String, CaseIterable, Identifiable, Sendable {
     /// the bundle that actually holds the catalogue, and where a test can catch
     /// a palette entry whose string was never written.
     public var name: String {
-        String(localized: String.LocalizationValue(Self.nameKey(for: self)), bundle: .module)
+        LocalizedKey.resolve(Self.nameKey(for: self))
     }
 
     /// Built from the raw value, so the string extractor never sees these keys

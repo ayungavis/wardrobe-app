@@ -65,7 +65,7 @@ public extension EditorDocument {
         }
     }
 
-    mutating func appendSticker(_ emoji: String) {
-        layers.append(EditorLayer(content: .sticker(StickerContent(emoji: emoji))))
+    mutating func appendSticker(_ art: StickerArt) {
+        layers.append(EditorLayer(content: .sticker(StickerContent(art: art))))
     }
 }

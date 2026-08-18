@@ -304,11 +304,15 @@ extension EditorDocument {
     }
 
     var stickerItems: [StickerItem] {
-        layers.compactMap { layer in
-            guard case let .sticker(sticker) = layer.content else { return nil }
+        layers.compactMap { layer -> StickerItem? in
+            guard case let .sticker(sticker) = layer.content,
+                  case let .emoji(glyph)? = sticker.art.design
+            else {
+                return nil
+            }
             return StickerItem(
                 id: layer.id,
-                emoji: sticker.emoji,
+                emoji: glyph,
                 position: layer.transform.position,
                 scale: layer.transform.scale,
                 rotationDegrees: layer.transform.rotationDegrees
@@ -318,5 +322,25 @@ extension EditorDocument {
 
     var stickerEmojis: [String] {
         stickerItems.map(\.emoji)
+    }
+
+    var stickerArts: [StickerArt] {
+        layers.compactMap { layer in
+            guard case let .sticker(sticker) = layer.content else { return nil }
+            return sticker.art
+        }
+    }
+}
+
+final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, @unchecked Sendable {
+    // @unchecked: tests drive it from one actor at a time.
+    var stored = AccountPreferences()
+
+    func load() -> AccountPreferences {
+        stored
+    }
+
+    func save(_ preferences: AccountPreferences) {
+        stored = preferences
     }
 }

@@ -21,9 +21,9 @@ struct LayerContentView: View {
         case let .text(text):
             TextItemLabelView(item: text, fontSize: TextRendering.baseFontSize(in: canvasSize))
         case let .sticker(sticker):
-            StickerLabelView(
-                emoji: sticker.emoji,
-                fontSize: TextRendering.baseStickerFontSize(in: canvasSize)
+            StickerArtworkView(
+                art: sticker.art,
+                size: TextRendering.baseStickerFontSize(in: canvasSize)
             )
         case .drawing:
             // Drawings arrive with the drawing tool.
