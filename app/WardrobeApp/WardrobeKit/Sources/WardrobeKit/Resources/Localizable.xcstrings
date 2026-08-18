@@ -1496,6 +1496,38 @@
         }
       }
     },
+    "editor.layer.actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layer Actions"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aksi Lapisan"
+          }
+        }
+      }
+    },
+    "editor.layer.adjust": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adjust"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesuaikan"
+          }
+        }
+      }
+    },
     "editor.layer.aligned.both": {
       "extractionState": "manual",
       "localizations": {
@@ -1547,6 +1579,38 @@
         }
       }
     },
+    "editor.layer.backward": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send Backward"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mundur Selapis"
+          }
+        }
+      }
+    },
+    "editor.layer.bigger": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bigger"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perbesar"
+          }
+        }
+      }
+    },
     "editor.layer.delete": {
       "localizations": {
         "en": {
@@ -1579,6 +1643,151 @@
         }
       }
     },
+    "editor.layer.duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gandakan"
+          }
+        }
+      }
+    },
+    "editor.layer.forward": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring Forward"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maju Selapis"
+          }
+        }
+      }
+    },
+    "editor.layer.lock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock Layer"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunci Lapisan"
+          }
+        }
+      }
+    },
+    "editor.layer.locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "locked"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terkunci"
+          }
+        }
+      }
+    },
+    "editor.layer.moveDown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Down"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geser Bawah"
+          }
+        }
+      }
+    },
+    "editor.layer.moveLeft": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Left"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geser Kiri"
+          }
+        }
+      }
+    },
+    "editor.layer.moveRight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Right"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geser Kanan"
+          }
+        }
+      }
+    },
+    "editor.layer.moveUp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Up"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geser Atas"
+          }
+        }
+      }
+    },
+    "editor.layer.order %lld %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "layer %1$lld of %2$lld"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lapisan %1$lld dari %2$lld"
+          }
+        }
+      }
+    },
     "editor.layer.photo": {
       "localizations": {
         "en": {
@@ -1591,6 +1800,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "Foto"
+          }
+        }
+      }
+    },
+    "editor.layer.position %lld %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld percent across, %2$lld percent down"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld persen dari kiri, %2$lld persen dari atas"
+          }
+        }
+      }
+    },
+    "editor.layer.reset": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset Transform"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kembalikan Semula"
+          }
+        }
+      }
+    },
+    "editor.layer.rotateLeft": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rotate Left"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Putar Kiri"
+          }
+        }
+      }
+    },
+    "editor.layer.rotateRight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rotate Right"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Putar Kanan"
+          }
+        }
+      }
+    },
+    "editor.layer.rotation %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld degrees"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld derajat"
+          }
+        }
+      }
+    },
+    "editor.layer.scale %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld percent"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld persen"
           }
         }
       }
@@ -1611,6 +1916,22 @@
         }
       }
     },
+    "editor.layer.smaller": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smaller"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perkecil"
+          }
+        }
+      }
+    },
     "editor.layer.sticker": {
       "localizations": {
         "en": {
@@ -1627,34 +1948,146 @@
         }
       }
     },
-    "editor.layer.transform %lld %lld": {
+    "editor.layer.strokes %lld": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld percent, %2$lld degrees"
+            "value": "%lld strokes"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld persen, %2$lld derajat"
+            "value": "%lld goresan"
           }
         }
       }
     },
-    "editor.layer.transformAligned %lld %lld %@": {
+    "editor.layer.text": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld percent, %2$lld degrees, %3$@"
+            "value": "Text"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld persen, %2$lld derajat, %3$@"
+            "value": "Teks"
+          }
+        }
+      }
+    },
+    "editor.layer.toBack": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send to Back"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kirim ke Belakang"
+          }
+        }
+      }
+    },
+    "editor.layer.toFront": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring to Front"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bawa ke Depan"
+          }
+        }
+      }
+    },
+    "editor.layer.unlock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock Layer"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka Kunci Lapisan"
+          }
+        }
+      }
+    },
+    "editor.layers.count %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld layers"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld lapisan"
+          }
+        }
+      }
+    },
+    "editor.layers.empty.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a photo, text, sticker, or drawing to begin."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambahkan foto, teks, stiker, atau coretan untuk memulai."
+          }
+        }
+      }
+    },
+    "editor.layers.empty.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Layers"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum Ada Lapisan"
+          }
+        }
+      }
+    },
+    "editor.layers.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layers"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lapisan"
           }
         }
       }
@@ -3065,6 +3498,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gambar"
+          }
+        }
+      }
+    },
+    "editor.tool.layers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layers"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lapisan"
           }
         }
       }

@@ -29,22 +29,23 @@ public final class EditorViewModel {
     /// which layer someone is holding means nothing on their other phone.
     public private(set) var selectedLayerID: UUID?
     public private(set) var activeTool: Tool?
-    public private(set) var exportState: Loadable<ExportedPhoto> = .idle
+    public internal(set) var exportState: Loadable<ExportedPhoto> = .idle
     public var isExportPresented = false
     public var isStickerPickerPresented = false
     public var isBackgroundPickerPresented = false
+    public var isLayerPanelPresented = false
     public var alertError: AppError?
-    public private(set) var didSaveToPhotos = false
-    public private(set) var isSaving = false
+    public internal(set) var didSaveToPhotos = false
+    public internal(set) var isSaving = false
 
     private var challenge: ActiveChallenge
     private let activeRepository: ActiveChallengeRepository
     private let photoRepository: PhotoRepository
-    private let librarySaver: PhotoLibrarySaveService
+    let librarySaver: PhotoLibrarySaveService
     private let preferencesRepository: AccountPreferencesRepository
     private(set) var loadTask: Task<Void, Never>?
-    private(set) var exportTask: Task<Void, Never>?
-    private(set) var saveTask: Task<Void, Never>?
+    var exportTask: Task<Void, Never>?
+    var saveTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
@@ -283,6 +284,35 @@ public final class EditorViewModel {
         persistDocument()
     }
 
+    // MARK: Layer panel (FR-090 reorder, FR-086 lock, §19 discrete adjustment)
+
+    public func moveLayer(id: UUID, _ move: EditorDocument.LayerMove) {
+        document.moveLayer(id: id, move)
+        persistDocument()
+    }
+
+    /// Locking selects, because the panel is the only way back to a locked
+    /// layer — the canvas ignores its gestures (FR-086).
+    public func setLock(_ isLocked: Bool, ofLayer id: UUID) {
+        document.setLock(isLocked, ofLayer: id)
+        selectedLayerID = id
+        persistDocument()
+    }
+
+    public func duplicateLayer(id: UUID) {
+        guard let copy = document.duplicateLayer(id: id) else { return }
+        selectedLayerID = copy
+        persistDocument()
+    }
+
+    /// §19's discrete adjustment. Routed through `commitTransform` so it
+    /// inherits the locked-layer refusal and the scale bound rather than
+    /// repeating them.
+    func step(_ step: LayerStep, layerID: UUID) {
+        guard let layer = document.layer(id: layerID) else { return }
+        commitTransform(layerID: layerID, to: LayerStep.apply(step, to: layer.transform))
+    }
+
     // MARK: Stickers (PRD FR-019)
 
     /// Recently used ids, newest first, with anything the catalogue no longer
@@ -305,72 +335,5 @@ public final class EditorViewModel {
         var preferences = preferencesRepository.load()
         preferences.remember(stickerID: id)
         preferencesRepository.save(preferences)
-    }
-}
-
-// MARK: - Export / save / share (FR-031/032 — independent of completion)
-
-/// Split into an extension purely to keep the class body readable; `private`
-/// is file-scoped in Swift, so nothing here reaches further than it did.
-public extension EditorViewModel {
-    func beginExport() {
-        guard case let .loaded(data) = originalData else { return }
-        exportTask?.cancel()
-        exportState = .loading
-        didSaveToPhotos = false
-        isExportPresented = true
-
-        let document = document
-        exportTask = Task {
-            do {
-                let start = ContinuousClock.now
-                let photo = try ExportService.render(original: data, document: document)
-                try Task.checkCancellation()
-                Log.ui.info(
-                    "Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
-                )
-                exportState = .loaded(ExportedPhoto(data: photo))
-            } catch is CancellationError {
-                // Ignore cancellation.
-            } catch {
-                Log.report(error)
-                exportState = .failed(.exportFailed)
-            }
-        }
-    }
-
-    func saveToPhotos() {
-        guard case let .loaded(photo) = exportState else { return }
-        saveTask = Task {
-            do {
-                try await librarySaver.save(photo.data)
-                didSaveToPhotos = true
-            } catch {
-                Log.report(error)
-                alertError = .photoSaveFailed
-            }
-        }
-    }
-
-    /// Save-pill path: render + save to the library in one step, no sheet.
-    func saveDirectly() {
-        guard case let .loaded(data) = originalData, !isSaving, !didSaveToPhotos else { return }
-        isSaving = true
-
-        let document = document
-        saveTask = Task {
-            defer { isSaving = false }
-            do {
-                let photo = try ExportService.render(original: data, document: document)
-                try Task.checkCancellation()
-                try await librarySaver.save(photo)
-                didSaveToPhotos = true
-            } catch is CancellationError {
-                // Ignore cancellation.
-            } catch {
-                Log.report(error)
-                alertError = .photoSaveFailed
-            }
-        }
     }
 }

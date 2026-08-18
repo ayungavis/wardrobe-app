@@ -80,4 +80,55 @@ public extension EditorDocument {
     mutating func appendSticker(_ art: StickerArt) {
         layers.append(EditorLayer(content: .sticker(StickerContent(art: art))))
     }
+
+    // MARK: Layer panel (FR-090)
+
+    /// Where a layer goes in the stack.
+    ///
+    /// One mutation with four behaviours rather than four mutations: z-order is
+    /// a single invariant, and §19 asks the panel for all four, not just the
+    /// one-step moves the canvas offers.
+    enum LayerMove: Equatable, Sendable {
+        case forward, backward, front, back
+    }
+
+    /// An unknown id, or a layer already at that end of the stack, changes
+    /// nothing — so a panel button with nowhere to go is a no-op rather than a
+    /// reorder that quietly moves the wrong layer.
+    mutating func moveLayer(id: UUID, _ move: LayerMove) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+
+        let destination = switch move {
+        case .forward: layers.index(after: index)
+        case .backward: layers.index(before: index)
+        case .front: layers.index(before: layers.endIndex)
+        case .back: layers.startIndex
+        }
+        guard layers.indices.contains(destination), destination != index else { return }
+
+        layers.insert(layers.remove(at: index), at: destination)
+    }
+
+    /// The only thing that writes `isLocked`. FR-086: locking changes nothing
+    /// about how a layer renders or exports — it is the gate that
+    /// `updateTransform` and `removeLayer` already check.
+    mutating func setLock(_ isLocked: Bool, ofLayer id: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        layers[index].isLocked = isLocked
+    }
+
+    /// The copy lands on top, offset by one step so it is visibly a second
+    /// layer, and is always unlocked even when its source was — duplicating a
+    /// locked layer to get an editable one is a reason to do this.
+    @discardableResult
+    mutating func duplicateLayer(id: UUID) -> UUID? {
+        guard let source = layer(id: id) else { return nil }
+
+        let copy = EditorLayer(
+            content: source.content,
+            transform: LayerStep.apply(.down, to: LayerStep.apply(.right, to: source.transform))
+        )
+        layers.append(copy)
+        return copy.id
+    }
 }

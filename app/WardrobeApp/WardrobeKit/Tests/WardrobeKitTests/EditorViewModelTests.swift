@@ -100,6 +100,57 @@ struct EditorViewModelTests {
         #expect(sut.selectedLayerID == nil)
     }
 
+    // MARK: Layer panel (FR-090, FR-086)
+
+    /// Every panel mutation has to reach the stored draft — a reorder that only
+    /// lives in memory would come back undone after a relaunch.
+    @Test func everyPanelMutationPersists() throws {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let first = TextItem(content: "one")
+        let second = TextItem(content: "two")
+        let sut = try makeEditorSUT(
+            activeRepository: activeRepository, document: .fixture(texts: [first, second])
+        )
+
+        sut.moveLayer(id: first.id, .front)
+        #expect(activeRepository.stored?.document.layers.last?.id == first.id)
+
+        sut.setLock(true, ofLayer: second.id)
+        #expect(activeRepository.stored?.document.layer(id: second.id)?.isLocked == true)
+
+        sut.duplicateLayer(id: second.id)
+        #expect(activeRepository.stored?.document.layers.count == sut.document.layers.count)
+
+        sut.step(.bigger, layerID: first.id)
+        #expect(activeRepository.stored?.document.layer(id: first.id)?.transform.scale == 1 + LayerStep.scaleStep)
+    }
+
+    /// Locking selects, because the panel is the only way back to a layer the
+    /// canvas has stopped responding to (FR-086).
+    @Test func lockingSelectsAndDuplicatingSelectsTheCopy() throws {
+        let item = TextItem(content: "hi")
+        let sut = try makeEditorSUT(document: .fixture(texts: [item]))
+
+        sut.setLock(true, ofLayer: item.id)
+        #expect(sut.selectedLayerID == item.id)
+
+        sut.duplicateLayer(id: item.id)
+        #expect(sut.selectedLayerID == sut.document.layers.last?.id)
+        #expect(sut.selectedLayerID != item.id)
+    }
+
+    /// A locked layer refuses the discrete step for the same reason it refuses
+    /// the gesture — one gate, checked in one place.
+    @Test func aDiscreteStepRespectsTheLock() throws {
+        let item = TextItem(content: "hi")
+        let sut = try makeEditorSUT(document: .fixture(texts: [item]))
+        sut.setLock(true, ofLayer: item.id)
+
+        sut.step(.rotateRight, layerID: item.id)
+
+        #expect(sut.document.layer(id: item.id)?.transform.rotationDegrees == 0)
+    }
+
     /// Selection is UI state, so it must not reach the stored document.
     @Test func selectingALayerDoesNotTouchTheDocument() throws {
         let activeRepository = InMemoryActiveChallengeRepository()

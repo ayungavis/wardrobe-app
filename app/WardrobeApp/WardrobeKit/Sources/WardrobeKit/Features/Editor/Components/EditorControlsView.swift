@@ -12,6 +12,7 @@ struct EditorControlsView: View {
     let onCrop: () -> Void
     let onBackground: () -> Void
     let onDrawing: () -> Void
+    let onLayers: () -> Void
     let onSave: () -> Void
     let onShare: () -> Void
     let onComplete: () -> Void
@@ -56,6 +57,9 @@ struct EditorControlsView: View {
             MediaCircleButtonView(systemName: "pencil.tip", action: onDrawing)
                 .accessibilityLabel(Text("editor.tool.drawing", bundle: .module))
                 .accessibilityIdentifier("editor.tool.drawing")
+            MediaCircleButtonView(systemName: "square.3.layers.3d", action: onLayers)
+                .accessibilityLabel(Text("editor.tool.layers", bundle: .module))
+                .accessibilityIdentifier("editor.tool.layers")
         }
     }
 

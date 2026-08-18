@@ -50,6 +50,9 @@ public struct EditorView<ReviewDrawer: View>: View {
                 .presentationBackground(AppColor.mediaSurface)
                 .preferredColorScheme(.dark)
         }
+        .sheet(isPresented: $viewModel.isLayerPanelPresented) {
+            LayerPanelView(viewModel: viewModel)
+        }
         .sheet(isPresented: $viewModel.isBackgroundPickerPresented) {
             BackgroundPickerView(
                 selected: viewModel.document.background,
@@ -147,6 +150,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                     onCrop: viewModel.beginCrop,
                     onBackground: { viewModel.isBackgroundPickerPresented = true },
                     onDrawing: viewModel.beginDrawing,
+                    onLayers: { viewModel.isLayerPanelPresented = true },
                     onSave: viewModel.saveDirectly,
                     onShare: viewModel.beginExport,
                     onComplete: onComplete

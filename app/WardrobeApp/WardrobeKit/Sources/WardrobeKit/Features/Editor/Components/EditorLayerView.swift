@@ -60,8 +60,14 @@ struct EditorLayerView: View {
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(accessibilityValue)
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-            .accessibilityAction(named: Text("editor.layer.select", bundle: .module), onSelect)
-            .accessibilityAction(named: Text("editor.layer.delete", bundle: .module), onDelete)
+            .accessibilityActions {
+                Button(action: onSelect) { Text("editor.layer.select", bundle: .module) }
+                // Offering Delete on a locked layer would advertise an action
+                // the document refuses (FR-087).
+                if !layer.isLocked {
+                    Button(action: onDelete) { Text("editor.layer.delete", bundle: .module) }
+                }
+            }
             .accessibilityIdentifier("editor.layer")
     }
 
@@ -72,32 +78,49 @@ struct EditorLayerView: View {
         reduceMotion ? nil : .snappy(duration: 0.2)
     }
 
+    /// Shared with the panel row, so a layer has one name wherever you meet it.
+    /// A sticker is named by its kind rather than its glyph — an emoji is not
+    /// speakable, so Voice Control could not target it.
     private var accessibilityLabel: Text {
-        switch layer.content {
-        case let .text(text):
-            Text(verbatim: text.content)
-        case .sticker:
-            // The emoji itself is not speakable, so Voice Control could not
-            // target it.
-            Text("editor.layer.sticker", bundle: .module)
-        case .photo:
-            Text("editor.layer.photo", bundle: .module)
-        case .drawing:
-            Text("editor.layer.drawing", bundle: .module)
-        }
+        Text(verbatim: LayerLabel.title(for: layer.content))
     }
 
-    /// §19: the guides and badges cannot be the only way to know a layer is
-    /// aligned, so the same alignment they draw is also what VoiceOver reads —
-    /// from one function, so the two can never say different things.
+    /// Everything §19 asks a canvas layer to announce: position, scale,
+    /// rotation, and — because the guides and badges cannot be the only way to
+    /// know — alignment and lock state.
+    ///
+    /// Built as separate phrases rather than one format. Two optional tails on
+    /// a single string would need a key per combination, and the alignment
+    /// still comes from `CanvasSnapping.alignment`, so the line that gets drawn
+    /// and the words that get spoken cannot disagree.
     private var accessibilityValue: Text {
-        let percent = Int((layer.transform.scale * 100).rounded())
-        let degrees = CanvasSnapping.readableDegrees(layer.transform.rotationDegrees)
+        Text(verbatim: valuePhrases.joined(separator: ", "))
+    }
 
-        guard let alignment = alignmentPhrase else {
-            return Text("editor.layer.transform \(percent) \(degrees)", bundle: .module)
+    private var valuePhrases: [String] {
+        let transform = layer.transform
+        var phrases = [
+            String(
+                localized: "editor.layer.position \(percent(transform.position.x)) \(percent(transform.position.y))",
+                bundle: .module
+            ),
+            String(localized: "editor.layer.scale \(percent(transform.scale))", bundle: .module),
+            String(
+                localized: "editor.layer.rotation \(CanvasSnapping.readableDegrees(transform.rotationDegrees))",
+                bundle: .module
+            ),
+        ]
+        if let alignmentPhrase {
+            phrases.append(alignmentPhrase)
         }
-        return Text("editor.layer.transformAligned \(percent) \(degrees) \(alignment)", bundle: .module)
+        if layer.isLocked {
+            phrases.append(LocalizedKey.resolve("editor.layer.locked"))
+        }
+        return phrases
+    }
+
+    private func percent(_ value: CGFloat) -> Int {
+        Int((value * 100).rounded())
     }
 
     private var alignmentPhrase: String? {
