@@ -12,6 +12,9 @@ struct LayerRowView: View {
     /// ordered — so the number VoiceOver reads is the number the document uses.
     let depth: Int
     let layerCount: Int
+    /// While the list owns the row for dragging, the row's own controls cannot
+    /// be tapped — so they are hidden rather than left looking live.
+    let isReordering: Bool
     let onSelect: () -> Void
     let onToggleLock: () -> Void
     let onMove: (EditorDocument.LayerMove) -> Void
@@ -22,17 +25,20 @@ struct LayerRowView: View {
     var body: some View {
         HStack(spacing: Spacing.sm) {
             selectButton
-            lockButton
-            LayerMenuView(
-                isLocked: layer.isLocked,
-                canMoveUp: depth < layerCount - 1,
-                canMoveDown: depth > 0,
-                onMove: onMove,
-                onStep: onStep,
-                onDuplicate: onDuplicate,
-                onDelete: onDelete
-            )
-            .accessibilityLabel(Text("editor.layer.actions", bundle: .module))
+
+            if !isReordering {
+                lockButton
+                LayerMenuView(
+                    isLocked: layer.isLocked,
+                    canMoveUp: depth < layerCount - 1,
+                    canMoveDown: depth > 0,
+                    onMove: onMove,
+                    onStep: onStep,
+                    onDuplicate: onDuplicate,
+                    onDelete: onDelete
+                )
+                .accessibilityLabel(Text("editor.layer.actions", bundle: .module))
+            }
         }
         .padding(.vertical, Spacing.xs)
         .listRowBackground(isSelected ? AppColor.accent.opacity(0.14) : AppColor.onMedia.opacity(0.04))
@@ -86,7 +92,7 @@ struct LayerRowView: View {
         Button(action: onToggleLock) {
             Image(systemName: layer.isLocked ? "lock.fill" : "lock.open")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(layer.isLocked ? AppColor.accent : AppColor.onMedia.opacity(0.64))
+                .foregroundStyle(layer.isLocked ? AppColor.warning : AppColor.onMedia.opacity(0.64))
                 .frame(width: 44, height: 44)
                 .background(AppColor.onMedia.opacity(0.08), in: Circle())
         }

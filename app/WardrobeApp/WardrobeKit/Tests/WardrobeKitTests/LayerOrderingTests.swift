@@ -89,6 +89,67 @@ struct LayerOrderingTests {
         #expect(document.layers.last?.id == id)
     }
 
+    // MARK: Dragging in the panel
+
+    /// The reason this takes an order and not a move.
+    ///
+    /// `List` can deliver one drag more than once. A delta applied twice
+    /// scrambles the stack — the bug this replaced turned "move row 3 to row 1"
+    /// into two hops and landed three layers in the wrong places. An order
+    /// applied twice is the same as applied once.
+    @Test func applyingTheSameOrderTwiceIsTheSameAsApplyingItOnce() {
+        var document = makeDocument()
+        let ids = document.layers.map(\.id)
+        let requested = [ids[1], ids[2], ids[0]]
+
+        document.reorderLayers(topFirstIDs: requested)
+        let once = document.layers.map(\.id)
+        document.reorderLayers(topFirstIDs: requested)
+
+        #expect(document.layers.map(\.id) == once)
+    }
+
+    @Test func theRequestedOrderIsWhatTheStackEndsUpIn() {
+        var document = makeDocument()
+        let ids = document.layers.map(\.id)
+
+        // Top of the stack first, so the stack itself reads the other way.
+        document.reorderLayers(topFirstIDs: [ids[0], ids[2], ids[1]])
+
+        #expect(document.layers.map(\.id) == [ids[1], ids[2], ids[0]])
+    }
+
+    /// Reordering must never be a way to lose or invent a layer, so anything
+    /// that is not a permutation of what exists is refused whole.
+    @Test func anOrderThatIsNotAPermutationChangesNothing() {
+        var document = makeDocument()
+        let ids = document.layers.map(\.id)
+        let before = document
+
+        document.reorderLayers(topFirstIDs: [ids[0], ids[1]])
+        document.reorderLayers(topFirstIDs: ids + [UUID()])
+        document.reorderLayers(topFirstIDs: [ids[0], ids[1], UUID()])
+        document.reorderLayers(topFirstIDs: [ids[0], ids[0], ids[1]])
+        document.reorderLayers(topFirstIDs: [])
+
+        #expect(document == before)
+    }
+
+    /// The same invariant the drag used to carry: reordering permutes, it never
+    /// touches what a layer is.
+    @Test func reorderingKeepsEveryLayerIntact() {
+        var document = makeDocument()
+        let locked = document.layers[1].id
+        document.setLock(true, ofLayer: locked)
+        let contents = document.layers.map(\.content)
+
+        // The order it is already in — top of the stack first, so reversed.
+        document.reorderLayers(topFirstIDs: document.layers.reversed().map(\.id))
+
+        #expect(document.layers.map(\.content) == contents)
+        #expect(document.layer(id: locked)?.isLocked == true)
+    }
+
     // MARK: Lock (FR-086, FR-087)
 
     @Test func lockingThenUnlockingRestoresEveryEdit() {

@@ -109,6 +109,24 @@ public extension EditorDocument {
         layers.insert(layers.remove(at: index), at: destination)
     }
 
+    /// Puts the stack in the given order, top of the stack first.
+    ///
+    /// Takes an order rather than a move, because a move is not idempotent:
+    /// `List` can deliver one drag more than once, and a delta applied twice
+    /// scrambles the stack while an absolute order applied twice is the same as
+    /// applied once.
+    ///
+    /// Refuses anything that is not a permutation of the layers that exist — an
+    /// unknown id or a missing one means the caller is working from a stale
+    /// list, and reordering must never be a way to lose a layer.
+    mutating func reorderLayers(topFirstIDs ids: [UUID]) {
+        let existing = layers.map(\.id)
+        guard ids.count == existing.count, Set(ids) == Set(existing) else { return }
+
+        let byID = Dictionary(uniqueKeysWithValues: layers.map { ($0.id, $0) })
+        layers = ids.reversed().compactMap { byID[$0] }
+    }
+
     /// The only thing that writes `isLocked`. FR-086: locking changes nothing
     /// about how a layer renders or exports — it is the gate that
     /// `updateTransform` and `removeLayer` already check.

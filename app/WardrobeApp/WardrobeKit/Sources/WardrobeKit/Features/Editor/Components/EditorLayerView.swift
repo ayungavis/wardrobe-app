@@ -140,15 +140,44 @@ struct EditorLayerView: View {
             let inverseScale = 1 / max(scale, ElementTransform.scaleRange.lowerBound)
             RoundedRectangle(cornerRadius: 6 * inverseScale)
                 .stroke(
-                    isOverDeleteTarget ? AppColor.destructive : AppColor.accent,
+                    outlineColor,
                     style: StrokeStyle(
                         lineWidth: inverseScale,
                         dash: [6 * inverseScale, 4 * inverseScale]
                     )
                 )
+                .overlay(alignment: .topTrailing) {
+                    if layer.isLocked {
+                        lockBadge(inverseScale: inverseScale)
+                    }
+                }
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
+    }
+
+    /// Over the delete target wins: that is about to happen, while locked is a
+    /// standing state.
+    private var outlineColor: Color {
+        if isOverDeleteTarget {
+            return AppColor.destructive
+        }
+        return layer.isLocked ? AppColor.warning : AppColor.accent
+    }
+
+    /// Why a gesture is being ignored, said where the gesture is happening
+    /// (FR-086). Scaled like the outline, so it stays the same size on screen
+    /// however far the layer is zoomed.
+    private func lockBadge(inverseScale: CGFloat) -> some View {
+        Image(systemName: "lock.fill")
+            .font(.system(size: 11 * inverseScale, weight: .bold))
+            .foregroundStyle(AppColor.onMedia)
+            .frame(width: 24 * inverseScale, height: 24 * inverseScale)
+            .background(AppColor.warning, in: Circle())
+            .overlay {
+                Circle().stroke(AppColor.onMedia.opacity(0.82), lineWidth: inverseScale)
+            }
+            .offset(x: 8 * inverseScale, y: -8 * inverseScale)
     }
 
     private var transformGesture: some Gesture {

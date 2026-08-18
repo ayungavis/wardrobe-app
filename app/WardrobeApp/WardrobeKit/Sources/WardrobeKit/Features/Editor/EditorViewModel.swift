@@ -291,6 +291,21 @@ public final class EditorViewModel {
         persistDocument()
     }
 
+    /// The panel's drag, as an order rather than a move — see
+    /// `reorderLayers(topFirstIDs:)` for why that distinction is the fix and
+    /// not a preference.
+    ///
+    /// Selection is deliberately left alone: with an order there is no "the
+    /// layer that moved" to select, and reaching for one is what put the
+    /// selection on an untouched layer while the delta version was misfiring.
+    public func reorderLayers(topFirstIDs ids: [UUID]) {
+        let before = document.layers.map(\.id)
+        document.reorderLayers(topFirstIDs: ids)
+        guard document.layers.map(\.id) != before else { return }
+
+        persistDocument()
+    }
+
     /// Locking selects, because the panel is the only way back to a locked
     /// layer — the canvas ignores its gestures (FR-086).
     public func setLock(_ isLocked: Bool, ofLayer id: UUID) {

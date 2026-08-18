@@ -9,6 +9,7 @@ public enum AppColor {
     public static let textSecondary = Color("textSecondary", bundle: .module)
     public static let accent = Color("accent", bundle: .module)
     public static let destructive = Color("destructive", bundle: .module)
+    public static let warning = Color("warning", bundle: .module)
 
     /// Media surfaces (camera/editor) commit to a dark look regardless of the
     /// system appearance — like every story-style editor.

@@ -12,11 +12,39 @@ struct LayerPanelView: View {
 
     let viewModel: EditorViewModel
 
-    /// Top of the stack first. `EditorDocument.layers` is ordered bottom to
-    /// top, and a list that reads the other way round would have the front
-    /// layer at the bottom of the screen.
-    private var rows: [(offset: Int, element: EditorLayer)] {
-        Array(viewModel.document.layers.enumerated()).reversed()
+    // A real binding, not `.constant(...)`: the list manages its own edit
+    // state while a drag is in flight, and a binding it cannot write to leaves
+    // it reconciling against something it does not own.
+    //
+    // Guarded because `EditMode` does not exist on macOS, and this package
+    // builds for macOS so `swift test` runs without a simulator.
+    #if os(iOS)
+        @State private var editMode: EditMode = .inactive
+    #endif
+
+    /// The list's own source of truth, top of the stack first — deliberately
+    /// not a computed read of the document.
+    ///
+    /// A drag moves this first and commits second. Re-deriving it from the
+    /// document instead means the commit changes the list's data while the
+    /// list's own drag is still in flight, which is what made one drag land as
+    /// two: rows drawn twice, and the same move applied twice.
+    @State private var rows: [EditorLayer] = []
+
+    private var isReordering: Bool {
+        #if os(iOS)
+            editMode == .active
+        #else
+            false
+        #endif
+    }
+
+    /// How far up the stack a layer sits, counted from the bottom. Read off the
+    /// array the list actually draws, so a row can never label itself from a
+    /// different order than the one it is in.
+    private func depth(of layer: EditorLayer) -> Int {
+        guard let row = rows.firstIndex(where: { $0.id == layer.id }) else { return 0 }
+        return rows.count - 1 - row
     }
 
     var body: some View {
@@ -27,6 +55,13 @@ struct LayerPanelView: View {
                 .navigationBarTitleDisplayMode(.inline)
             #endif
                 .toolbar { toolbar }
+        }
+        .onAppear { rows = viewModel.document.layers.reversed() }
+        .onChange(of: viewModel.document.layers) { _, layers in
+            // Everything that is not a drag — delete, duplicate, the menu's four
+            // reorder items — arrives here. After a drag this assigns the value
+            // already held, so SwiftUI sees no change and nothing rebuilds.
+            rows = layers.reversed()
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
@@ -49,22 +84,33 @@ struct LayerPanelView: View {
             }
         } else {
             List {
-                ForEach(rows, id: \.element.id) { depth, layer in
-                    row(layer, depth: depth)
+                ForEach(rows) { layer in
+                    row(layer)
+                }
+                .onMove { source, destination in
+                    rows.move(fromOffsets: source, toOffset: destination)
+                    viewModel.reorderLayers(topFirstIDs: rows.map(\.id))
                 }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            // A mode you turn on, not a permanent state: the system's reorder
+            // control and the row's own buttons occupy the same row, and pinning
+            // edit mode leaves the row half-dead.
+            #if os(iOS)
+                .environment(\.editMode, $editMode)
+            #endif
         }
     }
 
-    private func row(_ layer: EditorLayer, depth: Int) -> some View {
+    private func row(_ layer: EditorLayer) -> some View {
         LayerRowView(
             layer: layer,
             photo: viewModel.croppedPreviewImage,
             isSelected: viewModel.selectedLayerID == layer.id,
-            depth: depth,
+            depth: depth(of: layer),
             layerCount: viewModel.document.layers.count,
+            isReordering: isReordering,
             onSelect: { viewModel.select(layer.id) },
             onToggleLock: { viewModel.setLock(!layer.isLocked, ofLayer: layer.id) },
             onMove: { viewModel.moveLayer(id: layer.id, $0) },
@@ -77,10 +123,20 @@ struct LayerPanelView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Text("editor.layers.count \(viewModel.document.layers.count)", bundle: .module)
+            // The number alone — spelled out it collides with the inline
+            // title. VoiceOver still gets the whole phrase, since a bare digit
+            // read aloud means nothing.
+            Text(viewModel.document.layers.count, format: .number)
                 .font(AppFont.caption.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(AppColor.onMedia.opacity(0.64))
+                .accessibilityLabel(Text(
+                    "editor.layers.count \(viewModel.document.layers.count)", bundle: .module
+                ))
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            reorderToggle
         }
 
         ToolbarItem(placement: .confirmationAction) {
@@ -89,5 +145,21 @@ struct LayerPanelView: View {
                     .font(AppFont.body.weight(.bold))
             }
         }
+    }
+
+    private var reorderToggle: some View {
+        Button(action: toggleReordering) {
+            Image(systemName: "arrow.up.arrow.down")
+                .foregroundStyle(isReordering ? AppColor.accent : AppColor.onMedia)
+        }
+        .accessibilityLabel(Text("editor.layers.reorder", bundle: .module))
+        .accessibilityAddTraits(isReordering ? [.isSelected] : [])
+        .accessibilityIdentifier("editor.layers.reorderToggle")
+    }
+
+    private func toggleReordering() {
+        #if os(iOS)
+            editMode = isReordering ? .inactive : .active
+        #endif
     }
 }

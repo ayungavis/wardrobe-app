@@ -2076,6 +2076,22 @@
         }
       }
     },
+    "editor.layers.reorder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reorder Layers"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Urutkan Lapisan"
+          }
+        }
+      }
+    },
     "editor.layers.title": {
       "localizations": {
         "en": {
