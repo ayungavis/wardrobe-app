@@ -288,7 +288,7 @@ public struct PhotoContent: Equatable, Codable, Sendable {
 public struct TextContent: Equatable, Codable, Sendable {
     public var content: String
     public var colorName: String
-    public var hasBackground: Bool
+    public var backgroundStyleName: String
     public var fontName: String
     public var alignmentName: String
 
@@ -304,40 +304,68 @@ public struct TextContent: Equatable, Codable, Sendable {
         TextAlignmentStyle(rawValue: alignmentName) ?? .center
     }
 
+    /// An unrecognised style loses a look, not the words — so it falls back
+    /// rather than refusing, the same call `CanvasBackground` makes.
+    public var backgroundStyle: TextBackgroundStyle {
+        TextBackgroundStyle(rawValue: backgroundStyleName) ?? .none
+    }
+
     public init(
         content: String,
         colorName: String = TextColor.white.rawValue,
-        hasBackground: Bool = false,
+        backgroundStyle: TextBackgroundStyle = .none,
         fontName: String = TextFontStyle.classic.rawValue,
         alignmentName: String = TextAlignmentStyle.center.rawValue
     ) {
         self.content = content
         self.colorName = colorName
-        self.hasBackground = hasBackground
+        backgroundStyleName = backgroundStyle.rawValue
         self.fontName = fontName
         self.alignmentName = alignmentName
     }
 
-    /// Carries a flat draft's text across without losing its styling.
+    /// Carries a flat draft's text across without losing its styling. The old
+    /// boolean only knew two of the three states.
     public init(_ item: TextItem) {
         self.init(
             content: item.content,
             colorName: item.colorName,
-            hasBackground: item.hasBackground,
+            backgroundStyle: item.hasBackground ? .solid : .none,
             fontName: item.fontName,
             alignmentName: item.alignmentName
         )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case content, colorName, backgroundStyleName, fontName, alignmentName
+        /// The two-state predecessor. Read forever, written never.
+        case hasBackground
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         content = try container.decode(String.self, forKey: .content)
         colorName = try container.decodeIfPresent(String.self, forKey: .colorName) ?? TextColor.white.rawValue
-        hasBackground = try container.decodeIfPresent(Bool.self, forKey: .hasBackground) ?? false
         fontName = try container.decodeIfPresent(String.self, forKey: .fontName)
             ?? TextFontStyle.classic.rawValue
         alignmentName = try container.decodeIfPresent(String.self, forKey: .alignmentName)
             ?? TextAlignmentStyle.center.rawValue
+
+        if let style = try container.decodeIfPresent(String.self, forKey: .backgroundStyleName) {
+            backgroundStyleName = style
+        } else {
+            let hadBackground = try container.decodeIfPresent(Bool.self, forKey: .hasBackground) ?? false
+            backgroundStyleName = (hadBackground ? TextBackgroundStyle.solid : .none).rawValue
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(content, forKey: .content)
+        try container.encode(colorName, forKey: .colorName)
+        try container.encode(backgroundStyleName, forKey: .backgroundStyleName)
+        try container.encode(fontName, forKey: .fontName)
+        try container.encode(alignmentName, forKey: .alignmentName)
     }
 }
 

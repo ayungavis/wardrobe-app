@@ -93,8 +93,8 @@ struct EditorCanvasView: View {
     }
 
     private func beginEditing(_ layer: EditorLayer) {
-        guard let item = layer.textItem else { return }
-        viewModel.beginEditingText(item)
+        guard let draft = layer.textDraft else { return }
+        viewModel.beginEditingText(draft)
     }
 
     private func dragChanged(_ id: UUID, to position: CGPoint) {

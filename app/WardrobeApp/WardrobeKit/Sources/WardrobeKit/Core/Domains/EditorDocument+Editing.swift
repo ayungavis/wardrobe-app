@@ -53,41 +53,19 @@ public extension EditorDocument {
 
     /// Writes the composer's result back. An existing id updates in place —
     /// keeping its z-position — and a new one lands on top.
-    mutating func upsertText(_ item: TextItem) {
-        let transform = ElementTransform(
-            position: item.position,
-            scale: item.scale,
-            rotationDegrees: item.rotationDegrees
-        )
-        if let index = layers.firstIndex(where: { $0.id == item.id }) {
+    mutating func upsertText(_ draft: TextDraft) {
+        if let index = layers.firstIndex(where: { $0.id == draft.id }) {
             guard !layers[index].isLocked else { return }
-            layers[index].content = .text(TextContent(item))
-            layers[index].transform = transform
+            layers[index].content = .text(draft.content)
+            layers[index].transform = draft.transform.clamped()
         } else {
-            layers.append(EditorLayer(id: item.id, content: .text(TextContent(item)), transform: transform))
+            layers.append(EditorLayer(
+                id: draft.id, content: .text(draft.content), transform: draft.transform.clamped()
+            ))
         }
     }
 
     mutating func appendSticker(_ emoji: String) {
         layers.append(EditorLayer(content: .sticker(StickerContent(emoji: emoji))))
-    }
-}
-
-public extension EditorLayer {
-    /// The flat form the text composer still edits. It disappears when the
-    /// composer learns to edit a layer directly (S5 of the canvas port).
-    var textItem: TextItem? {
-        guard case let .text(text) = content else { return nil }
-        return TextItem(
-            id: id,
-            content: text.content,
-            position: transform.position,
-            scale: transform.scale,
-            rotationDegrees: transform.rotationDegrees,
-            colorName: text.colorName,
-            hasBackground: text.hasBackground,
-            fontName: text.fontName,
-            alignmentName: text.alignmentName
-        )
     }
 }

@@ -192,7 +192,7 @@ struct EditorDocumentTests {
         #expect(content.textColor == .pink)
         #expect(content.fontStyle == .serif)
         #expect(content.alignmentStyle == .leading)
-        #expect(content.hasBackground)
+        #expect(content.backgroundStyle == .solid)
     }
 
     @Test func anEmptyDraftBecomesJustThePhoto() {

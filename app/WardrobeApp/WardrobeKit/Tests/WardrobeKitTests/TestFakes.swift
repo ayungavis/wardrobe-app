@@ -278,11 +278,29 @@ extension EditorDocument {
     }
 
     var textContents: [String] {
-        layers.compactMap(\.textItem).map(\.content)
+        layers.compactMap { layer in
+            guard case let .text(text) = layer.content else { return nil }
+            return text.content
+        }
     }
 
+    /// The flat projection, kept here because only tests still compare against
+    /// the pre-canvas shape — production reads `EditorLayer.textDraft`.
     var textItems: [TextItem] {
-        layers.compactMap(\.textItem)
+        layers.compactMap { layer in
+            guard case let .text(text) = layer.content else { return nil }
+            return TextItem(
+                id: layer.id,
+                content: text.content,
+                position: layer.transform.position,
+                scale: layer.transform.scale,
+                rotationDegrees: layer.transform.rotationDegrees,
+                colorName: text.colorName,
+                hasBackground: text.backgroundStyle == .solid,
+                fontName: text.fontName,
+                alignmentName: text.alignmentName
+            )
+        }
     }
 
     var stickerItems: [StickerItem] {

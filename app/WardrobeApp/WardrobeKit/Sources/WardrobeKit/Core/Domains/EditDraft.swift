@@ -38,28 +38,67 @@ public struct CropSpec: Codable, Equatable, Sendable {
 }
 
 /// Story-style text color palette (content palette, not a UI token).
+///
+/// Order is the swatch order on screen. Raw values are stored, so they never
+/// change — only the list may grow.
 public enum TextColor: String, CaseIterable, Sendable {
-    case white, black, red, orange, yellow, green, blue, pink
+    case white, black, yellow, orange, red, pink, purple, blue, cyan, green
 
     public var color: Color {
         switch self {
         case .white: .white
         case .black: .black
-        case .red: Color(red: 0.93, green: 0.23, blue: 0.23)
-        case .orange: Color(red: 0.98, green: 0.58, blue: 0.13)
-        case .yellow: Color(red: 0.99, green: 0.86, blue: 0.20)
-        case .green: Color(red: 0.22, green: 0.79, blue: 0.42)
-        case .blue: Color(red: 0.22, green: 0.51, blue: 0.96)
-        case .pink: Color(red: 0.95, green: 0.36, blue: 0.65)
+        case .yellow: Color(red: 1, green: 0.86, blue: 0.08)
+        case .orange: Color(red: 1, green: 0.48, blue: 0.05)
+        case .red: Color(red: 0.96, green: 0.16, blue: 0.18)
+        case .pink: Color(red: 1, green: 0.23, blue: 0.55)
+        case .purple: Color(red: 0.57, green: 0.24, blue: 0.92)
+        case .blue: Color(red: 0.12, green: 0.47, blue: 0.98)
+        case .cyan: Color(red: 0.08, green: 0.78, blue: 0.94)
+        case .green: Color(red: 0.18, green: 0.78, blue: 0.35)
         }
     }
 
     /// Readable text color when this color is used as the pill background.
     public var contrastText: Color {
         switch self {
-        case .white, .yellow: .black
-        default: .white
+        case .black, .red, .purple, .blue: .white
+        case .white, .yellow, .orange, .pink, .cyan, .green: .black
         }
+    }
+
+    public var name: String {
+        String(localized: String.LocalizationValue(Self.nameKey(for: self)), bundle: .module)
+    }
+
+    /// Assembled at runtime, so the extractor never sees these keys in source
+    /// and prunes them as stale. They are pinned `"extractionState": "manual"`
+    /// in `Localizable.xcstrings`; a test fails if that pin is removed.
+    static func nameKey(for color: TextColor) -> String {
+        "editor.color.\(color.rawValue)"
+    }
+}
+
+/// How a text layer sits on whatever is behind it (FR-019's "background
+/// style"). Three states rather than a boolean, cycled by one button.
+public enum TextBackgroundStyle: String, CaseIterable, Sendable {
+    /// Bare text with a thin shadow so it stays legible on a busy photo.
+    case none
+    /// A pill filled with the chosen colour; the text flips to its contrast.
+    case solid
+    /// A dark pill; the text keeps the chosen colour.
+    case translucent
+
+    public var next: TextBackgroundStyle {
+        switch self {
+        case .none: .solid
+        case .solid: .translucent
+        case .translucent: .none
+        }
+    }
+
+    public var name: String {
+        String(localized: String.LocalizationValue("editor.text.background.\(rawValue)"), bundle: .module)
     }
 }
 
@@ -78,18 +117,27 @@ public enum TextFontStyle: String, CaseIterable, Sendable {
     }
 
     public var weight: Font.Weight {
-        self == .bold ? .black : .bold
+        switch self {
+        case .bold: .black
+        // Serif and monospace carry their own visual weight; at .bold they
+        // read as heavier than the sans faces rather than equal to them.
+        case .serif, .mono: .semibold
+        case .classic, .rounded: .bold
+        }
     }
 
-    /// Shown on the style chips.
-    public var sampleLabel: String {
-        switch self {
-        case .classic: "Aa"
-        case .bold: "Aa"
-        case .rounded: "Aa"
-        case .serif: "Aa"
-        case .mono: "Aa"
-        }
+    /// Shown on the chips, set in the typeface it names.
+    ///
+    /// The names describe the face, not the raw value — `classic` here is the
+    /// default sans, while the prototype's `classic` was its serif. Renaming
+    /// the raw values to match would have turned every stored `"classic"` into
+    /// a serif overnight, so the labels moved instead.
+    public var name: String {
+        String(localized: String.LocalizationValue(Self.nameKey(for: self)), bundle: .module)
+    }
+
+    static func nameKey(for style: TextFontStyle) -> String {
+        "editor.font.\(style.rawValue)"
     }
 }
 

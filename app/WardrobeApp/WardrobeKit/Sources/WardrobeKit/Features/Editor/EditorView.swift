@@ -118,6 +118,11 @@ public struct EditorView<ReviewDrawer: View>: View {
     private var canvasStage: some View {
         ZStack {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
+                // The canvas is the unit everything is measured against — text
+                // sizes, layer positions, the exported frame. Letting the
+                // keyboard shrink it would rescale the whole document every
+                // time the composer opened.
+                .ignoresSafeArea(.keyboard)
 
             if viewModel.activeTool == nil {
                 VStack {
@@ -144,6 +149,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                 TextComposerView(
                     working: working,
                     isExisting: !isNew,
+                    canvasSize: canvasSize,
                     onUpdate: { viewModel.updateWorking(text: $0) },
                     onDelete: viewModel.removeWorkingText,
                     onCancel: viewModel.cancelTool,

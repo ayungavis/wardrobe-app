@@ -5,9 +5,13 @@ import Observation
 @MainActor
 @Observable
 public final class EditorViewModel {
+    /// A story caption, not an essay. Long enough for anything anyone types on
+    /// a photo, short enough that a paste never becomes the whole document.
+    public static let maximumTextLength = 280
+
     public enum Tool: Equatable {
         case crop(CropSpec)
-        case text(TextItem, isNew: Bool)
+        case text(TextDraft, isNew: Bool)
     }
 
     public private(set) var originalData: Loadable<Data> = .idle
@@ -116,11 +120,14 @@ public final class EditorViewModel {
     }
 
     public func beginNewText(at position: CGPoint = CGPoint(x: 0.5, y: 0.5)) {
-        activeTool = .text(TextItem(content: "", position: position), isNew: true)
+        activeTool = .text(
+            TextDraft(content: TextContent(content: ""), transform: ElementTransform(position: position)),
+            isNew: true
+        )
     }
 
-    public func beginEditingText(_ item: TextItem) {
-        activeTool = .text(item, isNew: false)
+    public func beginEditingText(_ draft: TextDraft) {
+        activeTool = .text(draft, isNew: false)
     }
 
     public func updateWorking(crop: CropSpec) {
@@ -128,9 +135,15 @@ public final class EditorViewModel {
         activeTool = .crop(crop)
     }
 
-    public func updateWorking(text: TextItem) {
+    /// The length cap lives here rather than in the text field: it is a rule
+    /// about what gets stored, and here it can be tested without a keyboard.
+    public func updateWorking(text: TextDraft) {
         guard case let .text(_, isNew) = activeTool else { return }
-        activeTool = .text(text, isNew: isNew)
+        var capped = text
+        if capped.content.content.count > Self.maximumTextLength {
+            capped.content.content = String(capped.content.content.prefix(Self.maximumTextLength))
+        }
+        activeTool = .text(capped, isNew: isNew)
     }
 
     public func commitTool() {
@@ -138,13 +151,13 @@ public final class EditorViewModel {
         case let .crop(spec):
             document.photoCrop = spec
             updateCroppedPreview()
-        case let .text(item, _):
-            // Trimmed only to decide whether anything was written; what gets
-            // stored is what the user typed.
-            if item.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                document.removeLayer(id: item.id)
+        case let .text(draft, _):
+            // Blank means nothing was written; what gets stored otherwise is
+            // exactly what the user typed.
+            if draft.isBlank {
+                document.removeLayer(id: draft.id)
             } else {
-                document.upsertText(item)
+                document.upsertText(draft)
             }
         case nil:
             return
@@ -158,8 +171,8 @@ public final class EditorViewModel {
     }
 
     public func removeWorkingText() {
-        guard case let .text(item, _) = activeTool else { return }
-        document.removeLayer(id: item.id)
+        guard case let .text(draft, _) = activeTool else { return }
+        document.removeLayer(id: draft.id)
         activeTool = nil
         persistDocument()
     }

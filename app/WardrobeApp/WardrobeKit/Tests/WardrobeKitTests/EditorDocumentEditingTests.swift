@@ -92,10 +92,10 @@ struct EditorDocumentEditingTests {
     @Test func editingATextKeepsItsPlaceInTheStack() throws {
         var document = makeDocument()
         let target = document.layers[2]
-        var item = try #require(target.textItem)
-        item.content = "changed"
+        var draft = try #require(target.textDraft)
+        draft.content.content = "changed"
 
-        document.upsertText(item)
+        document.upsertText(draft)
 
         #expect(document.layers.count == 3)
         #expect(document.layers[2].id == target.id)
@@ -109,7 +109,10 @@ struct EditorDocumentEditingTests {
     @Test func aNewTextLandsOnTop() {
         var document = makeDocument()
 
-        document.upsertText(TextItem(content: "new", position: CGPoint(x: 0.2, y: 0.3), scale: 1.5))
+        document.upsertText(TextDraft(
+            content: TextContent(content: "new"),
+            transform: ElementTransform(position: CGPoint(x: 0.2, y: 0.3), scale: 1.5)
+        ))
 
         #expect(document.layers.count == 4)
         #expect(document.layers[3].transform.position == CGPoint(x: 0.2, y: 0.3))
@@ -161,7 +164,7 @@ struct EditorDocumentEditingTests {
         )
 
         #expect(document.photoCrop == crop)
-        let restoredText = try #require(document.layers.compactMap(\.textItem).first)
+        let restoredText = try #require(document.textItems.first)
         #expect(restoredText == text)
         guard case let .sticker(restoredSticker) = document.layers[1].content else {
             Issue.record("stickers sit below texts")
