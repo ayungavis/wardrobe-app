@@ -53,6 +53,10 @@ public struct EditorView<ReviewDrawer: View>: View {
         }
         .environment(\.colorScheme, .dark)
         .task { viewModel.onAppear() }
+        // Value-based rather than a call in a button: an export and a save
+        // finish long after the tap, and this is the value that says so.
+        .sensoryFeedback(.success, trigger: viewModel.didSaveToPhotos) { $1 }
+        .sensoryFeedback(.error, trigger: viewModel.alertError) { $1 != nil }
         .task(id: didResumeDraft) { await showRestoredNotice() }
         // Leaving the editor is the other moment a coalesced write has to
         // be made to land.

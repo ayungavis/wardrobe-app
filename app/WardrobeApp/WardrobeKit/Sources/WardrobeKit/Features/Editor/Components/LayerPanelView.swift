@@ -88,6 +88,7 @@ struct LayerPanelView: View {
                     row(layer)
                 }
                 .onMove { source, destination in
+                    EditorHaptics.selection.play()
                     rows.move(fromOffsets: source, toOffset: destination)
                     viewModel.reorderLayers(topFirstIDs: rows.map(\.id))
                 }

@@ -43,9 +43,12 @@ struct LayerMenuView: View {
             .disabled(isLocked)
 
             Section {
-                button("editor.layer.duplicate", "plus.square.on.square", action: onDuplicate)
+                button("editor.layer.duplicate", "plus.square.on.square", haptic: .commit, action: onDuplicate)
 
-                Button(role: .destructive, action: onDelete) {
+                Button(role: .destructive) {
+                    EditorHaptics.removed.play()
+                    onDelete()
+                } label: {
                     Label {
                         Text("editor.layer.delete", bundle: .module)
                     } icon: {
@@ -90,9 +93,13 @@ struct LayerMenuView: View {
     private func button(
         _ key: LocalizedStringKey,
         _ systemName: String,
+        haptic: EditorHaptics = .selection,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button {
+            haptic.play()
+            action()
+        } label: {
             Label {
                 Text(key, bundle: .module)
             } icon: {

@@ -80,6 +80,7 @@ struct StickerPickerView: View {
                 ForEach(availableCategories) { category in
                     let isSelected = self.category == category
                     Button {
+                        EditorHaptics.selection.play()
                         self.category = category
                     } label: {
                         Label {
@@ -112,6 +113,7 @@ struct StickerPickerView: View {
             LazyVGrid(columns: columns, spacing: Spacing.md) {
                 ForEach(StickerCatalogue.entries(in: category, recentIDs: recentIDs)) { entry in
                     Button {
+                        EditorHaptics.commit.play()
                         onPick(entry)
                         dismiss()
                     } label: {

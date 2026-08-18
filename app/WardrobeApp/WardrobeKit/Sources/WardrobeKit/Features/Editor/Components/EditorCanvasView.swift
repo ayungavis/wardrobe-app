@@ -143,7 +143,7 @@ struct EditorCanvasView: View {
     private func select(_ id: UUID) {
         guard viewModel.selectedLayerID != id else { return }
         viewModel.select(id)
-        CanvasHaptics.selectionChanged()
+        EditorHaptics.selection.play()
     }
 
     /// Double-tap reopens whatever the layer is made of: text goes back to the
@@ -169,14 +169,14 @@ struct EditorCanvasView: View {
             || (snap.snappedScale != nil && snap.snappedScale != self.snap?.snappedScale)
         self.snap = snap
         if landedOnSomething {
-            CanvasHaptics.selectionChanged()
+            EditorHaptics.latch.play()
         }
 
         let isOver = CanvasGeometry.isOverDeleteTarget(snap.transform.position)
         guard isOver != isOverDeleteTarget else { return }
         isOverDeleteTarget = isOver
         if isOver {
-            CanvasHaptics.enteredDeleteTarget()
+            EditorHaptics.armed.play()
         }
     }
 
@@ -187,7 +187,7 @@ struct EditorCanvasView: View {
         snap = nil
 
         if shouldDelete {
-            CanvasHaptics.deleted()
+            EditorHaptics.removed.play()
             viewModel.removeLayer(id: id)
         } else {
             viewModel.commitTransform(layerID: id, to: transform)
@@ -214,28 +214,5 @@ private struct CanvasFrameView: View {
             } action: { newSize in
                 canvasSize = newSize
             }
-    }
-}
-
-// ponytail: called straight through, no protocol and no injection — three
-// lines do not earn a service. Lift it into one the moment a view model needs
-// to trigger feedback or a test needs to assert it.
-private enum CanvasHaptics {
-    static func selectionChanged() {
-        #if os(iOS)
-            UISelectionFeedbackGenerator().selectionChanged()
-        #endif
-    }
-
-    static func enteredDeleteTarget() {
-        #if os(iOS)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
-    }
-
-    static func deleted() {
-        #if os(iOS)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
     }
 }

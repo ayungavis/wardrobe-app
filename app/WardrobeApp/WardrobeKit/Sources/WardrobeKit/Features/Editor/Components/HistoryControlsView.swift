@@ -49,7 +49,10 @@ struct HistoryControlsView: View {
         isEnabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button {
+            EditorHaptics.selection.play()
+            action()
+        } label: {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(AppColor.onMedia)

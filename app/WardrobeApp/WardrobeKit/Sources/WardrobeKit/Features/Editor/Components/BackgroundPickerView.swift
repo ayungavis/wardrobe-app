@@ -67,6 +67,7 @@ struct BackgroundPickerView: View {
 
     private func swatchButton(_ background: CanvasBackground) -> some View {
         Button {
+            EditorHaptics.selection.play()
             selected = background
             onPick(background)
         } label: {

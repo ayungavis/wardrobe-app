@@ -41,6 +41,7 @@ struct DrawingToolbarView: View {
                 label: Text("editor.drawing.clear", bundle: .module),
                 identifier: "editor.drawing.clear",
                 tint: canClear ? AppColor.destructive : AppColor.onMedia.opacity(0.36),
+                haptic: .removed,
                 action: onClear
             )
             .disabled(!canClear)
@@ -48,7 +49,8 @@ struct DrawingToolbarView: View {
             divider
 
             iconButton("checkmark", label: Text("common.done", bundle: .module),
-                       identifier: "editor.drawing.done", tint: AppColor.accent, action: onDone)
+                       identifier: "editor.drawing.done", tint: AppColor.accent,
+                       haptic: .success, action: onDone)
         }
         .padding(.horizontal, Spacing.sm)
         .padding(.vertical, Spacing.xs)
@@ -141,9 +143,13 @@ struct DrawingToolbarView: View {
         label: Text,
         identifier: String,
         tint: Color = AppColor.onMedia,
+        haptic: EditorHaptics = .selection,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button {
+            haptic.play()
+            action()
+        } label: {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(tint)

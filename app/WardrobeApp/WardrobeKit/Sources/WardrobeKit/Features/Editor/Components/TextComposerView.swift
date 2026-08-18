@@ -173,7 +173,10 @@ struct TextComposerView: View {
             // Only for a text that already exists: deleting is otherwise a trip
             // back to the canvas to drag it to the bin.
             if isExisting {
-                Button(role: .destructive, action: onDelete) {
+                Button(role: .destructive) {
+                    EditorHaptics.removed.play()
+                    onDelete()
+                } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 42, height: 42)
@@ -184,7 +187,10 @@ struct TextComposerView: View {
                 .accessibilityIdentifier("editor.text.delete")
             }
 
-            Button(action: onDone) {
+            Button {
+                EditorHaptics.commit.play()
+                onDone()
+            } label: {
                 Text("common.done", bundle: .module)
                     .font(AppFont.body.weight(.bold))
                     .padding(.horizontal, Spacing.lg)

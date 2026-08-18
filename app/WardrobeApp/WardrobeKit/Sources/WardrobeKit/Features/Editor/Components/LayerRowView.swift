@@ -89,7 +89,10 @@ struct LayerRowView: View {
     }
 
     private var lockButton: some View {
-        Button(action: onToggleLock) {
+        Button {
+            (layer.isLocked ? EditorHaptics.selection : .locked).play()
+            onToggleLock()
+        } label: {
             Image(systemName: layer.isLocked ? "lock.fill" : "lock.open")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(layer.isLocked ? AppColor.warning : AppColor.onMedia.opacity(0.64))

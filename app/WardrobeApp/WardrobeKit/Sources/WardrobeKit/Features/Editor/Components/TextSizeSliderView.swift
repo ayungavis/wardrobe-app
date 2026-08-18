@@ -80,6 +80,9 @@ struct TextSizeSliderView: View {
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { gesture in
+                        if !isDragging {
+                            EditorHaptics.commit.play()
+                        }
                         isDragging = true
                         let offset = min(max(gesture.location.y - thumbDiameter / 2, 0), travel)
                         let newProgress = 1 - offset / travel
@@ -88,7 +91,10 @@ struct TextSizeSliderView: View {
                                 + newProgress * (Self.range.upperBound - Self.range.lowerBound)
                         )
                     }
-                    .onEnded { _ in isDragging = false }
+                    .onEnded { _ in
+                        EditorHaptics.selection.play()
+                        isDragging = false
+                    }
             )
         }
         .frame(width: 30)
