@@ -12,6 +12,7 @@ public final class EditorViewModel {
     public enum Tool: Equatable {
         case crop(CropSpec)
         case text(TextDraft, isNew: Bool)
+        case drawing(DrawingContent)
     }
 
     public private(set) var originalData: Loadable<Data> = .idle
@@ -118,13 +119,75 @@ public final class EditorViewModel {
 
     // MARK: Tools (FR-019: cancel restores last committed state)
 
+    /// The pen survives between sessions; the strokes do not.
+    public private(set) var pen = DrawingPen()
+
+    public func beginDrawing() {
+        select(nil)
+        pen.isErasing = false
+        activeTool = .drawing(.empty)
+    }
+
+    public func setPen(color: DrawingColor) {
+        pen.color = color
+        // Picking a colour is asking to draw, not to keep erasing.
+        pen.isErasing = false
+    }
+
+    public func setPen(width: DrawingWidth) {
+        pen.width = width
+    }
+
+    public func toggleEraser() {
+        pen.isErasing.toggle()
+    }
+
+    /// One finished drag: a stroke to add, or an eraser pass to apply.
+    public func finishStroke(_ points: [DrawingPoint], canvasSize: CGSize) {
+        guard case let .drawing(session) = activeTool else { return }
+
+        let stroke = DrawingStroke(points: points, color: pen.color, width: pen.width)
+        guard
+            let updated = session.applying(
+                stroke,
+                pen: pen,
+                heightOverWidth: canvasSize.width > 0 ? canvasSize.height / canvasSize.width : 1
+            )
+        else {
+            return
+        }
+
+        activeTool = .drawing(updated)
+    }
+
+    public func clearDrawing() {
+        guard case .drawing = activeTool else { return }
+        activeTool = .drawing(.empty)
+    }
+
+    /// Commits the session as one layer. Nothing drawn means nothing added —
+    /// and the document is never touched until this point, which is what makes
+    /// cancelling free (FR-019).
+    public func finishDrawing(canvasSize: CGSize) {
+        guard case let .drawing(session) = activeTool else { return }
+        activeTool = nil
+
+        guard let id = document.appendDrawing(session, canvasSize: canvasSize) else { return }
+        selectedLayerID = id
+        persistDocument()
+    }
+
     public func beginCrop() {
-        activeTool = .crop(document.photoCrop ?? CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
+        activeTool = .crop(
+            document.photoCrop ?? CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1))
+        )
     }
 
     public func beginNewText(at position: CGPoint = CGPoint(x: 0.5, y: 0.5)) {
         activeTool = .text(
-            TextDraft(content: TextContent(content: ""), transform: ElementTransform(position: position)),
+            TextDraft(
+                content: TextContent(content: ""), transform: ElementTransform(position: position)
+            ),
             isNew: true
         )
     }
@@ -162,6 +225,10 @@ public final class EditorViewModel {
             } else {
                 document.upsertText(draft)
             }
+        case .drawing:
+            // Committing a drawing needs the canvas size to trim the layer to
+            // its marks, so it has its own entry point.
+            return
         case nil:
             return
         }
@@ -239,10 +306,14 @@ public final class EditorViewModel {
         preferences.remember(stickerID: id)
         preferencesRepository.save(preferences)
     }
+}
 
-    // MARK: Export / save / share (FR-031/032 — independent of completion)
+// MARK: - Export / save / share (FR-031/032 — independent of completion)
 
-    public func beginExport() {
+/// Split into an extension purely to keep the class body readable; `private`
+/// is file-scoped in Swift, so nothing here reaches further than it did.
+public extension EditorViewModel {
+    func beginExport() {
         guard case let .loaded(data) = originalData else { return }
         exportTask?.cancel()
         exportState = .loading
@@ -255,7 +326,9 @@ public final class EditorViewModel {
                 let start = ContinuousClock.now
                 let photo = try ExportService.render(original: data, document: document)
                 try Task.checkCancellation()
-                Log.ui.info("Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms")
+                Log.ui.info(
+                    "Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
+                )
                 exportState = .loaded(ExportedPhoto(data: photo))
             } catch is CancellationError {
                 // Ignore cancellation.
@@ -266,7 +339,7 @@ public final class EditorViewModel {
         }
     }
 
-    public func saveToPhotos() {
+    func saveToPhotos() {
         guard case let .loaded(photo) = exportState else { return }
         saveTask = Task {
             do {
@@ -280,7 +353,7 @@ public final class EditorViewModel {
     }
 
     /// Save-pill path: render + save to the library in one step, no sheet.
-    public func saveDirectly() {
+    func saveDirectly() {
         guard case let .loaded(data) = originalData, !isSaving, !didSaveToPhotos else { return }
         isSaving = true
 

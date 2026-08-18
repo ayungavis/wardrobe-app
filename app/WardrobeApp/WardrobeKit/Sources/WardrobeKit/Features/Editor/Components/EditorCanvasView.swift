@@ -21,6 +21,7 @@ struct EditorCanvasView: View {
         CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
             .gesture(backgroundTap)
             .overlay { layers }
+            .overlay { drawingSurface }
             .overlay(alignment: .bottom) { deleteTarget }
     }
 
@@ -62,6 +63,17 @@ struct EditorCanvasView: View {
                     // UUID stays the identity.
                     .zIndex(Double(index))
                 }
+            }
+        }
+    }
+
+    /// Mounted above the layers on purpose: it takes the touch first, so a
+    /// stroke drawn across a sticker draws instead of dragging the sticker.
+    @ViewBuilder
+    private var drawingSurface: some View {
+        if case let .drawing(session) = viewModel.activeTool {
+            DrawingSurfaceView(session: session, pen: viewModel.pen) { points in
+                viewModel.finishStroke(points, canvasSize: canvasSize)
             }
         }
     }

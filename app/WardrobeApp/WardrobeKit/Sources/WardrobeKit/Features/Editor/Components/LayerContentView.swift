@@ -25,9 +25,12 @@ struct LayerContentView: View {
                 art: sticker.art,
                 size: TextRendering.baseStickerFontSize(in: canvasSize)
             )
-        case .drawing:
-            // Drawings arrive with the drawing tool.
-            EmptyView()
+        case let .drawing(drawing):
+            DrawingCanvasView(content: drawing, referenceWidth: canvasSize.width)
+                .frame(
+                    width: canvasSize.width * drawing.widthRatio,
+                    height: canvasSize.height * drawing.heightRatio
+                )
         }
     }
 }

@@ -146,10 +146,28 @@ public struct EditorView<ReviewDrawer: View>: View {
                     onSticker: { viewModel.isStickerPickerPresented = true },
                     onCrop: viewModel.beginCrop,
                     onBackground: { viewModel.isBackgroundPickerPresented = true },
+                    onDrawing: viewModel.beginDrawing,
                     onSave: viewModel.saveDirectly,
                     onShare: viewModel.beginExport,
                     onComplete: onComplete
                 )
+            }
+
+            if case let .drawing(session) = viewModel.activeTool {
+                VStack {
+                    Spacer()
+                    DrawingToolbarView(
+                        pen: viewModel.pen,
+                        canClear: !session.isEmpty,
+                        onSelectColor: { viewModel.setPen(color: $0) },
+                        onSelectWidth: { viewModel.setPen(width: $0) },
+                        onToggleEraser: viewModel.toggleEraser,
+                        onClear: viewModel.clearDrawing,
+                        onCancel: viewModel.cancelTool,
+                        onDone: { viewModel.finishDrawing(canvasSize: canvasSize) }
+                    )
+                    .padding(.bottom, Spacing.lg)
+                }
             }
 
             if case let .text(working, isNew) = viewModel.activeTool {

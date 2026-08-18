@@ -65,6 +65,18 @@ public extension EditorDocument {
         }
     }
 
+    /// A whole drawing session becomes one layer, trimmed to its own marks so
+    /// it behaves like every other layer once committed. An empty session
+    /// commits nothing.
+    @discardableResult
+    mutating func appendDrawing(_ content: DrawingContent, canvasSize: CGSize) -> UUID? {
+        guard let fitted = DrawingFitting.fit(content, canvasSize: canvasSize) else { return nil }
+
+        let layer = EditorLayer(content: .drawing(fitted.content), transform: fitted.transform)
+        layers.append(layer)
+        return layer.id
+    }
+
     mutating func appendSticker(_ art: StickerArt) {
         layers.append(EditorLayer(content: .sticker(StickerContent(art: art))))
     }
