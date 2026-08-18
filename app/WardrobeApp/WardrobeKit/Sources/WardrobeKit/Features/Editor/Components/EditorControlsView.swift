@@ -15,7 +15,6 @@ struct EditorControlsView: View {
     let onRedo: () -> Void
     let onText: () -> Void
     let onSticker: () -> Void
-    let onCrop: () -> Void
     let onBackground: () -> Void
     let onDrawing: () -> Void
     let onLayers: () -> Void
@@ -60,9 +59,6 @@ struct EditorControlsView: View {
             MediaCircleButtonView(systemName: "face.smiling", action: onSticker)
                 .accessibilityLabel(Text("editor.tool.sticker", bundle: .module))
                 .accessibilityIdentifier("editor.tool.sticker")
-            MediaCircleButtonView(systemName: "crop", action: onCrop)
-                .accessibilityLabel(Text("editor.tool.crop", bundle: .module))
-                .accessibilityIdentifier("editor.tool.crop")
             MediaCircleButtonView(systemName: "paintpalette", action: onBackground)
                 .accessibilityLabel(Text("editor.tool.background", bundle: .module))
                 .accessibilityIdentifier("editor.tool.background")

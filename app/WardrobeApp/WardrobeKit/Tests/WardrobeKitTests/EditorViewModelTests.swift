@@ -22,22 +22,32 @@ struct EditorViewModelTests {
         let sut = try makeEditorSUT(activeRepository: activeRepository)
         let spec = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
 
-        sut.beginCrop()
-        sut.updateWorking(crop: spec)
-        sut.commitTool()
+        sut.commitCrop(spec)
 
         #expect(sut.document.photoCrop == spec)
         #expect(activeRepository.stored?.document.photoCrop == spec)
         #expect(sut.activeTool == nil)
     }
 
-    @Test func cancelToolDiscardsWorkingChanges() throws {
+    /// FR-019: crop is reached by double-tapping the photo, so with no photo
+    /// layer there is nothing to double-tap and nothing to open.
+    @Test func cropDoesNotOpenWithoutAPhotoLayer() throws {
+        let sut = try makeEditorSUT(document: EditorDocument(layers: []))
+
+        sut.beginCrop()
+
+        #expect(sut.activeTool == nil)
+    }
+
+    /// Nothing to discard any more — the crop screen owns its own framing and
+    /// only reports a finished one — so what this pins is that opening and
+    /// leaving the tool is not itself an edit.
+    @Test func cancellingCropLeavesTheDocumentAlone() throws {
         let activeRepository = InMemoryActiveChallengeRepository()
         let committed = EditorDocument.fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
         let sut = try makeEditorSUT(activeRepository: activeRepository, document: committed)
 
         sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4)))
         sut.cancelTool()
 
         #expect(sut.document == committed)
@@ -212,8 +222,7 @@ struct EditorViewModelTests {
         #expect(sut.croppedPreviewImage === afterLoad) // untouched by layer edits
 
         sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
-        sut.commitTool()
+        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
         let afterCrop = try #require(sut.croppedPreviewImage)
         #expect(afterCrop.width == 50) // recomputed exactly once, on crop commit
     }
@@ -283,8 +292,7 @@ struct EditorViewModelTests {
         let originalBytes = photoRepository.saved.values.first
 
         sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)))
-        sut.commitTool()
+        sut.commitCrop(CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)))
 
         #expect(photoRepository.saved.values.first == originalBytes) // §18.5 write-once
     }

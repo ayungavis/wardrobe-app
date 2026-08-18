@@ -1643,6 +1643,22 @@
         }
       }
     },
+    "editor.layer.crop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reframe Photo"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ubah Bingkai Foto"
+          }
+        }
+      }
+    },
     "editor.layer.delete": {
       "localizations": {
         "en": {
@@ -1687,6 +1703,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gandakan"
+          }
+        }
+      }
+    },
+    "editor.layer.edit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Text"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ubah Teks"
           }
         }
       }
@@ -2216,23 +2248,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Simpan"
-          }
-        }
-      }
-    },
-    "editor.saveToPhotos": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Save to Photos"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpan ke Foto"
           }
         }
       }
@@ -3550,22 +3565,6 @@
         }
       }
     },
-    "editor.tool.crop": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crop"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Potong"
-          }
-        }
-      }
-    },
     "editor.tool.drawing": {
       "localizations": {
         "en": {
@@ -3610,23 +3609,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stiker"
-          }
-        }
-      }
-    },
-    "editor.tool.text": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Text"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Teks"
           }
         }
       }
@@ -4379,23 +4361,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bukan pakaian — lewati"
-          }
-        }
-      }
-    },
-    "wardrobe.review.title": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Review scan"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tinjau hasil scan"
           }
         }
       }

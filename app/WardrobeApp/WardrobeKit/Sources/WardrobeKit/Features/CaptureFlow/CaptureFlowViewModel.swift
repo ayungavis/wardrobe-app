@@ -232,8 +232,8 @@ public final class CaptureFlowViewModel {
 
     /// **Use Crop** (FR-083): the framing is stored as an instruction, not as a
     /// second image file. The editor's preview and the exporter both already
-    /// read `draft.crop`, so the original stays the only photo on disk and is
-    /// never overwritten (FR-092).
+    /// read `document.photoCrop`, so the original stays the only photo on disk
+    /// and is never overwritten (FR-092).
     public func useCrop(_ crop: CropSpec) {
         guard challenge.photoID != nil else { return }
         challenge.document.photoCrop = crop

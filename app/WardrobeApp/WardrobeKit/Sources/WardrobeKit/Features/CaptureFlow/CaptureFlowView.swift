@@ -40,6 +40,9 @@ public struct CaptureFlowView: View {
                     viewModel: makeEditorViewModel(viewModel.challenge),
                     isCompleting: viewModel.isCompleting,
                     didResumeDraft: viewModel.didResumeDraft,
+                    makeCropViewModel: {
+                        viewModel.challenge.photoID.map { makeCropViewModel($0) }
+                    },
                     onDiscard: { viewModel.discardPhoto() },
                     onComplete: { viewModel.completeChallenge() },
                     reviewDrawer: {
@@ -91,7 +94,7 @@ public struct CaptureFlowView: View {
         if let photoID = viewModel.challenge.photoID {
             CropView(
                 viewModel: makeCropViewModel(photoID),
-                onRetake: { viewModel.discardPhoto() },
+                onExit: { viewModel.discardPhoto() },
                 onUseCrop: { viewModel.useCrop($0) }
             )
         }

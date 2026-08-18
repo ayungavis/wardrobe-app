@@ -62,6 +62,11 @@ struct EditorLayerView: View {
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             .accessibilityActions {
                 Button(action: onSelect) { Text("editor.layer.select", bundle: .module) }
+                // The double tap has to have a non-gesture twin (§19), and it
+                // means something different per kind.
+                if let reopen = reopenLabel {
+                    Button(action: onDoubleTap) { Text(reopen, bundle: .module) }
+                }
                 // Offering Delete on a locked layer would advertise an action
                 // the document refuses (FR-087).
                 if !layer.isLocked {
@@ -81,6 +86,15 @@ struct EditorLayerView: View {
     /// Shared with the panel row, so a layer has one name wherever you meet it.
     /// A sticker is named by its kind rather than its glyph — an emoji is not
     /// speakable, so Voice Control could not target it.
+    /// What double-tapping this layer would do, or nil where it does nothing.
+    private var reopenLabel: LocalizedStringKey? {
+        switch layer.content {
+        case .text: "editor.layer.edit"
+        case .photo: "editor.layer.crop"
+        case .sticker, .drawing: nil
+        }
+    }
+
     private var accessibilityLabel: Text {
         Text(verbatim: LayerLabel.title(for: layer.content))
     }

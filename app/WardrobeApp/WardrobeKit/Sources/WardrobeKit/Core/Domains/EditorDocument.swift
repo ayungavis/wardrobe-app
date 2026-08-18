@@ -55,7 +55,7 @@ public extension EditorDocument {
     /// port would erase work they have already done.
     ///
     /// Order is **read off the existing renderers, not chosen**: both
-    /// `EditorCanvasView` and `ExportCompositionView` draw stickers first and
+    /// `EditorCanvasView` and `DocumentCanvasView` draw stickers first and
     /// texts over them, so that is the z-order a migrated draft must keep.
     /// Getting it backwards would silently reshuffle work people have already
     /// done.

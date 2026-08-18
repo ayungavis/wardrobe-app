@@ -10,7 +10,7 @@ public final class EditorViewModel {
     public static let maximumTextLength = 280
 
     public enum Tool: Equatable {
-        case crop(CropSpec)
+        case crop
         case text(TextDraft, isNew: Bool)
         case drawing(DrawingContent)
     }
@@ -186,10 +186,29 @@ public final class EditorViewModel {
         persistDocument()
     }
 
+    /// FR-019: crop is not a tool in the rail. It is reached by double-tapping
+    /// the photo itself, and only when there is a photo to reframe.
     public func beginCrop() {
-        activeTool = .crop(
-            document.photoCrop ?? CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1))
-        )
+        guard hasPhotoLayer else { return }
+        activeTool = .crop
+    }
+
+    private var hasPhotoLayer: Bool {
+        document.layers.contains {
+            if case .photo = $0.content {
+                return true
+            }
+            return false
+        }
+    }
+
+    /// One finished framing, straight from the crop screen — there is no
+    /// in-flight spec for the editor to hold any more.
+    public func commitCrop(_ crop: CropSpec) {
+        document.photoCrop = crop
+        updateCroppedPreview()
+        activeTool = nil
+        persistDocument()
     }
 
     public func beginNewText(at position: CGPoint = CGPoint(x: 0.5, y: 0.5)) {
@@ -205,11 +224,6 @@ public final class EditorViewModel {
         activeTool = .text(draft, isNew: false)
     }
 
-    public func updateWorking(crop: CropSpec) {
-        guard case .crop = activeTool else { return }
-        activeTool = .crop(crop)
-    }
-
     /// The length cap lives here rather than in the text field: it is a rule
     /// about what gets stored, and here it can be tested without a keyboard.
     public func updateWorking(text: TextDraft) {
@@ -223,9 +237,6 @@ public final class EditorViewModel {
 
     public func commitTool() {
         switch activeTool {
-        case let .crop(spec):
-            document.photoCrop = spec
-            updateCroppedPreview()
         case let .text(draft, _):
             // Blank means nothing was written; what gets stored otherwise is
             // exactly what the user typed.
@@ -234,9 +245,10 @@ public final class EditorViewModel {
             } else {
                 document.upsertText(draft)
             }
-        case .drawing:
-            // Committing a drawing needs the canvas size to trim the layer to
-            // its marks, so it has its own entry point.
+        case .crop, .drawing:
+            // Both need something this call does not have — a finished framing,
+            // or the canvas size to trim a drawing to its marks — so each has
+            // its own entry point.
             return
         case nil:
             return

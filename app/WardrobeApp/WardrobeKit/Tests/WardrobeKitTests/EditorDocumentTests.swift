@@ -145,7 +145,7 @@ struct EditorDocumentTests {
     }
 
     /// The order is read off the renderers, not chosen: `EditorCanvasView` and
-    /// `ExportCompositionView` both draw stickers first and texts over them.
+    /// `DocumentCanvasView` both draw stickers first and texts over them.
     @Test func migrationKeepsStickersBelowTextsInOrder() {
         let draft = EditDraft(
             texts: [TextItem(content: "first"), TextItem(content: "second")],

@@ -77,8 +77,7 @@ struct EditorHistoryTests {
         sut.load()
         await sut.loadTask?.value
         sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
-        sut.commitTool()
+        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
         #expect(sut.croppedPreviewImage?.width == 50)
 
         sut.undo()

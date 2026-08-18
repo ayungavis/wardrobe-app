@@ -7,17 +7,29 @@ import SwiftUI
 /// `CropSpec` in unit image space, which the editor preview and the exporter
 /// already know how to apply. The original photo is never touched.
 public struct CropView: View {
+    /// What leaving without cropping means here. After capture there is nothing
+    /// to go back to but the camera; reopened from the editor the photo and its
+    /// layers are still there, so leaving is a cancel and must not read as
+    /// "throw the photo away".
+    public enum Exit {
+        case retake
+        case cancel
+    }
+
     @State private var viewModel: CropViewModel
-    private let onRetake: () -> Void
+    private let exit: Exit
+    private let onExit: () -> Void
     private let onUseCrop: (CropSpec) -> Void
 
     public init(
         viewModel: CropViewModel,
-        onRetake: @escaping () -> Void,
+        exit: Exit = .retake,
+        onExit: @escaping () -> Void,
         onUseCrop: @escaping (CropSpec) -> Void
     ) {
         _viewModel = State(wrappedValue: viewModel)
-        self.onRetake = onRetake
+        self.exit = exit
+        self.onExit = onExit
         self.onUseCrop = onUseCrop
     }
 
@@ -75,7 +87,7 @@ public struct CropView: View {
         } description: {
             Text(error.userMessage)
         } actions: {
-            Button(action: onRetake) {
+            Button(action: onExit) {
                 Text("crop.retake", bundle: .module)
             }
         }
@@ -85,15 +97,15 @@ public struct CropView: View {
 
     private var topBar: some View {
         HStack {
-            Button(action: onRetake) {
+            Button(action: onExit) {
                 Label {
-                    Text("crop.retake", bundle: .module)
+                    Text(exit == .retake ? "crop.retake" : "common.cancel", bundle: .module)
                 } icon: {
                     Image(systemName: "chevron.left")
                 }
                 .frame(minHeight: 44)
             }
-            .accessibilityIdentifier("crop.retake")
+            .accessibilityIdentifier(exit == .retake ? "crop.retake" : "crop.cancel")
 
             Spacer()
 

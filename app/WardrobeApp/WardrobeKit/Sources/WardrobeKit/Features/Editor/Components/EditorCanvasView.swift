@@ -146,9 +146,15 @@ struct EditorCanvasView: View {
         CanvasHaptics.selectionChanged()
     }
 
+    /// Double-tap reopens whatever the layer is made of: text goes back to the
+    /// composer, the photo back to the crop screen. FR-019 says crop is not a
+    /// tool in the rail — this is where it lives instead.
     private func beginEditing(_ layer: EditorLayer) {
-        guard let draft = layer.textDraft else { return }
-        viewModel.beginEditingText(draft)
+        if let draft = layer.textDraft {
+            viewModel.beginEditingText(draft)
+        } else if case .photo = layer.content {
+            viewModel.beginCrop()
+        }
     }
 
     private func snapChanged(_ id: UUID, to snap: CanvasSnap) {

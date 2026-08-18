@@ -16,6 +16,9 @@ public struct EditorView<ReviewDrawer: View>: View {
 
     private let isCompleting: Bool
     private let didResumeDraft: Bool
+    /// Nil when there is no photo to reframe. Supplied by the capture flow,
+    /// which is the only thing that knows which photo this is.
+    private let makeCropViewModel: () -> CropViewModel?
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
     /// The item-review drawer, supplied by the capture flow that owns the scan
@@ -27,6 +30,7 @@ public struct EditorView<ReviewDrawer: View>: View {
         viewModel: EditorViewModel,
         isCompleting: Bool,
         didResumeDraft: Bool,
+        makeCropViewModel: @escaping () -> CropViewModel?,
         onDiscard: @escaping () -> Void,
         onComplete: @escaping () -> Void,
         @ViewBuilder reviewDrawer: () -> ReviewDrawer
@@ -34,6 +38,7 @@ public struct EditorView<ReviewDrawer: View>: View {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
         self.didResumeDraft = didResumeDraft
+        self.makeCropViewModel = makeCropViewModel
         self.onDiscard = onDiscard
         self.onComplete = onComplete
         self.reviewDrawer = reviewDrawer()
@@ -126,13 +131,14 @@ public struct EditorView<ReviewDrawer: View>: View {
         case let .failed(error):
             EditorLoadFailedView(error: error, onRetry: viewModel.load)
         case .loaded:
-            if case let .crop(spec) = viewModel.activeTool {
-                CropStageView(
-                    image: viewModel.previewImage,
-                    spec: spec,
-                    onChange: { viewModel.updateWorking(crop: $0) },
-                    onCancel: viewModel.cancelTool,
-                    onDone: viewModel.commitTool
+            if case .crop = viewModel.activeTool, let cropViewModel = makeCropViewModel() {
+                // The same screen the capture flow uses, not a second crop tool
+                // that could drift from it — only the meaning of leaving differs.
+                CropView(
+                    viewModel: cropViewModel,
+                    exit: .cancel,
+                    onExit: viewModel.cancelTool,
+                    onUseCrop: viewModel.commitCrop
                 )
             } else {
                 canvasStage
@@ -208,7 +214,6 @@ public struct EditorView<ReviewDrawer: View>: View {
                     onRedo: viewModel.redo,
                     onText: { viewModel.beginNewText() },
                     onSticker: { viewModel.isStickerPickerPresented = true },
-                    onCrop: viewModel.beginCrop,
                     onBackground: { viewModel.isBackgroundPickerPresented = true },
                     onDrawing: viewModel.beginDrawing,
                     onLayers: { viewModel.isLayerPanelPresented = true },
