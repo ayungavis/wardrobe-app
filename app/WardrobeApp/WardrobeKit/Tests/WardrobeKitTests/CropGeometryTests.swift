@@ -152,4 +152,66 @@ struct CropGeometryTests {
         #expect(abs(size.height - 180) < 0.001)
         #expect(abs(size.width - 135) < 0.001)
     }
+
+    // MARK: Reopening a stored crop
+
+    private let image = CGSize(width: 1200, height: 1600)
+    private let crop = CGSize(width: 300, height: 400)
+
+    private func roundTrip(_ rect: CGRect) -> CGRect {
+        let framing = CropGeometry.framing(for: rect, imageSize: image, cropSize: crop)
+        return CropGeometry.normalizedRect(
+            scale: framing.scale, offset: framing.offset, imageSize: image, cropSize: crop
+        )
+    }
+
+    /// The real test: it ties the two directions to each other, so neither can
+    /// drift without the other noticing.
+    @Test(arguments: [
+        CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5),
+        CGRect(x: 0, y: 0, width: 0.4, height: 0.4),
+        CGRect(x: 0.6, y: 0.55, width: 0.4, height: 0.4),
+        CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2),
+    ])
+    func aStoredCropSurvivesARoundTrip(rect: CGRect) {
+        let restored = roundTrip(rect)
+
+        #expect(abs(restored.minX - rect.minX) < 0.0001)
+        #expect(abs(restored.minY - rect.minY) < 0.0001)
+        #expect(abs(restored.width - rect.width) < 0.0001)
+        #expect(abs(restored.height - rect.height) < 0.0001)
+    }
+
+    /// The whole image is exactly the state the screen opens in today.
+    @Test func theWholeImageIsScaleOneAndNoOffset() {
+        let framing = CropGeometry.framing(
+            for: CGRect(x: 0, y: 0, width: 1, height: 1), imageSize: image, cropSize: crop
+        )
+
+        #expect(framing.scale == 1)
+        #expect(framing.offset == .zero)
+    }
+
+    /// A crop tighter than the zoom ceiling comes back clamped rather than
+    /// reopening at a zoom the user could never have reached.
+    @Test func aCropBeyondTheZoomCeilingIsClamped() {
+        let framing = CropGeometry.framing(
+            for: CGRect(x: 0.45, y: 0.45, width: 0.02, height: 0.02),
+            imageSize: image, cropSize: crop
+        )
+
+        #expect(framing.scale == CropGeometry.scaleRange.upperBound)
+    }
+
+    @Test func adegenerateRectDoesNotProduceInfinities() {
+        let empty = CropGeometry.framing(for: .zero, imageSize: image, cropSize: crop)
+        #expect(empty.scale == 1)
+        #expect(empty.offset == .zero)
+
+        let noImage = CropGeometry.framing(
+            for: CGRect(x: 0, y: 0, width: 1, height: 1), imageSize: .zero, cropSize: crop
+        )
+        #expect(noImage.scale.isFinite)
+        #expect(noImage.offset.width.isFinite)
+    }
 }

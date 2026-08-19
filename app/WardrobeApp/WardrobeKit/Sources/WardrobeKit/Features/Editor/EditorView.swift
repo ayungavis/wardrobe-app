@@ -123,6 +123,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                 CropView(
                     viewModel: makeCropViewModel(photoID),
                     exit: .cancel,
+                    initialCrop: viewModel.croppingCrop,
                     onExit: viewModel.cancelTool,
                     onUseCrop: { viewModel.commitCrop($0, for: target) }
                 )

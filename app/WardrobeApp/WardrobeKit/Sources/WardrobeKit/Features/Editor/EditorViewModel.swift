@@ -144,6 +144,16 @@ public final class EditorViewModel {
         return photoID(for: target)
     }
 
+    /// The frame the crop screen should reopen on, so a second visit starts
+    /// where the first one left off instead of on the whole image.
+    public var croppingCrop: CropSpec? {
+        guard case let .crop(target) = activeTool else { return nil }
+        switch target {
+        case let .layer(id): return document.crop(ofLayer: id)
+        case .background: return document.background.crop
+        }
+    }
+
     private func photoID(for target: CropTarget) -> String? {
         switch target {
         case let .layer(id):

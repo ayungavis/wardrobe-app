@@ -76,6 +76,34 @@ enum CropGeometry {
         ).standardized
     }
 
+    struct Framing: Equatable {
+        let scale: CGFloat
+        let offset: CGSize
+    }
+
+    /// The inverse of `normalizedRect`, so a stored crop can be reopened on the
+    /// frame it was made with instead of on the whole image.
+    static func framing(for rect: CGRect, imageSize: CGSize, cropSize: CGSize) -> Framing {
+        let fill = aspectFillSize(imageSize: imageSize, cropSize: cropSize)
+        guard rect.width > 0, rect.height > 0, fill.width > 0, fill.height > 0 else {
+            return Framing(scale: 1, offset: .zero)
+        }
+
+        let scale = clampedScale(cropSize.width / rect.width / fill.width)
+        // Recomputed from the clamped scale, not the requested one, so the
+        // offset stays consistent with the size actually drawn.
+        let displayed = CGSize(width: fill.width * scale, height: fill.height * scale)
+        let offset = CGSize(
+            width: (displayed.width - cropSize.width) / 2 - rect.minX * displayed.width,
+            height: (displayed.height - cropSize.height) / 2 - rect.minY * displayed.height
+        )
+
+        return Framing(
+            scale: scale,
+            offset: clampedOffset(offset, scale: scale, imageSize: imageSize, cropSize: cropSize)
+        )
+    }
+
     private static func displayedSize(imageSize: CGSize, cropSize: CGSize, scale: CGFloat) -> CGSize {
         let base = aspectFillSize(imageSize: imageSize, cropSize: cropSize)
         return CGSize(width: base.width * scale, height: base.height * scale)
