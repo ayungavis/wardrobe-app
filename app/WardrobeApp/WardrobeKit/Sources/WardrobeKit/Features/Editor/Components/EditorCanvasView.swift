@@ -29,36 +29,69 @@ struct EditorCanvasView: View {
         .overlay(alignment: .top) { snapBadges }
         .overlay { drawingSurface }
         .overlay(alignment: .bottom) { deleteTarget }
+        // Declared out here, not on the frame inside: a named space is found by
+        // walking up from where it is used, and the gesture below is the
+        // ancestor. Overlays do not change the base's size, so this rect is the
+        // canvas rect either way.
+        .coordinateSpace(.named(CanvasTransformGestureModifier.coordinateSpace))
         .modifier(CanvasTransformGestureModifier(
-            onChanged: { transformChanged($0, $1, $2) },
-            onEnded: { transformFinished($0, $1, $2) },
-            onCancelled: { gesture = TransientTransform() }
+            hitTest: hitTest(at:),
+            onChanged: transformChanged,
+            onEnded: transformFinished,
+            onCancelled: endTransform
         ))
     }
 
-    private func transformChanged(
-        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
-    ) {
+    /// Only a layer the canvas may actually act on: a locked one, or any one
+    /// while a tool is open, swallows the touch without being grabbed (FR-086).
+    private func hitTest(at point: CGPoint) -> UUID? {
+        guard let id = CanvasHitTest.layerID(
+            at: point,
+            in: viewModel.document,
+            canvasSize: canvasSize,
+            layerSizes: layerSizes
+        ) else {
+            return nil
+        }
+        guard let layer = viewModel.document.layer(id: id),
+              EditorGesture.canHold(layer, activeTool: viewModel.activeTool)
+        else {
+            return nil
+        }
+        return id
+    }
+
+    private func transformChanged(_ update: CanvasTransformGestureModifier.Update) {
+        heldLayerID = update.layerID
         gesture = TransientTransform(
-            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+            translation: update.translation,
+            magnification: update.magnification,
+            rotationDegrees: update.rotationDegrees
         )
-        guard let layer = heldLayer else { return }
+        guard let layer = viewModel.document.layer(id: update.layerID) else { return }
         snapChanged(layer.id, to: snapping(
             for: layer,
-            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+            translation: update.translation,
+            magnification: update.magnification,
+            rotationDegrees: update.rotationDegrees
         ))
     }
 
-    private func transformFinished(
-        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
-    ) {
-        defer { gesture = TransientTransform() }
-        guard let layer = heldLayer else { return }
+    private func transformFinished(_ update: CanvasTransformGestureModifier.Update) {
+        defer { endTransform() }
+        guard let layer = viewModel.document.layer(id: update.layerID) else { return }
         let proposed = snapping(
             for: layer,
-            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+            translation: update.translation,
+            magnification: update.magnification,
+            rotationDegrees: update.rotationDegrees
         ).transform
         transformEnded(layer.id, to: settled(proposed, layer: layer))
+    }
+
+    private func endTransform() {
+        gesture = TransientTransform()
+        heldLayerID = nil
     }
 
     private var backgroundTap: some Gesture {
@@ -90,7 +123,6 @@ struct EditorCanvasView: View {
                         isChallengePhoto: viewModel.challengePhotoLayerID == layer.id,
                         onSelect: { select(layer.id) },
                         onDoubleTap: { beginEditing(layer) },
-                        onPressChanged: { pressChanged(layer, isPressed: $0) },
                         onSizeChanged: { layerSizes[layer.id] = $0 },
                         onDelete: { viewModel.removeLayer(id: layer.id) }
                     )
@@ -197,18 +229,6 @@ struct EditorCanvasView: View {
         }
     }
 
-    private func pressChanged(_ layer: EditorLayer, isPressed: Bool) {
-        guard isPressed else {
-            if heldLayerID == layer.id {
-                heldLayerID = nil
-            }
-            return
-        }
-        heldLayerID = EditorGesture.hold(
-            current: heldLayerID, pressing: layer, activeTool: viewModel.activeTool
-        )
-    }
-
     private func liveTransform(for layer: EditorLayer) -> ElementTransform {
         guard layer.id == heldLayerID else { return layer.transform }
         return snapping(
@@ -232,10 +252,6 @@ struct EditorCanvasView: View {
             rotationDelta: rotationDegrees,
             canvasSize: canvasSize
         )
-    }
-
-    private var heldLayer: EditorLayer? {
-        heldLayerID.flatMap { id in viewModel.document.layers.first { $0.id == id } }
     }
 
     private func settled(_ transform: ElementTransform, layer: EditorLayer) -> ElementTransform {
