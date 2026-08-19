@@ -131,6 +131,8 @@ public final class GarmentReviewModel {
         try wardrobeRepository.insert(
             WardrobeItem(
                 id: garment.id,
+                name: garment.name,
+                description: garment.description,
                 category: garment.category,
                 cutoutFile: garment.cutoutFile,
                 createdAt: date,

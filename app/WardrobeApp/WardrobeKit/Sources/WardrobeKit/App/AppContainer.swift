@@ -162,4 +162,17 @@ public final class AppContainer {
             NoopPhotoLibrarySaveService()
         #endif
     }
+    
+    public func makeCameraService() -> CameraService {
+        cameraService
+    }
+    
+    public func makeHistoryViewModel() -> HistoryViewModel {
+        HistoryViewModel(
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
+        )
+    }
 }

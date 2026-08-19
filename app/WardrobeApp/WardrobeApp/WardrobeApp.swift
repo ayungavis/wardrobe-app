@@ -1,18 +1,32 @@
 import Sentry
 import SwiftUI
 import WardrobeKit
+import DesignSystem
 
 @main
 struct WardrobeAppApp: App {
     private let container = AppContainer()
 
     init() {
+        FontRegistration.registerCustomFonts()
         Self.startSentryIfConfigured()
     }
 
     var body: some Scene {
         WindowGroup {
+//           ZStack{
+//                Image("appBG")
+//                    .resizable()
+//                    .ignoresSafeArea()
+//                RootView(container: container)
+//            }
             RootView(container: container)
+                //.background(Color.red.ignoresSafeArea())
+//                .background(
+//                                Image("appBG")
+//                                    .resizable()
+//                                    .ignoresSafeArea()
+//                            )
         }
     }
 
@@ -36,3 +50,4 @@ struct WardrobeAppApp: App {
         Log.errorReporter = { SentrySDK.capture(error: $0) }
     }
 }
+

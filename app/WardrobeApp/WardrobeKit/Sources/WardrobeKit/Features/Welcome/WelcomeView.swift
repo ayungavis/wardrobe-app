@@ -31,7 +31,7 @@ public struct WelcomeView: View {
             PrimaryButtonView(Text("welcome.continue", bundle: .module), action: onContinue)
         }
         .padding(Spacing.xl)
-        .background(AppColor.background)
+        //.background(AppColor.background)
     }
 }
 

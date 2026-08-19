@@ -11,41 +11,51 @@ public struct RootView: View {
     }
 
     public var body: some View {
-        if hasCompletedOnboarding {
-            TabView {
-                Tab {
-                    ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
-                } label: {
-                    Label {
-                        Text("tab.challenge", bundle: .module)
-                    } icon: {
-                        Image(systemName: "sparkles")
+        ZStack{
+            Image("appBG")
+                .resizable()
+                .ignoresSafeArea()
+            if hasCompletedOnboarding {
+                TabView {
+                    Tab {
+                        ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
+                    } label: {
+                        Label {
+                            Text("tab.challenge", bundle: .module)
+                        } icon: {
+                            Image(systemName: "sparkles")
+                        }
+                    }
+                    
+                    Tab {
+                        WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
+                    } label: {
+                        Label {
+                            Text("tab.wardrobe", bundle: .module)
+                        } icon: {
+                            Image(systemName: "tshirt")
+                        }
+                    }
+                    
+                    Tab {
+                        HistoryView(viewModel: container.makeHistoryViewModel(), container: container)
+                    } label: {
+                        Label {
+                            Text("tab.history", bundle: .module)
+                        } icon: {
+                            Image(systemName: "photo.on.rectangle.angled")
+                        }
                     }
                 }
-
-                Tab {
-                    WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
-                } label: {
-                    Label {
-                        Text("tab.wardrobe", bundle: .module)
-                    } icon: {
-                        Image(systemName: "tshirt")
-                    }
+                .toolbarBackground(.hidden, for: .tabBar)
+                .background(.clear)
+                
+                
+            } else {
+                WelcomeView {
+                    hasCompletedOnboarding = true
                 }
-
-                Tab {
-                    HistoryView()
-                } label: {
-                    Label {
-                        Text("tab.history", bundle: .module)
-                    } icon: {
-                        Image(systemName: "photo.on.rectangle.angled")
-                    }
-                }
-            }
-        } else {
-            WelcomeView {
-                hasCompletedOnboarding = true
+                
             }
         }
     }
@@ -53,4 +63,5 @@ public struct RootView: View {
 
 #Preview {
     RootView(container: AppContainer())
+
 }
