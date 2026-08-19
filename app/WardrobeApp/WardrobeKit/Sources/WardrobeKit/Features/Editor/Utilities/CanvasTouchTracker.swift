@@ -1,15 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// Free of UIKit so it can be tested without a simulator — this is the part that
-/// produced the bug where a second finger merely tapping resized a layer.
-///
-/// **Contract:** `points` must arrive in a stable order across calls; reordering
-/// them would flip the measured angle by 180°.
 struct CanvasTouchTracker: Equatable {
-    /// Below this the ratio is mostly noise: at a 10pt separation a 10pt slip is
-    /// 2×, which is exactly how a tap came out as a resize. 44pt is §19's
-    /// touch-target size, not a number picked to feel right.
     static let minimumPinchSeparation: CGFloat = 44
 
     private var settledTranslation: CGSize = .zero

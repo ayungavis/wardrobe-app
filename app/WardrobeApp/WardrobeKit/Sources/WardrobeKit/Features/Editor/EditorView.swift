@@ -84,7 +84,6 @@ public struct EditorView<ReviewDrawer: View>: View {
                 Text("editor.discard.action", bundle: .module)
             }
             Button(action: dismiss.callAsFunction) {
-                // FR-017: the draft survives; resume comes back here.
                 Text("editor.discard.keep", bundle: .module)
             }
             Button(role: .cancel) {} label: {
@@ -160,7 +159,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                 VStack {
                     Spacer()
                     reviewDrawer
-                        .padding(.bottom, 96) // clears the Save/Share/✓ bar
+                        .padding(.bottom, 96)
                 }
 
                 if let banner = draftBannerKind {

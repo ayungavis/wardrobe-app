@@ -8,10 +8,6 @@ public struct EditorDocument: Equatable, Sendable {
     public var layers: [EditorLayer]
     public var background: CanvasBackground
 
-    /// Derived, not stored: a document is only v2 when it holds something a v1
-    /// reader cannot render. Stamping every document v2 would make builds that
-    /// predate photo backgrounds refuse documents they could read perfectly
-    /// well — and a stored stamp would disagree with its own round trip.
     public var schemaVersion: Int {
         background.photoID == nil ? 1 : 2
     }

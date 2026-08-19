@@ -7,8 +7,6 @@ import Observation
 public final class EditorViewModel {
     public static let maximumTextLength = 280
 
-    /// What a crop is reframing. The background is not a layer, so an id alone
-    /// cannot say which of the two is meant.
     public enum CropTarget: Equatable {
         case layer(UUID)
         case background
@@ -20,16 +18,6 @@ public final class EditorViewModel {
         case drawing(DrawingContent)
     }
 
-    /// Whether the document's photos are on hand. One `Loadable` for all of
-    /// them: a canvas with a photo it cannot decode is not half-loaded, it is
-    /// broken, and FR-093 wants that said at the layer rather than as a state
-    /// of the whole editor.
-    /// Every photo's bytes, keyed by id. The exporter re-crops the original
-    /// rather than the preview, so the bytes have to stay reachable.
-    ///
-    /// One `Loadable` for all of them: a canvas with a photo it cannot decode
-    /// is not half-loaded, it is broken.
-    ///
     /// ponytail: every photo's bytes live here at once. Two or three is fine;
     /// if a document ever holds many, read them back from the repository at
     /// export time instead.
@@ -144,8 +132,6 @@ public final class EditorViewModel {
         return photoID(for: target)
     }
 
-    /// The frame the crop screen should reopen on, so a second visit starts
-    /// where the first one left off instead of on the whole image.
     public var croppingCrop: CropSpec? {
         guard case let .crop(target) = activeTool else { return nil }
         switch target {
@@ -154,8 +140,6 @@ public final class EditorViewModel {
         }
     }
 
-    /// The background fills the 9:16 story canvas, so framing it at the
-    /// polaroid's 3:4 would only be cropped again when it is drawn.
     public var croppingAspectRatio: CGFloat {
         guard case .crop(.background) = activeTool else { return CropGeometry.photoAspectRatio }
         return StoryCanvas.aspectRatio
@@ -274,11 +258,6 @@ public final class EditorViewModel {
         persistDocument()
     }
 
-    /// The bytes go to the photo repository and the document keeps only the id.
-    ///
-    /// A background this replaces needs no cleanup of its own: it leaves
-    /// `photoIDs` but stays in `importedPhotoIDs`, which is exactly the set
-    /// `deleteUnusedOriginals` collects at ✓.
     public func setBackgroundPhoto(_ data: Data) {
         do {
             let photoID = try photoRepository.saveOriginal(data)

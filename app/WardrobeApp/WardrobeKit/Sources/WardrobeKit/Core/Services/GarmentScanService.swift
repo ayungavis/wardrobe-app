@@ -37,9 +37,6 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         )
     }
 
-    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async function
-    /// stays on the caller's actor (SE-0461), so without this nothing moves.
-    /// Static because `self` is main-actor isolated.
     @concurrent
     private static func detect(
         photo: Data,
@@ -95,11 +92,6 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         )
     }
 
-    /// Every same-category comparison, including the ones that fall below the
-    /// threshold — those are the near misses, and tuning `ItemMatching.Tuning`
-    /// without seeing them would be guesswork.
-    ///
-    /// Ids and numbers only: nothing about what the photo contains (PRD §18/§24).
     private nonisolated static func logCalibration(
         for fingerprint: ItemFingerprint,
         category: GarmentCategory,

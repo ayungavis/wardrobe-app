@@ -17,23 +17,6 @@ public struct WardrobeItemDetailView: View {
         self.onDeleted = onDeleted
     }
 
-//    public var body: some View {
-//                        name: item.name,
-//                        category: item.category,
-//                        status: item.status,
-//                        wearCount: viewModel.wearCount,
-//                        firstWornAt: viewModel.firstWornAt,
-//                        lastWornAt: viewModel.lastWornAt
-//                    timeline
-//                    similar
-//                    deleteButton
-//        #if os(iOS)
-//        #endif
-//                isPresented: $isDeleteConfirmationPresented,
-//                titleVisibility: .visible
-//                    viewModel.delete()
-//                // FR-018.14: the consequence is stated before the red button,
-//                // not discovered after it.
     public var body: some View {
         ZStack {
             Image("appBG", bundle: .module)
@@ -279,8 +262,6 @@ private struct SimilarItemCellView: View {
             .background(AppColor.surface)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            // The confidence word, not the raw score: PRD §16 keeps the model's
-            // number internal.
             Text(entry.match.confidence.title, bundle: .module)
                 .font(AppFont.caption)
                 .foregroundStyle(AppColor.textSecondary)

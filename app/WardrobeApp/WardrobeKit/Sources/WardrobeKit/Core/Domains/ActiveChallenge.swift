@@ -23,7 +23,6 @@ public struct ActiveChallenge: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case card, acceptedAt, photoID, document, importedPhotoIDs
-        /// The flat pre-canvas shape. Read forever, written never.
         case draft
     }
 

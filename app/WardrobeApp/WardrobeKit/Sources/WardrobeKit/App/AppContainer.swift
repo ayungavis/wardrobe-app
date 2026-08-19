@@ -137,10 +137,8 @@ public final class AppContainer {
             return try ModelContainer(for: SwiftDataWardrobeItemRepository.schema)
         } catch {
             Log.report(error)
-            // Last resort after the on-disk container failed: an in-memory one
-            // keeps the app usable for this session. `ModelContainer` has no
-            // non-throwing initialiser, and failing here means SwiftData itself
-            // is unusable — there is nothing left to fall back to.
+            // `ModelContainer` has no non-throwing init, and a SwiftData that
+            // cannot even build one in memory leaves nothing to fall back to.
             // swiftlint:disable:next force_try
             return try! ModelContainer(
                 for: SwiftDataWardrobeItemRepository.schema,

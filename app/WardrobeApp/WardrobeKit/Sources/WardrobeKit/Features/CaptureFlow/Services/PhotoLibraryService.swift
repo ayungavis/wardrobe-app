@@ -69,7 +69,7 @@ public extension PhotoLibraryService {
             guard let asset = Self.asset(id) else { return nil }
 
             let options = PHImageRequestOptions()
-            options.isNetworkAccessAllowed = true // iCloud photos are fair game here
+            options.isNetworkAccessAllowed = true
             options.deliveryMode = .highQualityFormat
 
             return await withCheckedContinuation { continuation in

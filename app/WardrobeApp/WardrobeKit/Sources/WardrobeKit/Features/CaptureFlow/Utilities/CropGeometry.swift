@@ -1,8 +1,6 @@
 import CoreGraphics
 
 enum CropGeometry {
-    /// The polaroid photo well's shape, which is what a layer photo is framed
-    /// to. The canvas background is framed to `StoryCanvas.aspectRatio` instead.
     static let photoAspectRatio: CGFloat = 3.0 / 4.0
 
     static let scaleRange: ClosedRange<CGFloat> = 1 ... 6
@@ -87,8 +85,6 @@ enum CropGeometry {
         let offset: CGSize
     }
 
-    /// The inverse of `normalizedRect`, so a stored crop can be reopened on the
-    /// frame it was made with instead of on the whole image.
     static func framing(for rect: CGRect, imageSize: CGSize, cropSize: CGSize) -> Framing {
         let fill = aspectFillSize(imageSize: imageSize, cropSize: cropSize)
         guard rect.width > 0, rect.height > 0, fill.width > 0, fill.height > 0 else {
@@ -96,8 +92,6 @@ enum CropGeometry {
         }
 
         let scale = clampedScale(cropSize.width / rect.width / fill.width)
-        // Recomputed from the clamped scale, not the requested one, so the
-        // offset stays consistent with the size actually drawn.
         let displayed = CGSize(width: fill.width * scale, height: fill.height * scale)
         let offset = CGSize(
             width: (displayed.width - cropSize.width) / 2 - rect.minX * displayed.width,

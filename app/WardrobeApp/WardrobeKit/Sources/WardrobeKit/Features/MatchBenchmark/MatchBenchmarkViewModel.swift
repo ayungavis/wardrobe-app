@@ -68,7 +68,7 @@ final class MatchBenchmarkViewModel {
                     ))
                 }
             } catch {
-                Log.report(error) // one unreadable photo must not end the run
+                Log.report(error)
             }
         }
         return samples

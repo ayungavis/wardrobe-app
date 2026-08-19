@@ -10,8 +10,6 @@ struct EditorCanvasView: View {
     @Binding var canvasSize: CGSize
     @State private var heldLayerID: UUID?
     @State private var isOverDeleteTarget = false
-    /// True while a finger is doing something other than tapping. What closes
-    /// the doors a stray double tap would otherwise open mid-gesture.
     @State private var isGestureEngaged = false
     @State private var snap: CanvasSnap?
     @State private var layerSizes: [UUID: CGSize] = [:]
@@ -23,22 +21,13 @@ struct EditorCanvasView: View {
             photo: viewModel.preview(forPhoto:),
             canvasSize: $canvasSize
         )
-        // Registered before the single tap that starts a new text, the same
-        // ordering `EditorLayerView` already relies on.
         .onTapGesture(count: 2) { beginBackgroundCrop() }
         .gesture(backgroundTap)
-        // Inside the overlay, not on the composed stack: clipping out here
-        // would also clip the canvas gesture's touch area, and the corners of
-        // the canvas rect would stop reaching the recogniser.
         .overlay { layers.clipShape(.rect(cornerRadius: 12)) }
         .overlay { guides }
         .overlay(alignment: .top) { snapBadges }
         .overlay { drawingSurface }
         .overlay(alignment: .bottom) { deleteTarget }
-        // Declared out here, not on the frame inside: a named space is found by
-        // walking up from where it is used, and the gesture below is the
-        // ancestor. Overlays do not change the base's size, so this rect is the
-        // canvas rect either way.
         .coordinateSpace(.named(CanvasTransformGestureModifier.coordinateSpace))
         .modifier(CanvasTransformGestureModifier(
             hitTest: hitTest(at:),
@@ -49,8 +38,6 @@ struct EditorCanvasView: View {
         ))
     }
 
-    /// Only a layer the canvas may actually act on: a locked one, or any one
-    /// while a tool is open, swallows the touch without being grabbed (FR-086).
     private func hitTest(at point: CGPoint) -> UUID? {
         guard let id = CanvasHitTest.layerID(
             at: point,
@@ -204,9 +191,6 @@ struct EditorCanvasView: View {
         EditorHaptics.selection.play()
     }
 
-    /// The one place `heldLayerID` is written. A hold that never becomes a
-    /// transform sends no action at all — the recogniser simply fails — so
-    /// clearing it from the transform's end would leave it dangling.
     private func engagementChanged(_ isEngaged: Bool, _ layerID: UUID?) {
         isGestureEngaged = isEngaged
         heldLayerID = isEngaged ? layerID : nil
@@ -217,8 +201,6 @@ struct EditorCanvasView: View {
         viewModel.beginCrop(.background)
     }
 
-    /// Refused mid-gesture: a second finger tapping twice while the first holds
-    /// a layer must not yank the user into the composer or the crop screen.
     private func beginEditing(_ layer: EditorLayer) {
         guard !isGestureEngaged else { return }
         if let draft = layer.textDraft {

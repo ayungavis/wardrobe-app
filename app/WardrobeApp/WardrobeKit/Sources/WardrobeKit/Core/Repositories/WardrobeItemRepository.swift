@@ -90,7 +90,6 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
 
 // MARK: - Storage entities
 
-//
 // ponytail: plain `itemID` columns instead of SwiftData relationships — it
 // mirrors the Postgres schema in docs/wardrobe-generation.md, needs no cascade
 // configuration, and matching loads every fingerprint anyway.

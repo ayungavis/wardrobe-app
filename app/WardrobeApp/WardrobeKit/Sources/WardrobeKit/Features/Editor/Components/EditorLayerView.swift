@@ -39,13 +39,9 @@ struct EditorLayerView: View {
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             .accessibilityActions {
                 Button(action: onSelect) { Text("editor.layer.select", bundle: .module) }
-                // The double tap has to have a non-gesture twin (§19), and it
-                // means something different per kind.
                 if let reopen = reopenLabel {
                     Button(action: onDoubleTap) { Text(reopen, bundle: .module) }
                 }
-                // Offering Delete on a locked layer would advertise an action
-                // the document refuses (FR-087).
                 if !layer.isLocked, !isChallengePhoto {
                     Button(action: onDelete) { Text("editor.layer.delete", bundle: .module) }
                 }

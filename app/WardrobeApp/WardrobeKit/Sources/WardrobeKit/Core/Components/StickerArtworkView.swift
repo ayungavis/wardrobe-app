@@ -16,8 +16,6 @@ struct StickerArtworkView: View {
         case let .symbol(name, accent):
             tile(symbol: name, colors: accent.gradientColors)
         case nil:
-            // FR-019: an unavailable catalogue asset must not block editing, so
-            // the layer stays and says so rather than vanishing.
             tile(symbol: "questionmark", colors: [
                 AppColor.onMedia.opacity(0.32), AppColor.onMedia.opacity(0.18),
             ])

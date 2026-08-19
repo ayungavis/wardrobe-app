@@ -3,8 +3,6 @@ import SwiftUI
 
 struct CanvasBackgroundView: View {
     let background: CanvasBackground
-    /// The same lookup the layers use — a photo background is an id like any
-    /// other, already cropped by `updateCroppedPreviews()`.
     var photo: (String) -> CGImage? = { _ in nil }
 
     var body: some View {

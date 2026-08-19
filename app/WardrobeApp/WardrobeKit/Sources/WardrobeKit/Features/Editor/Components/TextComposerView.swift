@@ -72,8 +72,6 @@ struct TextComposerView: View {
             }
         }
         .task { isFocused = true }
-        // The X was the only way out, and §19 requires a modal to stay
-        // dismissable. An escape must not commit, so it is the cancel path.
         .accessibilityAction(.escape, onCancel)
     }
 

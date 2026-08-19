@@ -9,8 +9,6 @@ public struct CropView: View {
 
     @State private var viewModel: CropViewModel
     private let exit: Exit
-    /// Nil for the capture flow's first framing, which by definition has no
-    /// stored frame — `initialStage` only routes there while the crop is nil.
     private let initialCrop: CropSpec?
     private let aspectRatio: CGFloat
     private let onExit: () -> Void
@@ -73,9 +71,6 @@ public struct CropView: View {
                 Spacer(minLength: Spacing.xl)
                 useCropButton(imageSize: imageSize, cropSize: cropSize)
             }
-            // Both the image and `cropSize` are needed to turn a stored crop
-            // back into a scale and an offset, and neither exists until here.
-            // Once only: reapplying would throw away what the user is adjusting.
             .task(id: cropSize) {
                 restoreCrop(imageSize: imageSize, cropSize: cropSize)
             }

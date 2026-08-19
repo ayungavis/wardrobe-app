@@ -3,8 +3,6 @@ import SwiftUI
 
 public enum CanvasBackground: Equatable, Sendable {
     case palette(Palette)
-    /// The id, never the bytes: a document syncs after ✓, and photo bytes inside
-    /// it would break §18.5's separation of originals from derivatives.
     case photo(id: String, crop: CropSpec?)
 
     public static let `default` = CanvasBackground.palette(.white)
@@ -65,9 +63,6 @@ extension CanvasBackground: Codable {
         case photoID, crop
     }
 
-    /// A palette still encodes as the bare string it always did, so every
-    /// document written before photo backgrounds existed reads back unchanged —
-    /// and keeps being readable by builds that predate this.
     public init(from decoder: Decoder) throws {
         if let raw = try? decoder.singleValueContainer().decode(String.self) {
             self = .palette(Palette(rawValue: raw) ?? .white)

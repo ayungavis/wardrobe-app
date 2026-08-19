@@ -33,8 +33,6 @@ struct LayerMenuView: View {
                     Image(systemName: "slider.horizontal.3")
                 }
             }
-            // FR-086: a locked layer keeps its geometry, so the controls that
-            // would change it are closed rather than silently ignored.
             .disabled(isLocked)
 
             Section {
@@ -50,9 +48,6 @@ struct LayerMenuView: View {
                         Image(systemName: "trash")
                     }
                 }
-                // FR-087: deleting a locked layer takes an explicit unlock
-                // first — and the challenge's own photo cannot go at all. A
-                // live button that did nothing would be worse than either.
                 .disabled(isLocked || !canDelete)
             }
         } label: {

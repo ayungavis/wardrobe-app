@@ -2,15 +2,7 @@ import CoreGraphics
 import Foundation
 import SwiftUI
 
-/// Which layer a touch landed on.
-///
-/// Asks `LayerHitShape` — the very shape `.contentShape` gives SwiftUI — so the
-/// touch area is identical to the one taps already use, per-stroke logic for
-/// drawings included.
 enum CanvasHitTest {
-    /// Topmost first, because that is what the user sees on top. A layer the
-    /// caller may not act on still blocks the ones beneath it, the same way a
-    /// locked layer swallows a touch today rather than passing it through.
     static func layerID(
         at point: CGPoint,
         in document: EditorDocument,
@@ -33,8 +25,6 @@ enum CanvasHitTest {
         return nil
     }
 
-    /// Undoes `canvasLayerTransform`, which applies scale, then rotation, then
-    /// position — both effects anchored at the centre.
     private static func localPoint(
         _ point: CGPoint,
         layer: EditorLayer,

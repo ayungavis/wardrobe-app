@@ -2,16 +2,8 @@ import CoreGraphics
 import SwiftUI
 
 struct CanvasTransformGestureModifier: ViewModifier {
-    /// The canvas declares this space and the recogniser converts into it.
-    /// SwiftUI makes no `UIView` per view, so a touch's `location(in: view)`
-    /// lands in a shared host's space, not the canvas's — offset by wherever
-    /// the canvas sits on screen.
     static let coordinateSpace = "editorCanvas"
 
-    /// Which layer the first finger landed on, and what the fingers have done
-    /// since. One report rather than two pieces of state kept in step: sharing
-    /// the held layer between SwiftUI and UIKit is what let a second finger
-    /// cancel it mid-gesture.
     struct Update {
         let layerID: UUID
         let translation: CGSize
@@ -20,8 +12,6 @@ struct CanvasTransformGestureModifier: ViewModifier {
     }
 
     let hitTest: (CGPoint) -> UUID?
-    /// Fires the moment the touch sequence stops being a plain tap, so the
-    /// canvas can close the doors a tap would otherwise open.
     let onEngagementChanged: (Bool, UUID?) -> Void
     let onChanged: (Update) -> Void
     let onEnded: (Update) -> Void
@@ -60,16 +50,10 @@ struct CanvasTransformGestureModifier: ViewModifier {
     final class CanvasTransformRecognizer: UIGestureRecognizer {
         private static let minimumTranslation: CGFloat = 6
 
-        /// Decides the layer on the first touch and never again — "the first
-        /// finger wins" as structure rather than as a guard somewhere else.
-        /// Takes a point in **window** coordinates; the representable converts
-        /// it into the canvas's space before the hit test sees it.
         var hitTest: (CGPoint) -> UUID? = { _ in nil }
         var onEngagementChanged: (Bool, UUID?) -> Void = { _, _ in }
         private(set) var heldLayerID: UUID?
 
-        /// From the moment this sequence stops being a plain tap — a second
-        /// finger lands, or the transform begins — until every finger lifts.
         private var isEngaged = false {
             didSet {
                 guard isEngaged != oldValue else { return }
@@ -78,7 +62,6 @@ struct CanvasTransformGestureModifier: ViewModifier {
         }
 
         private var tracker = CanvasTouchTracker()
-        /// Ordered, not a `Set`: reordering would flip the measured angle by 180°.
         private var tracked: [UITouch] = []
 
         var translation: CGSize {
@@ -103,8 +86,6 @@ struct CanvasTransformGestureModifier: ViewModifier {
                 heldLayerID = touches.first.map { hitTest($0.location(in: nil)) } ?? nil
                 tracker.begin(points())
             } else {
-                // A second finger means this is no longer a tap, whether or not
-                // it ever moves far enough to become a transform.
                 isEngaged = true
                 tracker.update(points())
                 advance()
@@ -184,16 +165,11 @@ struct CanvasTransformGestureModifier: ViewModifier {
             return recognizer
         }
 
-        /// Refreshed every update so the hit test sees the current document,
-        /// canvas size, and open tool.
         func updateUIGestureRecognizer(_ recognizer: CanvasTransformRecognizer, context: Context) {
             recognizer.onEngagementChanged = onEngagementChanged
             install(hitTest, on: recognizer, converter: context.converter)
         }
 
-        /// SwiftUI does the conversion rather than arithmetic of ours against a
-        /// recorded frame: that would only hold if `.global` and the window's
-        /// coordinates always agreed, and this asks the framework instead.
         private func install(
             _ hitTest: @escaping (CGPoint) -> UUID?,
             on recognizer: CanvasTransformRecognizer,

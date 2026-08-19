@@ -121,7 +121,7 @@ public final class FileActiveChallengeRepository {
         )
         var options: Data.WritingOptions = [.atomic]
         #if os(iOS)
-            options.insert(.completeFileProtection) // §18.4, same as original captures
+            options.insert(.completeFileProtection)
         #endif
         try JSONEncoder().encode(challenge).write(to: url, options: options)
     }

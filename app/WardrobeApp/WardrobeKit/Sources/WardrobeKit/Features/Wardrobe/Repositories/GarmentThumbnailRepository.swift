@@ -3,11 +3,6 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Stores garment cut-outs on disk. PNG because the cut-outs carry alpha.
-///
-/// The API deals in **file names, never paths**: an iOS container's UUID changes
-/// on every reinstall, so a persisted absolute path points at a directory that
-/// no longer exists. The directory is resolved fresh on every call instead.
 public protocol GarmentThumbnailRepository: Sendable {
     @discardableResult
     func save(_ image: CGImage, id: UUID) throws -> String
@@ -17,7 +12,6 @@ public protocol GarmentThumbnailRepository: Sendable {
 }
 
 public final class FileGarmentThumbnailRepository: GarmentThumbnailRepository, @unchecked Sendable {
-    // @unchecked: FileManager is thread-safe for these operations.
     private let directory: URL
 
     public init(directory: URL? = nil) {

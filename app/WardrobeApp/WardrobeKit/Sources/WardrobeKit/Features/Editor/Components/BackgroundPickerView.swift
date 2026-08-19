@@ -7,8 +7,6 @@ struct BackgroundPickerView: View {
     @Environment(\.dismiss) private var dismiss
 
     let selected: CanvasBackground
-    /// So the photo tile shows the picture already in use rather than a
-    /// placeholder that disagrees with the canvas behind the sheet.
     let photo: (String) -> CGImage?
     let onPick: (CanvasBackground) -> Void
     let onPickPhoto: (Data) -> Void
@@ -110,11 +108,7 @@ struct BackgroundPickerView: View {
     }
 }
 
-/// Its own type because `PhotosPicker`'s label closure is `Sendable`, so it
-/// cannot call a main-actor method on the picker view.
 private struct BackgroundTileView: View {
-    /// One value rather than a background plus an optional symbol: as two, a
-    /// white tile carrying a white icon was a state that could be written.
     enum Artwork {
         case background(CanvasBackground)
         case emptyPhotoSlot
@@ -131,8 +125,6 @@ private struct BackgroundTileView: View {
                 .frame(width: 58, height: 92)
                 .clipShape(.rect(cornerRadius: 14))
                 .overlay {
-                    // `strokeBorder`, not `stroke`: a centred line puts half its
-                    // width outside the frame, and the scroll view clips it.
                     RoundedRectangle(cornerRadius: 14)
                         .strokeBorder(
                             isSelected ? AppColor.onMedia : AppColor.onMedia.opacity(0.16),

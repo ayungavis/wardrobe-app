@@ -210,7 +210,7 @@
                 defer { device.unlockForConfiguration() }
                 body(device)
             } catch {
-                Log.report(error, logger: Log.ui) // non-fatal: framing stays as-is
+                Log.report(error, logger: Log.ui)
             }
         }
 
