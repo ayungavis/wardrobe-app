@@ -22,8 +22,8 @@ public struct RootView: View {
             if hasCompletedOnboarding {
                 tabs
             } else {
-                WelcomeView {
-                    completeOnboarding()
+                OnboardingView(viewModel: container.makeOnboardingViewModel()) {
+                    hasCompletedOnboarding = true
                 }
             }
         }
@@ -65,15 +65,6 @@ public struct RootView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         #endif
         .background(.clear)
-    }
-}
-
-private extension RootView {
-    func completeOnboarding() {
-        var preferences = container.preferencesRepository.load()
-        preferences.hasCompletedOnboarding = true
-        container.preferencesRepository.save(preferences)
-        hasCompletedOnboarding = true
     }
 }
 

@@ -44,6 +44,11 @@ targets:
           CODE_SIGN_IDENTITY: Apple Distribution
           DEVELOPMENT_TEAM: QHL64K2LPL
           PROVISIONING_PROFILE_SPECIFIER: WardrobeApp Apple Distribution
+    entitlements:
+      path: WardrobeApp/WardrobeApp.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     info:
       path: WardrobeApp/Info.plist
       properties:

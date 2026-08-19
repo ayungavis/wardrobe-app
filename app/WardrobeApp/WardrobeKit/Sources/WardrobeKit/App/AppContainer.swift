@@ -9,6 +9,7 @@ public final class AppContainer {
     private let photoRepository: PhotoRepository
     let preferencesRepository: AccountPreferencesRepository
     private let completionPreviewRepository: CompletionPreviewRepository
+    private let appleAccountRepository: AppleAccountRepository
     private let cameraService: CameraService
 
     public init(
@@ -18,6 +19,7 @@ public final class AppContainer {
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
+        appleAccountRepository: AppleAccountRepository = KeychainAppleAccountRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
@@ -26,6 +28,7 @@ public final class AppContainer {
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
+        self.appleAccountRepository = appleAccountRepository
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -39,6 +42,13 @@ public final class AppContainer {
 
     public func flushDrafts() async {
         await activeChallengeRepository.flush()
+    }
+
+    public func makeOnboardingViewModel() -> OnboardingViewModel {
+        OnboardingViewModel(
+            accountRepository: appleAccountRepository,
+            preferencesRepository: preferencesRepository
+        )
     }
 
     public func makeChallengeViewModel() -> ChallengeViewModel {
