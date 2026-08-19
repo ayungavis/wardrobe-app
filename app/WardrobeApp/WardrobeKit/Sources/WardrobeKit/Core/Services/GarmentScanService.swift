@@ -78,8 +78,6 @@ public struct WardrobeGarmentScanService: GarmentScanService {
 
         return try ScannedGarment(
             id: id,
-            name: category.defaultName,
-            description: "",
             category: category,
             cutoutFile: thumbnails.save(cutout.image, id: id),
             fingerprint: fingerprint,

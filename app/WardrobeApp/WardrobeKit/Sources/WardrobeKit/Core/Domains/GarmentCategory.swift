@@ -12,6 +12,7 @@ public enum GarmentCategory: String, CaseIterable, Codable, Sendable {
         case .bottom: [6]
         }
     }
+
     public var defaultName: String {
         switch self {
         case .top: "Top"

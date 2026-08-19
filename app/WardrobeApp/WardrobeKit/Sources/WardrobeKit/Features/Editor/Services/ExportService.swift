@@ -5,7 +5,6 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-@MainActor
 // ponytail: a pure function, so no protocol — add one when a second
 // implementation or a test seam actually needs it.
 public enum ExportService {
@@ -18,33 +17,66 @@ public enum ExportService {
     /// shows — and re-encodes through `CGImageDestination` writing zero source
     /// properties. Save and Share both come through here, so the file always
     /// matches the preview.
-    public static func render(original: Data, draft: EditDraft) throws -> Data {
+    ///
+    /// Split in three because only the middle step has to be on the main
+    /// actor: `ImageRenderer` is main-actor-bound, but decoding a 12-megapixel
+    /// source and deflating the JPEG are not, and running them there is what
+    /// made exporting stall the canvas (PRD §17 asks for non-blocking
+    /// progress).
+    public static func render(originals: [String: Data], document: EditorDocument) async throws -> Data {
+        var photos: [String: CGImage] = [:]
+        for layer in document.layers {
+            guard case let .photo(content) = layer.content,
+                  let original = originals[content.photoID]
+            else {
+                continue
+            }
+            // Each layer's own crop: FR-093 lets a document hold several photos,
+            // and framing belongs to the layer that shows it.
+            photos[content.photoID] = try await prepare(original: original, crop: content.crop)
+        }
+
+        let rendered = try await rasterize(document: document, photos: photos)
+        return try await encode(rendered)
+    }
+
+    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async
+    /// function stays on the caller's actor (SE-0461), and every caller here is
+    /// `@MainActor`, so without it this would not move at all.
+    @concurrent
+    static func prepare(original: Data, crop: CropSpec?) async throws -> CGImage {
         // Orientation-corrected, metadata-free decode.
-        guard var image = ImageDecoding.downsampledImage(from: original, maxPixel: maxOutputPixel) else {
+        guard let image = ImageDecoding.downsampledImage(from: original, maxPixel: maxOutputPixel) else {
             throw AppError.exportFailed
         }
+        guard let crop else { return image }
 
-        if let crop = draft.crop {
-            let rect = CGRect(
-                x: crop.rect.origin.x * CGFloat(image.width),
-                y: crop.rect.origin.y * CGFloat(image.height),
-                width: crop.rect.width * CGFloat(image.width),
-                height: crop.rect.height * CGFloat(image.height)
-            ).integral
-            guard let cropped = image.cropping(to: rect) else { throw AppError.exportFailed }
-            image = cropped
-        }
+        let rect = CGRect(
+            x: crop.rect.origin.x * CGFloat(image.width),
+            y: crop.rect.origin.y * CGFloat(image.height),
+            width: crop.rect.width * CGFloat(image.width),
+            height: crop.rect.height * CGFloat(image.height)
+        ).integral
+        guard let cropped = image.cropping(to: rect) else { throw AppError.exportFailed }
+        return cropped
+    }
 
+    /// The one step that must be here. Rendering at `exportSize` directly, with
+    /// no scale derived from the on-screen canvas, is why the output size is a
+    /// constant rather than something that has to be checked afterwards.
+    @MainActor
+    static func rasterize(document: EditorDocument, photos: [String: CGImage]) throws -> CGImage {
         let size = StoryCanvas.exportSize
         let renderer = ImageRenderer(
-            content: ExportCompositionView(image: image, texts: draft.texts, stickers: draft.stickers, size: size)
+            content: DocumentCanvasView(document: document, photo: { photos[$0] }, size: size)
         )
         renderer.proposedSize = ProposedViewSize(size)
         guard let rendered = renderer.cgImage else { throw AppError.exportFailed }
-        return try encodeJPEG(rendered)
+        return rendered
     }
 
-    static func encodeJPEG(_ image: CGImage) throws -> Data {
+    @concurrent
+    static func encode(_ image: CGImage) async throws -> Data {
         let out = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else {
             throw AppError.exportFailed
@@ -56,13 +88,15 @@ public enum ExportService {
     }
 }
 
-/// Shared text layout math so the editor preview and the export stay WYSIWYG.
+/// Shared layer sizing. A layer draws at its base size and its transform is
+/// applied on top — on the canvas and in the export alike, through the same
+/// modifier, so there is nothing left for the two to disagree about.
 enum TextRendering {
-    static func fontSize(for item: TextItem, in size: CGSize) -> CGFloat {
-        0.08 * min(size.width, size.height) * item.scale
+    static func baseFontSize(in size: CGSize) -> CGFloat {
+        0.08 * min(size.width, size.height)
     }
 
-    static func stickerFontSize(for item: StickerItem, in size: CGSize) -> CGFloat {
-        0.15 * min(size.width, size.height) * item.scale
+    static func baseStickerFontSize(in size: CGSize) -> CGFloat {
+        0.15 * min(size.width, size.height)
     }
 }

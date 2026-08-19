@@ -11,8 +11,8 @@ struct ChallengeDeckView: View {
     let onAccept: (ChallengeCard) -> Void
 
     @State private var currentIndex = 0
-    @State private var dragOffset: CGFloat = 0        // drag for the current (front) card
-    @State private var bringBackOffset: CGFloat = 0   // drag for the most recently parked card
+    @State private var dragOffset: CGFloat = 0 // drag for the current (front) card
+    @State private var bringBackOffset: CGFloat = 0 // drag for the most recently parked card
 
     private let parkedOffsetX: CGFloat = -300
     private let parkedOffsetY: CGFloat = -100
@@ -20,32 +20,31 @@ struct ChallengeDeckView: View {
 
     var body: some View {
         ZStack {
-            ForEach(cards.indices, id: \.self) { i in
-                cardView(for: i)
+            ForEach(cards.indices, id: \.self) { index in
+                cardView(for: index)
             }
         }
     }
 
     @ViewBuilder
-    private func cardView(for i: Int) -> some View {
-        let isCurrent = i == currentIndex
-        let isMostRecentlyParked = i == currentIndex - 1
-        let isParked = i < currentIndex
+    private func cardView(for index: Int) -> some View {
+        let isCurrent = index == currentIndex
+        let isMostRecentlyParked = index == currentIndex - 1
+        let isParked = index < currentIndex
 
         ChallengeCardView(
-            card: cards[i],
-            onAccept: { onAccept(cards[i]) }
+            card: cards[index],
+            onAccept: { onAccept(cards[index]) }
         )
-        .rotationEffect(rotation(for: i))
+        .rotationEffect(rotation(for: index))
         .offset(
             x: isCurrent ? dragOffset : (isMostRecentlyParked ? parkedOffsetX + bringBackOffset : (isParked ? parkedOffsetX : 0)),
             y: isParked ? parkedOffsetY : 0
         )
-        //.zIndex(isCurrent ? Double(cards.count + 1) : (isParked ? Double(i + cards.count) : Double(cards.count - i)))
         .zIndex(
-            isParked ? Double(100 + i) :
-            isCurrent ? (dragOffset < 0 ? 200.0 : 50.0) :
-            Double(-i)
+            isParked ? Double(100 + index) :
+                isCurrent ? (dragOffset < 0 ? 200.0 : 50.0) :
+                Double(-index)
         )
         .allowsHitTesting(isCurrent || isMostRecentlyParked)
         .gesture(swipeAwayGesture, including: isCurrent ? .all : .none)
@@ -103,7 +102,7 @@ struct ChallengeDeckView: View {
             ChallengeCard(id: UUID(), prompt: "Wear something you haven't worn in a month"),
             ChallengeCard(id: UUID(), prompt: "Mix two patterns you'd normally avoid"),
             ChallengeCard(id: UUID(), prompt: "Style your comfiest piece to look put-together"),
-            ChallengeCard(id: UUID(), prompt: "Try an accessory you never reach for")
+            ChallengeCard(id: UUID(), prompt: "Try an accessory you never reach for"),
         ],
         onAccept: { _ in }
     )

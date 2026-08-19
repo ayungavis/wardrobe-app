@@ -94,12 +94,8 @@ public final class ChallengeViewModel {
     }
 
     public func abandon() {
-        if let photoID = activeChallenge?.photoID {
-            do {
-                try photoRepository.deleteOriginal(id: photoID)
-            } catch {
-                Log.report(error) // orphaned file is not worth blocking the abandon
-            }
+        if let active = activeChallenge {
+            photoRepository.deleteOriginals(of: active.document, and: active.photoID)
         }
         activeRepository.clear()
         activeChallenge = nil

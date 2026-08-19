@@ -1,29 +1,47 @@
+import CoreGraphics
 import DesignSystem
 import SwiftUI
+#if os(iOS)
+    import UIKit
+#endif
 
-/// Photo canvas with committed overlays; tapping an empty spot starts a new
-/// text there. Dragging an overlay reveals a trash zone at the bottom.
+/// The 9:16 canvas: the photo behind, the document's layers over it, and a
+/// delete target that appears while one is being dragged.
+///
+/// Everything transient — which layer is under the finger, whether it is over
+/// the delete target — lives here rather than in the view model. It changes
+/// many times a second and means nothing once the finger lifts, so keeping it
+/// out of the document is what stops a gesture from writing sixty times.
 struct EditorCanvasView: View {
-    enum DraggedOverlay: Equatable {
-        case text(UUID)
-        case sticker(UUID)
-    }
-
     let viewModel: EditorViewModel
     @Binding var canvasSize: CGSize
-    @State private var dragging: DraggedOverlay?
+    @State private var interactingLayerID: UUID?
+    @State private var isOverDeleteTarget = false
+    /// What the current gesture last landed on. Transient like the two above —
+    /// it means nothing once the finger lifts.
+    @State private var snap: CanvasSnap?
 
     var body: some View {
-        CanvasPhotoLayer(image: viewModel.croppedPreviewImage, canvasSize: $canvasSize)
-            .gesture(tapToAddText)
-            .overlay { committedOverlays }
-            .overlay(alignment: .bottom) { trashZone }
+        CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
+            .gesture(backgroundTap)
+            .overlay { layers }
+            .overlay { guides }
+            .overlay(alignment: .top) { snapBadges }
+            .overlay { drawingSurface }
+            .overlay(alignment: .bottom) { deleteTarget }
     }
 
-    private var tapToAddText: some Gesture {
+    /// An empty spot dismisses the selection if there is one, and otherwise
+    /// starts a new text where it was tapped — so the existing shortcut
+    /// survives without becoming a mode.
+    private var backgroundTap: some Gesture {
         SpatialTapGesture()
             .onEnded { value in
                 guard canvasSize != .zero, viewModel.activeTool == nil else { return }
+                guard viewModel.selectedLayerID == nil else {
+                    viewModel.select(nil)
+                    return
+                }
                 viewModel.beginNewText(at: CGPoint(
                     x: min(1, max(0, value.location.x / canvasSize.width)),
                     y: min(1, max(0, value.location.y / canvasSize.height))
@@ -31,110 +49,170 @@ struct EditorCanvasView: View {
             }
     }
 
-    private var committedOverlays: some View {
+    private var layers: some View {
         ZStack {
-            ForEach(viewModel.draft.stickers) { item in
-                CommittedStickerView(
-                    item: item,
-                    canvasSize: canvasSize,
-                    onMove: { viewModel.moveSticker(id: item.id, to: $0) },
-                    onScale: { viewModel.scaleSticker(id: item.id, to: $0) },
-                    onRotate: { viewModel.rotateSticker(id: item.id, to: $0) },
-                    onDragActive: { active in
-                        dragging = active ? .sticker(item.id) : nil
-                        if !active {
-                            finishDrag(.sticker(item.id))
-                        }
-                    },
-                    onManipulationEnd: { viewModel.finishDirectManipulation() }
-                )
-            }
-
-            ForEach(viewModel.draft.texts) { item in
-                if !isEditing(item) {
-                    CommittedTextView(
-                        item: item,
+            ForEach(Array(viewModel.document.layers.enumerated()), id: \.element.id) { index, layer in
+                if isInteractive(layer) {
+                    EditorLayerView(
+                        layer: layer,
                         canvasSize: canvasSize,
-                        onTap: { viewModel.beginEditingText(item) },
-                        onMove: { viewModel.moveText(id: item.id, to: $0) },
-                        onScale: { viewModel.scaleText(id: item.id, to: $0) },
-                        onRotate: { viewModel.rotateText(id: item.id, to: $0) },
-                        onDragActive: { active in
-                            dragging = active ? .text(item.id) : nil
-                            if !active {
-                                finishDrag(.text(item.id))
-                            }
-                        },
-                        onManipulationEnd: { viewModel.finishDirectManipulation() }
+                        photo: viewModel.preview(forPhoto:),
+                        isSelected: viewModel.selectedLayerID == layer.id,
+                        isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
+                        isChallengePhoto: viewModel.challengePhotoLayerID == layer.id,
+                        onSelect: { select(layer.id) },
+                        onDoubleTap: { beginEditing(layer) },
+                        onSnapChanged: { snapChanged(layer.id, to: $0) },
+                        onTransformEnded: { transformEnded(layer.id, to: $0) },
+                        onDelete: { viewModel.removeLayer(id: layer.id) }
+                    )
+                    // Array order is z-order; the index is the position, the
+                    // UUID stays the identity.
+                    .zIndex(Double(index))
+                }
+            }
+        }
+    }
+
+    /// Suppressed over the delete target: a layer about to be thrown away has
+    /// nothing to align to.
+    @ViewBuilder
+    private var guides: some View {
+        if let snap, !isOverDeleteTarget {
+            CanvasGuidesView(alignment: snap.alignment)
+        }
+    }
+
+    @ViewBuilder
+    private var snapBadges: some View {
+        if let snap, !isOverDeleteTarget {
+            VStack(spacing: Spacing.sm) {
+                if let degrees = snap.snappedRotationDegrees {
+                    SnapBadgeView(
+                        systemName: "arrow.clockwise",
+                        value: Text(
+                            "editor.snap.degrees \(CanvasSnapping.readableDegrees(degrees))",
+                            bundle: .module
+                        )
                     )
                 }
+                if let scale = snap.snappedScale {
+                    SnapBadgeView(
+                        systemName: "arrow.up.left.and.arrow.down.right",
+                        value: Text(
+                            "editor.snap.scale \(Int((scale * 100).rounded()))",
+                            bundle: .module
+                        )
+                    )
+                }
+            }
+            .padding(.top, Spacing.xxl)
+        }
+    }
+
+    /// Mounted above the layers on purpose: it takes the touch first, so a
+    /// stroke drawn across a sticker draws instead of dragging the sticker.
+    @ViewBuilder
+    private var drawingSurface: some View {
+        if case let .drawing(session) = viewModel.activeTool {
+            DrawingSurfaceView(session: session, pen: viewModel.pen) { points in
+                viewModel.finishStroke(points, canvasSize: canvasSize)
             }
         }
     }
 
     @ViewBuilder
-    private var trashZone: some View {
-        if dragging != nil {
-            Image(systemName: "trash")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(AppColor.onMedia)
-                .frame(width: 56, height: 56)
-                .background(.ultraThinMaterial, in: Circle())
-                .padding(.bottom, Spacing.lg)
+    private var deleteTarget: some View {
+        // Never shown for a layer it could not take: dragging into a bin that
+        // then does nothing is worse than no bin at all.
+        if let interactingLayerID, viewModel.canRemove(layerID: interactingLayerID) {
+            DeleteDropTargetView(isActive: isOverDeleteTarget)
                 .transition(.opacity)
         }
     }
 
-    /// Dropping an overlay on the bottom-center trash zone deletes it.
-    private func finishDrag(_ overlay: DraggedOverlay) {
-        switch overlay {
-        case let .text(id):
-            let position = viewModel.draft.texts.first { $0.id == id }?.position
-            if let position, isInTrashZone(position) {
-                viewModel.removeText(id: id)
-            }
-        case let .sticker(id):
-            let position = viewModel.draft.stickers.first { $0.id == id }?.position
-            if let position, isInTrashZone(position) {
-                viewModel.removeSticker(id: id)
-            }
+    /// Only the text open in the composer is skipped — the composer draws it
+    /// instead. The photo is a layer like any other now that it has a frame to
+    /// sit in (FR-092).
+    private func isInteractive(_ layer: EditorLayer) -> Bool {
+        if case let .text(working, _) = viewModel.activeTool, working.id == layer.id {
+            return false
+        }
+        return true
+    }
+
+    // MARK: Interaction
+
+    private func select(_ id: UUID) {
+        guard viewModel.selectedLayerID != id else { return }
+        viewModel.select(id)
+        EditorHaptics.selection.play()
+    }
+
+    /// Double-tap reopens whatever the layer is made of: text goes back to the
+    /// composer, the photo back to the crop screen. FR-019 says crop is not a
+    /// tool in the rail — this is where it lives instead.
+    private func beginEditing(_ layer: EditorLayer) {
+        if let draft = layer.textDraft {
+            viewModel.beginEditingText(draft)
+        } else if case .photo = layer.content {
+            viewModel.beginCrop(layerID: layer.id)
         }
     }
 
-    private func isInTrashZone(_ position: CGPoint) -> Bool {
-        abs(position.x - 0.5) < 0.15 && position.y > 0.85
+    private func snapChanged(_ id: UUID, to snap: CanvasSnap) {
+        interactingLayerID = id
+        select(id)
+
+        // Edge-triggered: feedback belongs to the moment something latches on,
+        // not to every frame it stays there.
+        let landedOnSomething = (snap.alignment != .none && self.snap?.alignment == CanvasAlignment.none)
+            || (snap.snappedRotationDegrees != nil
+                && snap.snappedRotationDegrees != self.snap?.snappedRotationDegrees)
+            || (snap.snappedScale != nil && snap.snappedScale != self.snap?.snappedScale)
+        self.snap = snap
+        if landedOnSomething {
+            EditorHaptics.latch.play()
+        }
+
+        guard viewModel.canRemove(layerID: id) else { return }
+
+        let isOver = CanvasGeometry.isOverDeleteTarget(snap.transform.position)
+        guard isOver != isOverDeleteTarget else { return }
+        isOverDeleteTarget = isOver
+        if isOver {
+            EditorHaptics.armed.play()
+        }
     }
 
-    private func isEditing(_ item: TextItem) -> Bool {
-        if case let .text(working, _) = viewModel.activeTool {
-            return working.id == item.id
+    private func transformEnded(_ id: UUID, to transform: ElementTransform) {
+        let shouldDelete = isOverDeleteTarget && interactingLayerID == id
+        interactingLayerID = nil
+        isOverDeleteTarget = false
+        snap = nil
+
+        if shouldDelete {
+            EditorHaptics.removed.play()
+            viewModel.removeLayer(id: id)
+        } else {
+            viewModel.commitTransform(layerID: id, to: transform)
         }
-        return false
     }
 }
 
-/// The story frame: a 9:16 window with the photo aspect-filled into it, the
-/// same framing the camera preview showed and the same one the export uses.
+/// The 9:16 window the document is arranged inside, and the only thing that
+/// measures it.
 ///
-/// Takes a plain value rather than the view model so moving an overlay never
-/// invalidates (or re-decodes) the image layer.
-private struct CanvasPhotoLayer: View {
-    let image: CGImage?
+/// The rounded corner is editor chrome — the exported picture is square-edged,
+/// because the corner belongs to the screen, not to the photograph.
+private struct CanvasFrameView: View {
+    let background: CanvasBackground
     @Binding var canvasSize: CGSize
 
     var body: some View {
         Color.clear
             .aspectRatio(StoryCanvas.aspectRatio, contentMode: .fit)
-            .overlay {
-                if let image {
-                    Image(decorative: image, scale: 1)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    ProgressView()
-                        .tint(AppColor.onMedia)
-                }
-            }
+            .background(CanvasBackgroundView(background: background))
             .clipShape(.rect(cornerRadius: 12))
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size

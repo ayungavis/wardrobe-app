@@ -13,7 +13,7 @@ public struct HistoryView: View {
 
     private let columns = [
         GridItem(.flexible(), spacing: Spacing.md),
-        GridItem(.flexible(), spacing: Spacing.md)
+        GridItem(.flexible(), spacing: Spacing.md),
     ]
 
     public var body: some View {
@@ -51,7 +51,7 @@ public struct HistoryView: View {
                     HistoryDetailView(
                         completion: completion,
                         photoData: viewModel.photoData(for: completion),
-                        viewModel : viewModel
+                        viewModel: viewModel
                     )
                 }
             }
@@ -68,13 +68,3 @@ public struct HistoryView: View {
         }
     }
 }
-
-//#Preview {
-//    let container = AppContainer()
-//    HistoryView(viewModel: HistoryViewModel(
-//        completedRepository: UserDefaultsCompletedChallengeRepository(),
-//        photoRepository: FilePhotoRepository(),
-//        wardrobeRepository: WardrobeItemRepository(),
-//        thumbnails: GarmentThumbnailRepository()
-//    ), container: container)
-//}

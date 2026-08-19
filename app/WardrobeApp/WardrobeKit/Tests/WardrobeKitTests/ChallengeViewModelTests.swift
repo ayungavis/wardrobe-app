@@ -142,7 +142,7 @@ struct ChallengeViewModelTests {
         CompletedChallenge(
             card: ChallengeCard(prompt: "done"),
             photoID: UUID().uuidString,
-            draft: EditDraft(),
+            document: .fixture(),
             completedAt: date
         )
     }

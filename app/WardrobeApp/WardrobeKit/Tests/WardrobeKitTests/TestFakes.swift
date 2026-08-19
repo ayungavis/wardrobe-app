@@ -4,6 +4,10 @@ import Foundation
 
 final class InMemoryActiveChallengeRepository: ActiveChallengeRepository, @unchecked Sendable {
     var stored: ActiveChallenge?
+    /// Counted, not just recorded: an edit the document refused must not reach
+    /// the store at all, and only a count can tell that apart from a write that
+    /// happened to store the same value.
+    private(set) var saveCount = 0
 
     func load() -> ActiveChallenge? {
         stored
@@ -11,10 +15,18 @@ final class InMemoryActiveChallengeRepository: ActiveChallengeRepository, @unche
 
     func save(_ challenge: ActiveChallenge) {
         stored = challenge
+        saveCount += 1
     }
 
     func clear() {
         stored = nil
+    }
+
+    /// Nothing is ever in flight here, so there is nothing to wait for and
+    /// nothing that can fail.
+    func flush() async {}
+    var didFailToPersist: Bool {
+        false
     }
 }
 
@@ -51,6 +63,11 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
 
     func wears(for itemID: UUID) throws -> [WearRecord] {
         storedWears.filter { $0.itemID == itemID }
+    }
+
+    func update(_ item: WardrobeItem) throws {
+        guard let index = storedItems.firstIndex(where: { $0.id == item.id }) else { return }
+        storedItems[index] = item
     }
 
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
@@ -252,5 +269,121 @@ final class FakeCameraService: CameraService {
 
     func capturePhoto() async throws -> Data {
         try captureResult.get()
+    }
+}
+
+// MARK: - Document fixtures and readers
+
+extension EditorDocument {
+    /// The same document with every photo layer pointed at `photoID`.
+    func showingPhoto(_ photoID: String) -> EditorDocument {
+        var copy = self
+        copy.layers = layers.map { layer in
+            guard case let .photo(content) = layer.content else { return layer }
+            var updated = layer
+            updated.content = .photo(PhotoContent(photoID: photoID, crop: content.crop))
+            return updated
+        }
+        return copy
+    }
+
+    /// The bottom photo layer's crop — the single-photo shape most tests still
+    /// speak in. Production says which layer it means (FR-093); a test with one
+    /// photo has nothing to disambiguate.
+    var firstPhotoCrop: CropSpec? {
+        photoIDs.first
+            .flatMap { photoLayerID(showing: $0) }
+            .flatMap { crop(ofLayer: $0) }
+    }
+
+    /// The layer showing the first photo, for tests that need to name it.
+    var firstPhotoLayerID: UUID? {
+        photoIDs.first.flatMap { photoLayerID(showing: $0) }
+    }
+
+    /// Builds a document from the flat shape tests already read well in.
+    /// Routed through the migration on purpose rather than reimplementing it —
+    /// the migration has its own tests, so a break there fails loudly at the
+    /// source instead of quietly here.
+    static func fixture(
+        photoID: String? = "photo-1",
+        crop: CropSpec? = nil,
+        texts: [TextItem] = [],
+        stickers: [StickerItem] = [],
+        background: CanvasBackground = .white
+    ) -> EditorDocument {
+        var document = EditorDocument(
+            migrating: EditDraft(crop: crop, texts: texts, stickers: stickers),
+            photoID: photoID
+        )
+        document.background = background
+        return document
+    }
+
+    var textContents: [String] {
+        layers.compactMap { layer in
+            guard case let .text(text) = layer.content else { return nil }
+            return text.content
+        }
+    }
+
+    /// The flat projection, kept here because only tests still compare against
+    /// the pre-canvas shape — production reads `EditorLayer.textDraft`.
+    var textItems: [TextItem] {
+        layers.compactMap { layer in
+            guard case let .text(text) = layer.content else { return nil }
+            return TextItem(
+                id: layer.id,
+                content: text.content,
+                position: layer.transform.position,
+                scale: layer.transform.scale,
+                rotationDegrees: layer.transform.rotationDegrees,
+                colorName: text.colorName,
+                hasBackground: text.backgroundStyle == .solid,
+                fontName: text.fontName,
+                alignmentName: text.alignmentName
+            )
+        }
+    }
+
+    var stickerItems: [StickerItem] {
+        layers.compactMap { layer -> StickerItem? in
+            guard case let .sticker(sticker) = layer.content,
+                  case let .emoji(glyph)? = sticker.art.design
+            else {
+                return nil
+            }
+            return StickerItem(
+                id: layer.id,
+                emoji: glyph,
+                position: layer.transform.position,
+                scale: layer.transform.scale,
+                rotationDegrees: layer.transform.rotationDegrees
+            )
+        }
+    }
+
+    var stickerEmojis: [String] {
+        stickerItems.map(\.emoji)
+    }
+
+    var stickerArts: [StickerArt] {
+        layers.compactMap { layer in
+            guard case let .sticker(sticker) = layer.content else { return nil }
+            return sticker.art
+        }
+    }
+}
+
+final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, @unchecked Sendable {
+    // @unchecked: tests drive it from one actor at a time.
+    var stored = AccountPreferences()
+
+    func load() -> AccountPreferences {
+        stored
+    }
+
+    func save(_ preferences: AccountPreferences) {
+        stored = preferences
     }
 }

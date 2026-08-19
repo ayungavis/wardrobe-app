@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 #if os(iOS)
-@preconcurrency import AVFoundation
+    @preconcurrency import AVFoundation
 #endif
 
 /// A lightweight, repeatable capture loop for bulk-scanning outfits straight
@@ -36,67 +36,70 @@ struct BulkScanCameraView: View {
             }
             .navigationTitle(Text(verbatim: "Camera"))
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task {
-                            await review.finishScanning()
-                            dismiss()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button {
+                            Task {
+                                await review.finishScanning()
+                                dismiss()
+                            }
+                        } label: {
+                            Text("wardrobe.review.confirm", bundle: .module)
                         }
-                    } label: {
-                        Text("wardrobe.review.confirm", bundle: .module)
+                        .disabled(capturedCount == 0)
                     }
-                    .disabled(capturedCount == 0)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .cancel) {
-                        review.cancel()
-                        dismiss()
-                    } label: {
-                        Text("common.cancel", bundle: .module)
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .cancel) {
+                            review.cancel()
+                            dismiss()
+                        } label: {
+                            Text("common.cancel", bundle: .module)
+                        }
                     }
                 }
-            }
-            .alert(
-                Text("common.errorTitle", bundle: .module),
-                isPresented: Binding(
-                    get: { alertError != nil },
-                    set: { if !$0 { alertError = nil } }
-                )
-            ) {
-                Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
-            } message: {
-                Text(alertError?.userMessage ?? "")
-            }
-            .task { await requestPermissionIfNeeded() }
-            .onDisappear {
-                sessionTask?.cancel()
-                camera.stopSession()
-            }
-            .onChange(of: scenePhase) { _, newPhase in
-                if newPhase == .active, permission != .granted {
-                    permission = camera.permission
-                    startSessionIfNeeded()
+                .alert(
+                    Text("common.errorTitle", bundle: .module),
+                    isPresented: Binding(
+                        get: { alertError != nil },
+                        set: {
+                            if !$0 {
+                                alertError = nil
+                            }
+                        }
+                    )
+                ) {
+                    Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
+                } message: {
+                    Text(alertError?.userMessage ?? "")
                 }
-            }
+                .task { await requestPermissionIfNeeded() }
+                .onDisappear {
+                    sessionTask?.cancel()
+                    camera.stopSession()
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active, permission != .granted {
+                        permission = camera.permission
+                        startSessionIfNeeded()
+                    }
+                }
         }
     }
 
-    @ViewBuilder
     private var cameraContent: some View {
         ZStack(alignment: .bottom) {
             #if os(iOS)
-            if let session = camera.previewSession {
-                CameraPreviewView(session: session)
-                    .ignoresSafeArea()
-            }
+                if let session = camera.previewSession {
+                    CameraPreviewView(session: session)
+                        .ignoresSafeArea()
+                }
             #endif
 
             VStack(spacing: Spacing.md) {
                 if capturedCount > 0 {
-                    Text("\(capturedCount) captured")
+                    Text("bulkScan.captured \(capturedCount)", bundle: .module)
                         .font(AppFont.caption)
                         .foregroundStyle(.white)
                         .padding(.horizontal, Spacing.md)
@@ -120,7 +123,7 @@ struct BulkScanCameraView: View {
 
     private var deniedState: some View {
         ContentUnavailableView {
-            Label("Camera access needed", systemImage: "camera")
+            Label { Text("camera.permission.denied.title", bundle: .module) } icon: { Image(systemName: "camera") }
         } description: {
             Text(verbatim: "Enable camera access in Settings to scan outfits.")
         }

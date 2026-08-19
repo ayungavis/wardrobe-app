@@ -11,5 +11,4 @@ public enum AppFont {
     public static let caption = Font.caption
     public static let customTitle = Font.custom("Allison-Regular", size: 128)
     public static let customSmallTitle = Font.custom("SeymourOne", size: 20)
-
 }

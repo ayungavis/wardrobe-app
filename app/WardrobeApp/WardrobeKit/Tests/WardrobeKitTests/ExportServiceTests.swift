@@ -45,14 +45,17 @@ struct ExportServiceTests {
         return props
     }
 
-    @Test func exportStripsEXIFAndGPS() throws {
+    @Test func exportStripsEXIFAndGPS() async throws {
         let original = try makeJPEGWithMetadata()
 
         // Sanity: source really contains the metadata we planted.
         let sourceProps = try properties(of: original)
         #expect(sourceProps[kCGImagePropertyGPSDictionary] != nil)
 
-        let exported = try ExportService.render(original: original, draft: EditDraft())
+        let exported = try await ExportService.render(
+            originals: ["photo-1": original],
+            document: EditorDocument(photoID: "photo-1")
+        )
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
@@ -65,23 +68,23 @@ struct ExportServiceTests {
     /// The editor canvas is 9:16, so every export is — crop or no crop,
     /// overlays or none. What you see is what gets saved and shared.
     @Test(arguments: [
-        EditDraft(),
-        EditDraft(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))),
-        EditDraft(texts: [TextItem(content: "OOTD")]),
+        EditorDocument.fixture(),
+        EditorDocument.fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))),
+        EditorDocument.fixture(texts: [TextItem(content: "OOTD")]),
     ])
-    func exportAlwaysUsesStoryCanvasSize(draft: EditDraft) throws {
+    func exportAlwaysUsesStoryCanvasSize(document: EditorDocument) async throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 100, height: 200)
 
-        let exported = try ExportService.render(original: original, draft: draft)
+        let exported = try await ExportService.render(originals: ["photo-1": original], document: document)
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyPixelWidth] as? Int == Int(StoryCanvas.exportSize.width))
         #expect(props[kCGImagePropertyPixelHeight] as? Int == Int(StoryCanvas.exportSize.height))
     }
 
-    @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() throws {
+    @Test func exportWithStyledTextAndStickersProducesDecodableJPEG() async throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 200, height: 200)
-        let draft = EditDraft(
+        let document = EditorDocument.fixture(
             texts: [TextItem(
                 content: "OOTD",
                 rotationDegrees: -12,
@@ -96,7 +99,7 @@ struct ExportServiceTests {
             )]
         )
 
-        let exported = try ExportService.render(original: original, draft: draft)
+        let exported = try await ExportService.render(originals: ["photo-1": original], document: document)
         let props = try properties(of: exported)
 
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)

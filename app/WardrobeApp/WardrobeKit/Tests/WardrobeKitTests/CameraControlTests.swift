@@ -127,7 +127,7 @@ struct CameraControlTests {
 
     // MARK: Gallery import (PRD open question #6)
 
-    @Test func usePickedPhotoPersistsThenOpensEditor() async throws {
+    @Test func usePickedPhotoPersistsThenOpensCrop() async throws {
         let camera = FakeCameraService()
         camera.permission = .granted
         let activeRepository = InMemoryActiveChallengeRepository()
@@ -141,7 +141,7 @@ struct CameraControlTests {
         let savedID = photoRepository.saved.keys.first
         #expect(photoRepository.saved.values.first == picked)
         #expect(activeRepository.stored?.photoID == savedID)
-        #expect(sut.stage == .editor)
+        #expect(sut.stage == .crop)
     }
 
     @Test func usePickedPhotoRejectsUndecodableDataAndPersistsNothing() async {
@@ -232,7 +232,7 @@ struct CameraControlTests {
 
         #expect(photoRepository.saved.values.first == picked)
         #expect(activeRepository.stored?.photoID == photoRepository.saved.keys.first)
-        #expect(sut.stage == .editor)
+        #expect(sut.stage == .crop)
         #expect(!sut.isGalleryPresented)
     }
 

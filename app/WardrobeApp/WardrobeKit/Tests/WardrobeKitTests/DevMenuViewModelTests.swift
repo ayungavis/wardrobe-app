@@ -58,7 +58,7 @@ struct DevMenuViewModelTests {
         CompletedChallenge(
             card: ChallengeCard(prompt: "x"),
             photoID: photoID,
-            draft: EditDraft(),
+            document: .fixture(),
             completedAt: date
         )
     }

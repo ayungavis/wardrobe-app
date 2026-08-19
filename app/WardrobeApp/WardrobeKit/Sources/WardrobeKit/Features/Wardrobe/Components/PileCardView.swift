@@ -32,8 +32,6 @@ struct PileCardView: View {
                     if let data = thumbnailData(item) {
                         DownsampledPhotoView(data: data)
                             .frame(width: 90, height: 90)
-                            //.background(AppColor.surface)
-                            //.clipShape(RoundedRectangle(cornerRadius: 12))
                             .rotationEffect(.degrees(pileRotation(for: index)))
                             .offset(pileOffset(for: index))
                             .matchedGeometryEffect(id: item.id, in: namespace)
@@ -45,8 +43,6 @@ struct PileCardView: View {
             .frame(maxWidth: .infinity)
         }
         .padding(Spacing.lg)
-        //.background(AppColor.surface, in: RoundedRectangle(cornerRadius: 16))
-        //.contentShape(Rectangle())
         .onTapGesture { onTap() }
     }
 
@@ -59,7 +55,7 @@ struct PileCardView: View {
         let offsets: [CGSize] = [
             CGSize(width: -10, height: 5), CGSize(width: 15, height: -8),
             CGSize(width: -5, height: -12), CGSize(width: 8, height: 10),
-            CGSize(width: 0, height: 0)
+            CGSize(width: 0, height: 0),
         ]
         return offsets[index % offsets.count]
     }

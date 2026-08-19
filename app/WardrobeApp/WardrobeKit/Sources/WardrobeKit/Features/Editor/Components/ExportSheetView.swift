@@ -43,12 +43,19 @@ struct ExportSheetView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColor.background)
+            .background(AppColor.mediaSurface)
             .navigationTitle(Text("editor.export.title", bundle: .module))
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
             #endif
         }
+        // The same recipe as the sticker, background, and layer sheets — a
+        // sheet is its own presentation context, so without the last line this
+        // one alone came up in the system colour scheme.
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(30)
+        .presentationBackground(AppColor.mediaSurface)
+        .preferredColorScheme(.dark)
     }
 }

@@ -21,7 +21,7 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
     public init(
         id: UUID = UUID(),
         name: String? = nil,
-        description: String,
+        description: String = "",
         category: GarmentCategory,
         status: ItemStatus = .pending,
         cutoutFile: String,

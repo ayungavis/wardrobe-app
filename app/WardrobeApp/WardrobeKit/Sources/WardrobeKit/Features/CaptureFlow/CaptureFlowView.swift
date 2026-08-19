@@ -7,13 +7,16 @@ public struct CaptureFlowView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: CaptureFlowViewModel
     private let makeEditorViewModel: (ActiveChallenge) -> EditorViewModel
+    private let makeCropViewModel: (String) -> CropViewModel
 
     public init(
         viewModel: CaptureFlowViewModel,
-        makeEditorViewModel: @escaping (ActiveChallenge) -> EditorViewModel
+        makeEditorViewModel: @escaping (ActiveChallenge) -> EditorViewModel,
+        makeCropViewModel: @escaping (String) -> CropViewModel
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.makeEditorViewModel = makeEditorViewModel
+        self.makeCropViewModel = makeCropViewModel
     }
 
     public var body: some View {
@@ -30,9 +33,14 @@ public struct CaptureFlowView: View {
                 DeniedStageView(onClose: { dismiss() })
             case .camera:
                 CameraStageView(viewModel: viewModel, onClose: { dismiss() })
+            case .crop:
+                cropStage
             case .editor:
                 EditorView(
                     viewModel: makeEditorViewModel(viewModel.challenge),
+                    isCompleting: viewModel.isCompleting,
+                    didResumeDraft: viewModel.didResumeDraft,
+                    makeCropViewModel: makeCropViewModel,
                     onDiscard: { viewModel.discardPhoto() },
                     onComplete: { viewModel.completeChallenge() },
                     reviewDrawer: {
@@ -74,6 +82,19 @@ public struct CaptureFlowView: View {
             Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
         } message: {
             Text(viewModel.alertError?.userMessage ?? "")
+        }
+    }
+
+    /// FR-083. Its own screen with its own view model, the way the editor
+    /// stage is — crop has loading and failure of its own.
+    @ViewBuilder
+    private var cropStage: some View {
+        if let photoID = viewModel.challenge.photoID {
+            CropView(
+                viewModel: makeCropViewModel(photoID),
+                onExit: { viewModel.discardPhoto() },
+                onUseCrop: { viewModel.useCrop($0) }
+            )
         }
     }
 }

@@ -3,251 +3,236 @@ import Foundation
 import Testing
 @testable import WardrobeKit
 
-final class SpyLibrarySaver: PhotoLibrarySaveService, @unchecked Sendable {
-    var saveError: Error?
-    private(set) var savedData: [Data] = []
-
-    func save(_ data: Data) async throws {
-        if let saveError {
-            throw saveError
-        }
-        savedData.append(data)
-    }
-}
-
 @MainActor
 struct EditorViewModelTests {
-    private func makeSUT(
-        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
-        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
-        librarySaver: SpyLibrarySaver = SpyLibrarySaver(),
-        draft: EditDraft = EditDraft()
-    ) throws -> EditorViewModel {
-        let photoID = try photoRepository.saveOriginal(SampleCameraService.makeSampleJPEG(width: 100, height: 200))
-        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = photoID
-        challenge.draft = draft
-        activeRepository.stored = challenge
-        return EditorViewModel(
-            challenge: challenge,
-            activeRepository: activeRepository,
-            photoRepository: photoRepository,
-            librarySaver: librarySaver
-        )
-    }
-
     @Test func loadDecodesOriginalAndPreview() async throws {
-        let sut = try makeSUT()
+        let sut = try makeEditorSUT()
 
         sut.load()
         await sut.loadTask?.value
 
-        if case .loaded = sut.originalData {} else {
-            Issue.record("expected loaded, got \(sut.originalData)")
+        if case .loaded = sut.originals {} else {
+            Issue.record("expected loaded, got \(sut.originals)")
         }
-        #expect(sut.previewImage != nil)
+        #expect(!sut.previewImages.isEmpty)
     }
 
     @Test func commitCropPersistsDraftToStore() throws {
         let activeRepository = InMemoryActiveChallengeRepository()
-        let sut = try makeSUT(activeRepository: activeRepository)
+        let sut = try makeEditorSUT(activeRepository: activeRepository)
         let spec = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
 
-        sut.beginCrop()
-        sut.updateWorking(crop: spec)
-        sut.commitTool()
+        try sut.commitCrop(spec, ofLayer: #require(sut.document.firstPhotoLayerID))
 
-        #expect(sut.draft.crop == spec)
-        #expect(activeRepository.stored?.draft.crop == spec)
+        #expect(sut.document.firstPhotoCrop == spec)
+        #expect(activeRepository.stored?.document.firstPhotoCrop == spec)
         #expect(sut.activeTool == nil)
     }
 
-    @Test func cancelToolDiscardsWorkingChanges() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let committed = EditDraft(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
-        let sut = try makeSUT(activeRepository: activeRepository, draft: committed)
+    /// FR-019: crop is reached by double-tapping the photo, so with no photo
+    /// layer there is nothing to double-tap and nothing to open.
+    @Test func cropDoesNotOpenWithoutAPhotoLayer() throws {
+        let sut = try makeEditorSUT(document: EditorDocument(layers: []))
 
-        sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4)))
+        sut.beginCrop(layerID: UUID())
+
+        #expect(sut.activeTool == nil)
+    }
+
+    /// Nothing to discard any more — the crop screen owns its own framing and
+    /// only reports a finished one — so what this pins is that opening and
+    /// leaving the tool is not itself an edit.
+    @Test func cancellingCropLeavesTheDocumentAlone() throws {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = try makeEditorSUT(
+            activeRepository: activeRepository,
+            document: .fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
+        )
+        // Read back rather than reused: the SUT points the fixture's photo layer
+        // at the id the repository actually minted.
+        let committed = sut.document
+
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
         sut.cancelTool()
 
-        #expect(sut.draft == committed)
-        #expect(activeRepository.stored?.draft == committed)
+        #expect(sut.document == committed)
+        #expect(activeRepository.stored?.document == committed)
     }
 
-    @Test func commitNewTextAppendsAndEmptyTextIsDropped() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let sut = try makeSUT(activeRepository: activeRepository)
+    // MARK: Canvas layers (FR-085 select/transform, FR-087 delete)
 
-        sut.beginNewText()
-        guard case var .text(working, _) = sut.activeTool else {
-            Issue.record("expected text tool")
-            return
-        }
-        working.content = "OOTD"
-        sut.updateWorking(text: working)
-        sut.commitTool()
-        #expect(sut.draft.texts.map(\.content) == ["OOTD"])
-        #expect(activeRepository.stored?.draft.texts.map(\.content) == ["OOTD"])
-
-        sut.beginNewText()
-        sut.commitTool() // empty content — dropped
-        #expect(sut.draft.texts.count == 1)
-    }
-
-    @Test func editingExistingTextUpdatesInPlace() throws {
-        let item = TextItem(content: "old")
-        let sut = try makeSUT(draft: EditDraft(texts: [item]))
-
-        sut.beginEditingText(item)
-        var updated = item
-        updated.content = "new"
-        sut.updateWorking(text: updated)
-        sut.commitTool()
-
-        #expect(sut.draft.texts.map(\.content) == ["new"])
-        #expect(sut.draft.texts.count == 1)
-    }
-
-    @Test func removeWorkingTextDeletesAndPersists() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let item = TextItem(content: "bye")
-        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [item]))
-
-        sut.beginEditingText(item)
-        sut.removeWorkingText()
-
-        #expect(sut.draft.texts.isEmpty)
-        #expect(activeRepository.stored?.draft.texts.isEmpty == true)
-        #expect(sut.activeTool == nil)
-    }
-
-    @Test func moveAndScaleTextClampAndPersistOnFinish() throws {
+    /// There is deliberately no mid-gesture entry point any more: the canvas
+    /// renders the live transform itself and the view model is told once, at
+    /// the end. "Not persisted on every frame" is now a property of the API
+    /// rather than something a test has to police.
+    @Test func committingATransformStoresItClampedAndPersists() throws {
         let activeRepository = InMemoryActiveChallengeRepository()
         let item = TextItem(content: "hi")
-        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [item]))
+        let sut = try makeEditorSUT(activeRepository: activeRepository, document: .fixture(texts: [item]))
 
-        sut.moveText(id: item.id, to: CGPoint(x: 1.7, y: -0.3))
-        sut.scaleText(id: item.id, to: 9)
-        #expect(sut.draft.texts[0].position == CGPoint(x: 1, y: 0)) // clamped
-        #expect(sut.draft.texts[0].scale == 3) // clamped
-        #expect(activeRepository.stored?.draft.texts.first?.scale == 1) // not persisted yet
+        sut.commitTransform(layerID: item.id, to: ElementTransform(
+            position: CGPoint(x: 0.2, y: 0.8), scale: 9, rotationDegrees: 42
+        ))
 
-        sut.finishDirectManipulation()
-        #expect(activeRepository.stored?.draft.texts.first?.scale == 3) // persisted at gesture end
+        #expect(sut.document.textItems[0].position == CGPoint(x: 0.2, y: 0.8))
+        #expect(sut.document.textItems[0].scale == ElementTransform.scaleRange.upperBound)
+        #expect(sut.document.textItems[0].rotationDegrees == 42)
+        #expect(activeRepository.stored?.document.textItems.first?.rotationDegrees == 42)
     }
 
-    @Test func moveUnknownTextIDIsNoOp() throws {
-        let sut = try makeSUT(draft: EditDraft(texts: [TextItem(content: "hi")]))
-        let before = sut.draft
+    /// FR-085 word for word: a transform never alters another layer.
+    @Test func transformingOneLayerLeavesEveryOtherUntouched() throws {
+        let moved = TextItem(content: "moved")
+        let other = TextItem(content: "other")
+        let sticker = StickerItem(emoji: "✨")
+        let sut = try makeEditorSUT(document: .fixture(texts: [moved, other], stickers: [sticker]))
 
-        sut.moveText(id: UUID(), to: CGPoint(x: 0.1, y: 0.1))
-        sut.scaleText(id: UUID(), to: 2)
+        sut.commitTransform(layerID: moved.id, to: ElementTransform(position: CGPoint(x: 0.1, y: 0.1)))
 
-        #expect(sut.draft == before)
+        #expect(sut.document.textItems.first { $0.id == other.id }?.position == CGPoint(x: 0.5, y: 0.5))
+        #expect(sut.document.stickerItems[0].position == CGPoint(x: 0.5, y: 0.5))
     }
 
-    @Test func beginNewTextUsesTapPosition() throws {
-        let sut = try makeSUT()
+    @Test func transformingAnUnknownLayerChangesNothing() throws {
+        let sut = try makeEditorSUT(document: .fixture(texts: [TextItem(content: "hi")]))
+        let before = sut.document
 
-        sut.beginNewText(at: CGPoint(x: 0.25, y: 0.75))
+        sut.commitTransform(layerID: UUID(), to: ElementTransform(position: CGPoint(x: 0.1, y: 0.1), scale: 2))
 
-        guard case let .text(working, isNew) = sut.activeTool else {
-            Issue.record("expected text tool")
-            return
-        }
-        #expect(isNew)
-        #expect(working.position == CGPoint(x: 0.25, y: 0.75))
+        #expect(sut.document == before)
+    }
+
+    @Test func removingALayerPersistsAndClearsTheSelection() throws {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let item = TextItem(content: "bye")
+        let sut = try makeEditorSUT(activeRepository: activeRepository, document: .fixture(texts: [item]))
+        sut.select(item.id)
+
+        sut.removeLayer(id: item.id)
+
+        #expect(sut.document.textItems.isEmpty)
+        #expect(activeRepository.stored?.document.textItems.isEmpty == true)
+        #expect(sut.selectedLayerID == nil)
+    }
+
+    // MARK: Layer panel (FR-090, FR-086)
+
+    /// Every panel mutation has to reach the stored draft — a reorder that only
+    /// lives in memory would come back undone after a relaunch.
+    @Test func everyPanelMutationPersists() throws {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let first = TextItem(content: "one")
+        let second = TextItem(content: "two")
+        let sut = try makeEditorSUT(
+            activeRepository: activeRepository, document: .fixture(texts: [first, second])
+        )
+
+        sut.moveLayer(id: first.id, .front)
+        #expect(activeRepository.stored?.document.layers.last?.id == first.id)
+
+        sut.setLock(true, ofLayer: second.id)
+        #expect(activeRepository.stored?.document.layer(id: second.id)?.isLocked == true)
+
+        sut.duplicateLayer(id: second.id)
+        #expect(activeRepository.stored?.document.layers.count == sut.document.layers.count)
+
+        sut.step(.bigger, layerID: first.id)
+        #expect(activeRepository.stored?.document.layer(id: first.id)?.transform.scale == 1 + LayerStep.scaleStep)
+    }
+
+    /// Locking selects, because the panel is the only way back to a layer the
+    /// canvas has stopped responding to (FR-086).
+    @Test func lockingSelectsAndDuplicatingSelectsTheCopy() throws {
+        let item = TextItem(content: "hi")
+        let sut = try makeEditorSUT(document: .fixture(texts: [item]))
+
+        sut.setLock(true, ofLayer: item.id)
+        #expect(sut.selectedLayerID == item.id)
+
+        sut.duplicateLayer(id: item.id)
+        #expect(sut.selectedLayerID == sut.document.layers.last?.id)
+        #expect(sut.selectedLayerID != item.id)
+    }
+
+    /// A locked layer refuses the discrete step for the same reason it refuses
+    /// the gesture — one gate, checked in one place.
+    @Test func aDiscreteStepRespectsTheLock() throws {
+        let item = TextItem(content: "hi")
+        let sut = try makeEditorSUT(document: .fixture(texts: [item]))
+        sut.setLock(true, ofLayer: item.id)
+
+        sut.step(.rotateRight, layerID: item.id)
+
+        #expect(sut.document.layer(id: item.id)?.transform.rotationDegrees == 0)
+    }
+
+    /// Selection is UI state, so it must not reach the stored document.
+    @Test func selectingALayerDoesNotTouchTheDocument() throws {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let item = TextItem(content: "hi")
+        let sut = try makeEditorSUT(activeRepository: activeRepository, document: .fixture(texts: [item]))
+        let stored = activeRepository.stored?.document
+
+        sut.select(item.id)
+
+        #expect(sut.selectedLayerID == item.id)
+        #expect(activeRepository.stored?.document == stored)
     }
 
     // MARK: Stickers (FR-019)
 
     @Test func addStickerAppendsCenteredAndPersists() throws {
         let activeRepository = InMemoryActiveChallengeRepository()
-        let sut = try makeSUT(activeRepository: activeRepository)
+        let sut = try makeEditorSUT(activeRepository: activeRepository)
+        let entry = try #require(StickerCatalogue.entry(id: "emoji.fire"))
 
         sut.isStickerPickerPresented = true
-        sut.addSticker("🔥")
+        sut.addSticker(entry)
 
-        #expect(sut.draft.stickers.map(\.emoji) == ["🔥"])
-        #expect(sut.draft.stickers[0].position == CGPoint(x: 0.5, y: 0.5))
-        #expect(activeRepository.stored?.draft.stickers.count == 1)
+        #expect(sut.document.stickerArts == [.catalogue("emoji.fire")])
+        #expect(sut.document.layers.last?.transform.position == CGPoint(x: 0.5, y: 0.5))
+        #expect(activeRepository.stored?.document.stickerArts.count == 1)
         #expect(!sut.isStickerPickerPresented)
+        // Selected on arrival, so it can be placed without hunting for it.
+        #expect(sut.selectedLayerID == sut.document.layers.last?.id)
     }
 
-    @Test func moveAndScaleStickerClampAndPersistOnFinish() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let sticker = StickerItem(emoji: "✨")
-        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(stickers: [sticker]))
+    /// FR-099: the preference is written, and written *after* the document —
+    /// convenience must never be able to block the edit.
+    @Test func pickingAStickerRemembersItAsRecent() throws {
+        let preferences = InMemoryAccountPreferencesRepository()
+        let sut = try makeEditorSUT(preferencesRepository: preferences)
 
-        sut.moveSticker(id: sticker.id, to: CGPoint(x: -1, y: 2))
-        sut.scaleSticker(id: sticker.id, to: 99)
-        #expect(sut.draft.stickers[0].position == CGPoint(x: 0, y: 1))
-        #expect(sut.draft.stickers[0].scale == 4)
+        try sut.addSticker(#require(StickerCatalogue.entry(id: "sticker.heart")))
+        try sut.addSticker(#require(StickerCatalogue.entry(id: "emoji.fire")))
+        try sut.addSticker(#require(StickerCatalogue.entry(id: "sticker.heart")))
 
-        sut.finishDirectManipulation()
-        #expect(activeRepository.stored?.draft.stickers.first?.scale == 4)
-    }
-
-    @Test func removeStickerPersists() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let sticker = StickerItem(emoji: "✨")
-        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(stickers: [sticker]))
-
-        sut.removeSticker(id: sticker.id)
-
-        #expect(sut.draft.stickers.isEmpty)
-        #expect(activeRepository.stored?.draft.stickers.isEmpty == true)
-    }
-
-    // MARK: Rotation (story-style two-finger rotate)
-
-    @Test func rotateTextAndStickerPersistOnFinish() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let text = TextItem(content: "hi")
-        let sticker = StickerItem(emoji: "✨")
-        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [text], stickers: [sticker]))
-
-        sut.rotateText(id: text.id, to: 42)
-        sut.rotateSticker(id: sticker.id, to: -30)
-        #expect(sut.draft.texts[0].rotationDegrees == 42)
-        #expect(sut.draft.stickers[0].rotationDegrees == -30)
-        #expect(activeRepository.stored?.draft.texts.first?.rotationDegrees == 0) // not persisted mid-gesture
-
-        sut.finishDirectManipulation()
-        #expect(activeRepository.stored?.draft.texts.first?.rotationDegrees == 42)
-        #expect(activeRepository.stored?.draft.stickers.first?.rotationDegrees == -30)
-    }
-
-    @Test func rotateUnknownIDIsNoOp() throws {
-        let sut = try makeSUT(draft: EditDraft(texts: [TextItem(content: "hi")], stickers: [StickerItem(emoji: "✨")]))
-        let before = sut.draft
-
-        sut.rotateText(id: UUID(), to: 90)
-        sut.rotateSticker(id: UUID(), to: 90)
-
-        #expect(sut.draft == before)
+        // Newest first, and picking the same one twice does not duplicate it.
+        #expect(preferences.stored.recentStickerIDs == ["sticker.heart", "emoji.fire"])
+        #expect(sut.recentStickerIDs == ["sticker.heart", "emoji.fire"])
     }
 
     // MARK: Derived preview cache (perf guard)
 
     @Test func croppedPreviewOnlyRecomputesWhenCropChanges() async throws {
         let text = TextItem(content: "hi")
-        let sut = try makeSUT(draft: EditDraft(texts: [text]))
+        let sut = try makeEditorSUT(document: .fixture(texts: [text]))
         sut.load()
         await sut.loadTask?.value
 
-        let afterLoad = try #require(sut.croppedPreviewImage)
+        let photoID = try #require(sut.document.photoIDs.first)
+        let afterLoad = try #require(sut.preview(forPhoto: photoID))
         #expect(afterLoad.width == 100) // full preview, no crop yet
 
-        sut.moveText(id: text.id, to: CGPoint(x: 0.2, y: 0.2))
-        sut.finishDirectManipulation()
-        #expect(sut.croppedPreviewImage === afterLoad) // untouched by overlay edits
+        sut.commitTransform(layerID: text.id, to: ElementTransform(position: CGPoint(x: 0.2, y: 0.2)))
+        #expect(sut.preview(forPhoto: photoID) === afterLoad) // untouched by layer edits
 
-        sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
-        sut.commitTool()
-        let afterCrop = try #require(sut.croppedPreviewImage)
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
+        try sut.commitCrop(
+            CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)),
+            ofLayer: #require(sut.document.firstPhotoLayerID)
+        )
+        let afterCrop = try #require(sut.preview(forPhoto: photoID))
         #expect(afterCrop.width == 50) // recomputed exactly once, on crop commit
     }
 
@@ -255,7 +240,7 @@ struct EditorViewModelTests {
 
     @Test func saveDirectlyRendersAndSaves() async throws {
         let librarySaver = SpyLibrarySaver()
-        let sut = try makeSUT(librarySaver: librarySaver)
+        let sut = try makeEditorSUT(librarySaver: librarySaver)
         sut.load()
         await sut.loadTask?.value
 
@@ -270,7 +255,7 @@ struct EditorViewModelTests {
     @Test func saveDirectlyFailureSetsError() async throws {
         let librarySaver = SpyLibrarySaver()
         librarySaver.saveError = AppError.photoSaveFailed
-        let sut = try makeSUT(librarySaver: librarySaver)
+        let sut = try makeEditorSUT(librarySaver: librarySaver)
         sut.load()
         await sut.loadTask?.value
 
@@ -299,24 +284,6 @@ struct EditorViewModelTests {
         #expect(draft.stickers.isEmpty)
     }
 
-    @Test func textFontAndAlignmentCommitAndPersist() throws {
-        let activeRepository = InMemoryActiveChallengeRepository()
-        let item = TextItem(content: "OOTD")
-        let sut = try makeSUT(activeRepository: activeRepository, draft: EditDraft(texts: [item]))
-
-        sut.beginEditingText(item)
-        var updated = item
-        updated.fontName = TextFontStyle.serif.rawValue
-        updated.alignmentName = TextAlignmentStyle.trailing.rawValue
-        sut.updateWorking(text: updated)
-        sut.commitTool()
-
-        #expect(sut.draft.texts[0].fontStyle == .serif)
-        #expect(sut.draft.texts[0].alignmentStyle == .trailing)
-        #expect(activeRepository.stored?.draft.texts[0].fontName == TextFontStyle.serif.rawValue)
-        #expect(activeRepository.stored?.draft.texts[0].alignmentName == TextAlignmentStyle.trailing.rawValue)
-    }
-
     @Test func draftWithPreRotationStickerDecodesWithZeroRotation() throws {
         let legacy = Data("""
         {"stickers":[{"id":"22222222-3333-4444-5555-666666666666","emoji":"🔥","position":[0.5,0.5],"scale":1}]}
@@ -330,12 +297,14 @@ struct EditorViewModelTests {
 
     @Test func originalBytesNeverChangeAfterCommits() throws {
         let photoRepository = SpyPhotoRepository()
-        let sut = try makeSUT(photoRepository: photoRepository)
+        let sut = try makeEditorSUT(photoRepository: photoRepository)
         let originalBytes = photoRepository.saved.values.first
 
-        sut.beginCrop()
-        sut.updateWorking(crop: CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)))
-        sut.commitTool()
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
+        try sut.commitCrop(
+            CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)),
+            ofLayer: #require(sut.document.firstPhotoLayerID)
+        )
 
         #expect(photoRepository.saved.values.first == originalBytes) // §18.5 write-once
     }

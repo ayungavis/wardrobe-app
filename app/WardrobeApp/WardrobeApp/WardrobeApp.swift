@@ -1,10 +1,12 @@
+import DesignSystem
 import Sentry
 import SwiftUI
 import WardrobeKit
-import DesignSystem
 
 @main
 struct WardrobeAppApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     private let container = AppContainer()
 
     init() {
@@ -21,12 +23,19 @@ struct WardrobeAppApp: App {
 //                RootView(container: container)
 //            }
             RootView(container: container)
-                //.background(Color.red.ignoresSafeArea())
+            // .background(Color.red.ignoresSafeArea())
 //                .background(
 //                                Image("appBG")
 //                                    .resizable()
 //                                    .ignoresSafeArea()
 //                            )
+        }
+        // Draft writes are coalesced, so this is where the last one is made to
+        // land — without it, backgrounding mid-edit could lose the burst that
+        // the timer had not got to yet (FR-004).
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background else { return }
+            Task { await container.flushDrafts() }
         }
     }
 
@@ -50,4 +59,3 @@ struct WardrobeAppApp: App {
         Log.errorReporter = { SentrySDK.capture(error: $0) }
     }
 }
-

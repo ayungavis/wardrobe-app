@@ -9,19 +9,22 @@ public final class AppContainer {
     private let activeChallengeRepository: ActiveChallengeRepository
     private let completedChallengeRepository: CompletedChallengeRepository
     private let photoRepository: PhotoRepository
+    let preferencesRepository: AccountPreferencesRepository
     private let cameraService: CameraService
 
     public init(
         challengeRepository: ChallengeRepository = MockChallengeRepository(),
-        activeChallengeRepository: ActiveChallengeRepository = UserDefaultsActiveChallengeRepository(),
+        activeChallengeRepository: ActiveChallengeRepository = FileActiveChallengeRepository(),
         completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
         photoRepository: PhotoRepository = FilePhotoRepository(),
+        preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
         self.activeChallengeRepository = activeChallengeRepository
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
+        self.preferencesRepository = preferencesRepository
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -31,6 +34,12 @@ public final class AppContainer {
         #else
             SampleCameraService()
         #endif
+    }
+
+    /// Makes the in-progress draft durable. Called when the app leaves the
+    /// screen, which is the last moment it is certain to get.
+    public func flushDrafts() async {
+        await activeChallengeRepository.flush()
     }
 
     public func makeChallengeViewModel() -> ChallengeViewModel {
@@ -69,8 +78,13 @@ public final class AppContainer {
             challenge: challenge,
             activeRepository: activeChallengeRepository,
             photoRepository: photoRepository,
-            librarySaver: Self.defaultLibrarySaver()
+            librarySaver: Self.defaultLibrarySaver(),
+            preferencesRepository: preferencesRepository
         )
+    }
+
+    public func makeCropViewModel(photoID: String) -> CropViewModel {
+        CropViewModel(photoID: photoID, photoRepository: photoRepository)
     }
 
     public func makeWardrobeViewModel() -> WardrobeViewModel {
@@ -162,11 +176,11 @@ public final class AppContainer {
             NoopPhotoLibrarySaveService()
         #endif
     }
-    
+
     public func makeCameraService() -> CameraService {
         cameraService
     }
-    
+
     public func makeHistoryViewModel() -> HistoryViewModel {
         HistoryViewModel(
             completedRepository: completedChallengeRepository,

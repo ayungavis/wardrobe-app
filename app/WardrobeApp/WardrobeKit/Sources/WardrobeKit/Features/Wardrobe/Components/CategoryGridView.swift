@@ -7,6 +7,7 @@
 
 import DesignSystem
 import SwiftUI
+
 struct CategoryGridView: View {
     let category: GarmentCategory
     let items: [WardrobeItem]
@@ -19,7 +20,7 @@ struct CategoryGridView: View {
 
     private let columns = [
         GridItem(.flexible(), spacing: Spacing.md),
-        GridItem(.flexible(), spacing: Spacing.md)
+        GridItem(.flexible(), spacing: Spacing.md),
     ]
 
     private var sortedItems: [WardrobeItem] {
@@ -47,11 +48,12 @@ struct CategoryGridView: View {
                         }
                     }
                 } label: {
-                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
-                        .padding(.horizontal, Spacing.md)
-                        .padding(.vertical, Spacing.sm)
-                        //.background(Capsule().fill(AppColor.surface))
-                        .background(Capsule().fill(.ultraThinMaterial))
+                    Label { Text("wardrobe.filter", bundle: .module) } icon: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.sm)
+                    .background(Capsule().fill(.ultraThinMaterial))
                 }
             }
             .padding(Spacing.lg)

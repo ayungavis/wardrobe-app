@@ -28,7 +28,13 @@ public final class CaptureFlowViewModel {
 
     /// Set once the checkmark commits — the flow's cover closes on it.
     public private(set) var isCompleted = false
-    private var isCompleting = false
+    /// Read by the editor so the ✓ can show the wait for the garment scan
+    /// rather than looking inert.
+    public private(set) var isCompleting = false
+    /// True when this session opened onto work that was already there, rather
+    /// than work it created. Read by the editor to state that a device-only
+    /// draft was restored (§17).
+    public private(set) var didResumeDraft = false
 
     /// The AI item review shown in the editor drawer (FR-027).
     public let review: GarmentReviewModel
@@ -69,13 +75,27 @@ public final class CaptureFlowViewModel {
             thumbnails: thumbnails
         )
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
+        // Landing straight in the editor can only mean the challenge came off
+        // disk with the crop already committed — which is exactly the "restored
+        // draft" §17 wants stated. No extra flag is persisted to say what the
+        // stage already says.
+        didResumeDraft = stage == .editor
         syncCameraState()
     }
 
     static func initialStage(challenge: ActiveChallenge, permission: CameraPermission) -> CaptureStage {
-        if challenge.photoID != nil {
-            return .editor
-        } // resume straight to editor (FR-017)
+        // Resume where the photo actually is (FR-017). A capture that never got
+        // framed reopens the crop step rather than skipping past it — the crop
+        // in the draft is what says the step is done, so no extra flag is
+        // persisted to say the same thing twice.
+        if let photoID = challenge.photoID {
+            // The *challenge* photo's crop, not any photo's: a second photo
+            // added in the editor must not send the flow back to the crop step
+            // (FR-093).
+            let layerID = challenge.document.photoLayerID(showing: photoID)
+            let crop = layerID.flatMap { challenge.document.crop(ofLayer: $0) }
+            return crop == nil ? .crop : .editor
+        }
         switch permission {
         case .granted: return .camera
         case .notDetermined: return .consent // FR-013: explain before the system prompt
@@ -98,7 +118,8 @@ public final class CaptureFlowViewModel {
         switch stage {
         case .consent, .denied, .camera:
             stage = Self.initialStage(challenge: challenge, permission: camera.permission)
-        case .editor:
+        case .crop, .editor:
+            // A photo already exists; camera permission cannot un-take it.
             break
         }
     }
@@ -197,18 +218,36 @@ public final class CaptureFlowViewModel {
         focusPoint = point
     }
 
-    /// Ordering matters: file write first, then persist photoID, then editor.
-    /// A failed write leaves nothing persisted (FR-016).
+    /// Ordering matters: file write first, then persist photoID, then the crop
+    /// step. A failed write leaves nothing persisted (FR-016).
     private func persistPhoto(_ data: Data) {
         do {
             let id = try photoRepository.saveOriginal(data)
             challenge.photoID = id
+            // The photo layer is born with the photo — the crop step and the
+            // editor both write into it rather than creating it later.
+            challenge.document = EditorDocument(photoID: id)
             activeRepository.save(challenge)
-            stage = .editor
+            stage = .crop
         } catch {
             Log.report(error)
             alertError = .captureFailed
         }
+    }
+
+    /// **Use Crop** (FR-083): the framing is stored as an instruction, not as a
+    /// second image file. The editor's preview and the exporter both already
+    /// read `document.photoCrop`, so the original stays the only photo on disk
+    /// and is never overwritten (FR-092).
+    public func useCrop(_ crop: CropSpec) {
+        guard let photoID = challenge.photoID,
+              let layerID = challenge.document.photoLayerID(showing: photoID)
+        else {
+            return
+        }
+        challenge.document.setCrop(crop, ofLayer: layerID)
+        activeRepository.save(challenge)
+        stage = .editor
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
@@ -233,7 +272,11 @@ public final class CaptureFlowViewModel {
         let completion = CompletedChallenge(
             card: challenge.card,
             photoID: photoID,
-            draft: challenge.draft,
+            // Read back rather than trusted: the editor owns a separate copy of
+            // the challenge and saves its edits to the repository, so this
+            // value copy has been stale ever since the editor opened. Taking
+            // the local one here silently dropped every text and sticker at ✓.
+            document: activeRepository.load()?.document ?? challenge.document,
             completedAt: now
         )
 
@@ -241,6 +284,11 @@ public final class CaptureFlowViewModel {
         // one transaction is impossible; if the bookkeeping fails the challenge
         // still completes rather than being held hostage by it.
         review.commit(completionID: completion.id, at: now)
+        // Photos added and then deleted have nothing left in the document to
+        // name them, so this is the last chance to clean them up.
+        photoRepository.deleteUnusedOriginals(
+            of: completion.document, imported: challenge.importedPhotoIDs
+        )
 
         completedRepository.append(completion)
         activeRepository.clear() // the photo file stays — History will render it
@@ -251,15 +299,11 @@ public final class CaptureFlowViewModel {
 
     /// Editor X: throw the photo and its edits away, back to the camera.
     public func discardPhoto() {
-        if let photoID = challenge.photoID {
-            do {
-                try photoRepository.deleteOriginal(id: photoID)
-            } catch {
-                Log.report(error) // orphaned file is not worth blocking the retake
-            }
-        }
+        // Every photo the canvas holds, not just the capture (FR-093).
+        photoRepository.deleteOriginals(of: challenge.document, and: challenge.photoID)
         challenge.photoID = nil
-        challenge.draft = EditDraft()
+        challenge.document = EditorDocument(layers: [])
+        challenge.importedPhotoIDs = []
         activeRepository.save(challenge)
         stage = .camera
     }

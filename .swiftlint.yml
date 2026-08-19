@@ -19,3 +19,14 @@ line_length:
 
 identifier_name:
   min_length: 2
+  # `x`/`y` mirror CGPoint on the two geometry value types; anything shorter
+  # than these is renamed, not excused.
+  allowed_symbols: []
+  excluded:
+    - x
+    - y
+
+redundant_discardable_let:
+  # `let _ = sideEffect()` is the only way to run a Void call inside a
+  # ViewBuilder, which is what the previews need for font registration.
+  ignore_swiftui_view_bodies: true

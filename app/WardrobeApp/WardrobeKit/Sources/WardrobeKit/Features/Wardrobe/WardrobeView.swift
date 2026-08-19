@@ -18,8 +18,13 @@ public struct WardrobeView: View {
         self.container = container
     }
 
-    private var topItems: [WardrobeItem] { viewModel.items.filter { $0.category == .top } }
-    private var bottomItems: [WardrobeItem] { viewModel.items.filter { $0.category == .bottom } }
+    private var topItems: [WardrobeItem] {
+        viewModel.items.filter { $0.category == .top }
+    }
+
+    private var bottomItems: [WardrobeItem] {
+        viewModel.items.filter { $0.category == .bottom }
+    }
 
     public var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -85,12 +90,12 @@ public struct WardrobeView: View {
                 Button {
                     isCameraScanPresented = true
                 } label: {
-                    Label("Camera", systemImage: "camera")
+                    Label { Text("wardrobe.add.camera", bundle: .module) } icon: { Image(systemName: "camera") }
                 }
                 Button {
                     isBulkScanPresented = true
                 } label: {
-                    Label("Add from Photos", systemImage: "photo.on.rectangle")
+                    Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
                 }
             } label: {
                 Image(systemName: "plus")
@@ -136,22 +141,24 @@ public struct WardrobeView: View {
                     category: .top,
                     items: topItems,
                     thumbnailData: { viewModel.thumbnailData(for: $0) },
-                    namespace: pileNamespace
-                ) {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                        expandedCategory = .top
+                    namespace: pileNamespace,
+                    onTap: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            expandedCategory = .top
+                        }
                     }
-                }
+                )
                 PileCardView(
                     category: .bottom,
                     items: bottomItems,
                     thumbnailData: { viewModel.thumbnailData(for: $0) },
-                    namespace: pileNamespace
-                ) {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                        expandedCategory = .bottom
+                    namespace: pileNamespace,
+                    onTap: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            expandedCategory = .bottom
+                        }
                     }
-                }
+                )
             }
             .padding(Spacing.lg)
         }

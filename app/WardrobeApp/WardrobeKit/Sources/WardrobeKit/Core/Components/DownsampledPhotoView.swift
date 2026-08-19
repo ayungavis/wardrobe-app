@@ -7,6 +7,7 @@ struct DownsampledPhotoView: View {
     let data: Data
     // ponytail: fixed decode budget; derive from displayScale when profiling says so.
     var maxPixel: CGFloat = 1600
+    var contentMode: ContentMode = .fit
 
     @State private var image: CGImage?
 
@@ -15,7 +16,7 @@ struct DownsampledPhotoView: View {
             if let image {
                 Image(decorative: image, scale: 1)
                     .resizable()
-                    .scaledToFit()
+                    .aspectRatio(contentMode: contentMode)
             } else {
                 ProgressView()
             }

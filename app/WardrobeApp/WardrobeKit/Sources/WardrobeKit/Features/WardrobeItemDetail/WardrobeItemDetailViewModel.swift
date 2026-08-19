@@ -110,7 +110,7 @@ public final class WardrobeItemDetailViewModel {
             Log.report(error)
         }
     }
-    
+
     public func updateItem(name: String, description: String) {
         guard var updated = item else { return }
         updated.name = name
@@ -124,5 +124,5 @@ public final class WardrobeItemDetailViewModel {
         } catch {
             Log.report(error)
         }
-    } 
+    }
 }

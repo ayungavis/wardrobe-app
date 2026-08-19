@@ -5,9 +5,9 @@ struct WardrobeItemCellView: View {
     let item: WardrobeItem
     let data: Data?
     let wearCount: Int
-    
+
     private static let thumbnailHeight: CGFloat = 150
-    
+
     var body: some View {
         VStack(spacing: Spacing.xs) {
             ZStack(alignment: .bottomTrailing) {
@@ -20,22 +20,20 @@ struct WardrobeItemCellView: View {
                         .fill(AppColor.surface)
                         .frame(height: Self.thumbnailHeight)
                 }
-                
-                Text("\(wearCount)x")
+
+                Text("wardrobe.wearCount \(wearCount)", bundle: .module)
                     .font(AppFont.title.bold())
                     .stroke(color: .white, width: 3)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, 4)
-                    //.background(Capsule().fill(.white))
                     .padding(Spacing.sm)
             }
-            
+
             Text(item.category.title, bundle: .module)
                 .font(AppFont.caption)
                 .foregroundStyle(AppColor.textSecondary)
         }
     }
-
 }
 
 extension GarmentCategory {
