@@ -4,14 +4,9 @@ import SwiftUI
 struct ChallengeCardView: View {
     let card: ChallengeCard
     let onAccept: () -> Void
-    // The card's real design size in Figma — the single source of truth for
-    // every position below. Constant, so the layout is resolved once for the
-    // type rather than rebuilt for each card in the deck.
     private static let frameWidth: CGFloat = 346
     private static let frameHeight: CGFloat = 617
 
-    /// Paste a sticker's raw px position/size straight from Figma's inspector;
-    /// the card frame is already known, so it never has to be repeated.
     private static func sticker(
         _ name: String,
         _ figmaX: CGFloat, _ figmaY: CGFloat,
@@ -70,11 +65,9 @@ struct ChallengeCardView: View {
                     .frame(width: cw * Self.stickyPlacement.widthFraction)
                     .position(x: cw * Self.stickyPlacement.x, y: ch * Self.stickyPlacement.y)
 
-                // Text layered directly on top of the sticky note, same position + matching size
                 Text(card.prompt)
                     .font(AppFont.body)
                     .multilineTextAlignment(.center)
-                    // Narrower than the note so the text never touches its edges.
                     .frame(width: cw * Self.stickyPlacement.widthFraction * 0.8)
                     .position(x: cw * Self.stickyPlacement.x, y: ch * Self.stickyPlacement.y)
 

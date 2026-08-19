@@ -1,11 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// Every occasion this garment was worn, newest first.
-///
-/// The list is the point: a count alone says how much, while the dates say
-/// when — which is what tells someone whether a garment is in rotation or was
-/// worn once in March.
 struct WearTimelineView: View {
     let wears: [WearRecord]
 
@@ -21,8 +16,6 @@ struct WearTimelineView: View {
                         .foregroundStyle(AppColor.textPrimary)
                     Spacer()
                     if wear.completionID == nil {
-                        // Imported outside the daily loop, which is worth saying:
-                        // it explains a wear with no challenge behind it.
                         Text("wardrobe.detail.wear.imported", bundle: .module)
                             .font(AppFont.caption)
                             .foregroundStyle(AppColor.textSecondary)

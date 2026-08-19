@@ -2,21 +2,11 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// A layer at 46 points, for the panel row.
-///
-/// Drawn per kind rather than by shrinking `LayerContentView`. Every size in
-/// that view is a fraction of the canvas, so a true miniature would put text at
-/// about four points and the polaroid at twenty-seven with its white border —
-/// honest, and unreadable. What a row needs is recognisable, which is a
-/// different job.
 struct LayerThumbnailView: View {
     static let size: CGFloat = 46
     private static let cornerRadius: CGFloat = 11
 
     let content: LayerContent
-    /// A lookup rather than one image: a document can hold more than one photo
-    /// layer (FR-093), and handing the same pixels to every layer drew the same
-    /// picture twice.
     let photo: (String) -> CGImage?
 
     var body: some View {
@@ -41,8 +31,6 @@ struct LayerThumbnailView: View {
         }
     }
 
-    /// The cropped capture itself, not the polaroid frame: at this size the
-    /// border and lip would be most of the cell.
     @ViewBuilder
     private func photoFill(_ photoID: String) -> some View {
         if let photo = photo(photoID) {
@@ -54,7 +42,6 @@ struct LayerThumbnailView: View {
         }
     }
 
-    /// The layer's own colours on a specimen, the way a font menu shows one.
     private func textPreview(_ text: TextContent) -> some View {
         ZStack {
             textBackground(text)
@@ -75,9 +62,6 @@ struct LayerThumbnailView: View {
 }
 
 private extension DrawingContent {
-    /// A fitted drawing is stored in a box smaller than the canvas, so the
-    /// reference width it was drawn against is the box divided by that ratio —
-    /// otherwise every trimmed drawing comes out thin.
     var widthScale: CGFloat {
         max(CGFloat(widthRatio), 0.001)
     }

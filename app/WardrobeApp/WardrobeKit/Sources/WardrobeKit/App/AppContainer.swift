@@ -1,8 +1,6 @@
 import Foundation
 import SwiftData
 
-/// Composition root. Owns dependency construction so views and view models
-/// stay injectable and testable.
 @MainActor
 public final class AppContainer {
     private let challengeRepository: ChallengeRepository
@@ -39,8 +37,6 @@ public final class AppContainer {
         #endif
     }
 
-    /// Makes the in-progress draft durable. Called when the app leaves the
-    /// screen, which is the last moment it is certain to get.
     public func flushDrafts() async {
         await activeChallengeRepository.flush()
     }
@@ -115,7 +111,6 @@ public final class AppContainer {
         )
     }
 
-    /// Internal: the benchmark is a dev tool and never leaves the package.
     func makeMatchBenchmarkViewModel() -> MatchBenchmarkViewModel {
         MatchBenchmarkViewModel(
             scanner: makeGarmentScanService(),
@@ -137,7 +132,6 @@ public final class AppContainer {
         SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
     }
 
-    /// Built once per process; `ModelContainer` is Sendable and cheap to share.
     private static let wardrobeContainer: ModelContainer = {
         do {
             return try ModelContainer(for: SwiftDataWardrobeItemRepository.schema)

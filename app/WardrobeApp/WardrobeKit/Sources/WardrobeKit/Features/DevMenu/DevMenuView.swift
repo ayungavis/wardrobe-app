@@ -3,7 +3,6 @@ import SwiftUI
 // ponytail: strings here are deliberately NOT localized (`Text(verbatim:)`).
 // The sheet never reaches an App Store build, so no user ever reads them.
 
-/// Developer configuration sheet — long-press the Challenge screen to open it.
 struct DevMenuView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DevMenuViewModel
@@ -12,12 +11,8 @@ struct DevMenuView: View {
     @State private var isWardrobeResetConfirmationPresented = false
     @State private var isBulkScanPresented = false
     @State private var isBenchmarkPresented = false
-    /// Called after an action mutates a repository, so the screen behind the sheet
-    /// updates right away instead of waiting for dismissal.
     private let onStateChanged: () -> Void
-    /// Built on demand so a scan always starts from an empty queue.
     private let makeReview: () -> GarmentReviewModel
-    /// Same reason: every benchmark run starts from an empty set of labels.
     private let makeBenchmark: () -> MatchBenchmarkViewModel
 
     init(
@@ -177,8 +172,6 @@ private struct DevTodaySection: View {
         } header: {
             Text(verbatim: "Today")
         } footer: {
-            // New dev actions go here as extra rows — one method on the view
-            // model, one Button.
             Text(verbatim: lastAction ?? "Reopens the deck as if today had not started.")
         }
     }

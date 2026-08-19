@@ -1,19 +1,10 @@
 import CoreGraphics
 import Foundation
 
-/// Puts every cut-out on the same canvas at the same scale.
-///
-/// Raw cut-outs arrive at whatever size the garment happened to occupy in the
-/// photo, which makes the wardrobe grid look random and makes fingerprints of
-/// the same shirt disagree from one day to the next.
 enum GarmentNormalization {
     static let canvasSize = 1024
-    /// Share of the canvas the garment's longest side fills. The remainder is
-    /// the margin that makes the grid read as a catalogue.
     static let fillRatio: CGFloat = 0.8
 
-    /// Background stays transparent: the grid draws it over `AppColor.surface`,
-    /// and fingerprinting flattens it onto a constant grey of its own.
     static func normalize(_ image: CGImage) -> CGImage? {
         let side = CGFloat(canvasSize)
         guard image.width > 0, image.height > 0 else { return nil }

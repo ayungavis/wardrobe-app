@@ -4,8 +4,6 @@ import SwiftUI
     import UIKit
 #endif
 
-/// The drawing tool's own bar, anchored at the bottom where the review drawer
-/// and the Save/Share/✓ row sit when no tool is open.
 struct DrawingToolbarView: View {
     let pen: DrawingPen
     let canClear: Bool
@@ -26,8 +24,6 @@ struct DrawingToolbarView: View {
             colorMenu
             widthMenu
 
-            // Shows the tool it would switch *to*, so the button is an offer
-            // rather than a status light.
             iconButton(
                 pen.isErasing ? "pencil.tip" : "eraser.fill",
                 label: Text(pen.isErasing ? "editor.drawing.pen" : "editor.drawing.eraser", bundle: .module),
@@ -91,10 +87,6 @@ struct DrawingToolbarView: View {
         .accessibilityIdentifier("editor.drawing.color")
     }
 
-    /// A rasterised swatch rather than an SF Symbol. UIKit renders menu-item
-    /// images as templates — it recolours them with the menu's tint and ignores
-    /// `.foregroundStyle` — so a symbol comes out the same colour for all eight
-    /// entries. `.original` on a drawn image is what keeps the palette.
     @ViewBuilder
     private func swatchIcon(_ color: DrawingColor) -> some View {
         #if os(iOS)
@@ -163,10 +155,6 @@ struct DrawingToolbarView: View {
 }
 
 #if os(iOS)
-    /// Draws the menu swatch by hand, because a template image cannot carry a
-    /// palette. Not extracted into a named utility: `UIGraphicsImageRenderer`
-    /// does not exist on macOS, where the tests run, so it has exactly one
-    /// caller and no way to be checked by an assertion.
     private enum DrawingSwatchImage {
         static func make(_ color: DrawingColor, isSelected: Bool) -> UIImage {
             let side: CGFloat = 20

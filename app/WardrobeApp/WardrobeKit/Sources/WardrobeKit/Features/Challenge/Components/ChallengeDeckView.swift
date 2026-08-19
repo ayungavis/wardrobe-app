@@ -1,9 +1,3 @@
-//
-//  ChallengeDeckView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 14/08/26.
-//
 import SwiftUI
 
 struct ChallengeDeckView: View {
@@ -11,8 +5,8 @@ struct ChallengeDeckView: View {
     let onAccept: (ChallengeCard) -> Void
 
     @State private var currentIndex = 0
-    @State private var dragOffset: CGFloat = 0 // drag for the current (front) card
-    @State private var bringBackOffset: CGFloat = 0 // drag for the most recently parked card
+    @State private var dragOffset: CGFloat = 0
+    @State private var bringBackOffset: CGFloat = 0
 
     private let parkedOffsetX: CGFloat = -300
     private let parkedOffsetY: CGFloat = -100
@@ -78,7 +72,6 @@ struct ChallengeDeckView: View {
     private var bringBackGesture: some Gesture {
         DragGesture()
             .onChanged { value in
-                // Only respond to rightward drags — pulling the card back toward center
                 bringBackOffset = max(0, value.translation.width)
             }
             .onEnded { value in

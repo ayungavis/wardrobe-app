@@ -1,11 +1,6 @@
 import Foundation
 import Observation
 
-/// What a photo appears to contain, and what the user decided about each
-/// garment (PRD FR-027). Nothing is written until `commit` is called.
-///
-/// One model for both callers: the editor drawer during a challenge, and the
-/// dev-menu bulk scan. Two copies of the merge rules would drift apart.
 @MainActor
 @Observable
 public final class GarmentReviewModel {
@@ -35,16 +30,12 @@ public final class GarmentReviewModel {
     // screen — a second of jank on a big photo. Moving Core ML off the main
     // actor is the upgrade when it starts to bite.
 
-    /// Runs once per photo, when the editor appears. A Task, so the editor is
-    /// usable while it works.
     public func scanIfNeeded(photoID: String?) {
         guard let photoID, scannedPhotoID != photoID else { return }
         scannedPhotoID = photoID
         scan { [photoRepository] in try photoRepository.loadOriginal(id: photoID) }
     }
 
-    /// Bulk scan: the picker hands over bytes directly. Results accumulate, so
-    /// a batch of photos becomes one review queue.
     public func scan(photo: Data) {
         scan { photo }
     }
@@ -70,8 +61,6 @@ public final class GarmentReviewModel {
         }
     }
 
-    /// Drops every pending decision and the cut-outs written for them, so a
-    /// dismissed review does not leak files.
     public func cancel() {
         scanTask?.cancel()
         for garment in garments {
@@ -81,14 +70,10 @@ public final class GarmentReviewModel {
         scannedPhotoID = nil
     }
 
-    /// Waits for an in-flight scan. Bounded on-device work, so the checkmark
-    /// waits for it rather than dropping garments it was about to produce.
     public func finishScanning() async {
         await scanTask?.value
     }
 
-    /// The queue's only entry point: scanning appends through it, and tests
-    /// stage a batch so commit can be exercised without a model.
     func stage(_ garments: [ScannedGarment]) {
         self.garments.append(contentsOf: garments)
     }
@@ -109,10 +94,6 @@ public final class GarmentReviewModel {
         return thumbnailData(forFile: item.cutoutFile)
     }
 
-    /// Writes every confirmed decision. Failures are reported, never thrown:
-    /// wardrobe bookkeeping must not hold the daily challenge hostage.
-    /// `completionID` is nil outside the daily loop — the bulk scan imports
-    /// garments that no challenge produced.
     public func commit(completionID: UUID?, at date: Date) {
         for garment in garments {
             do {

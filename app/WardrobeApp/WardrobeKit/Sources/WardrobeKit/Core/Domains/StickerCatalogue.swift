@@ -1,17 +1,11 @@
 import Foundation
 import SwiftUI
 
-/// How a catalogue entry is drawn. Separate from `StickerArt`, which is what
-/// gets *stored* — one is a recipe this build ships, the other is an identity
-/// that outlives it.
 public enum StickerDesign: Equatable, Sendable {
     case emoji(String)
     case symbol(name: String, accent: StickerAccent)
 }
 
-/// Gradient palette for the offline stickers. A content palette, like
-/// `TextColor` and `CanvasBackground` — a choice about the picture, not a
-/// design-system token.
 public enum StickerAccent: String, CaseIterable, Sendable {
     case pink, red, orange, yellow, green, blue, purple
 
@@ -32,26 +26,15 @@ public struct StickerCatalogueEntry: Identifiable, Equatable, Sendable {
     public let id: String
     public let design: StickerDesign
 
-    /// Spoken by VoiceOver and targeted by Voice Control — an emoji is not
-    /// something either can say, so every entry carries a name.
     public var name: String {
         LocalizedKey.resolve(Self.nameKey(for: id))
     }
 
-    /// Assembled from the id at runtime, so the extractor never sees these keys
-    /// in source and prunes them as stale. They are pinned
-    /// `"extractionState": "manual"` in `Localizable.xcstrings`; a test fails if
-    /// that pin is removed.
     static func nameKey(for id: String) -> String {
         "editor.sticker.\(id)"
     }
 }
 
-/// The fixed sticker catalogue (FR-019).
-///
-/// **Ids are a storage contract.** A layer stores the id, so renaming or
-/// removing one deletes that sticker from documents people have already made.
-/// A test pins the list for exactly that reason.
 public enum StickerCatalogue {
     public static let emojis: [StickerCatalogueEntry] = [
         StickerCatalogueEntry(id: "emoji.love-face", design: .emoji("🥰")),
@@ -103,8 +86,6 @@ public enum StickerCatalogue {
         StickerCatalogueEntry(id: "emoji.airplane", design: .emoji("✈️")),
     ]
 
-    /// Drawn rather than typed, so they look the same on every phone and in
-    /// every export — no font, no emoji version, nothing to download.
     public static let offlineStickers: [StickerCatalogueEntry] = [
         StickerCatalogueEntry(id: "sticker.heart", design: .symbol(name: "heart.fill", accent: .pink)),
         StickerCatalogueEntry(id: "sticker.star", design: .symbol(name: "star.fill", accent: .yellow)),
@@ -126,7 +107,6 @@ public enum StickerCatalogue {
         all.first { $0.id == id }
     }
 
-    /// Used once, when reading a document that stored a raw glyph.
     public static func entry(matching emoji: String) -> StickerCatalogueEntry? {
         all.first { $0.design == .emoji(emoji) }
     }

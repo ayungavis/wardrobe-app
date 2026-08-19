@@ -2,11 +2,6 @@ import DesignSystem
 import PhotosUI
 import SwiftUI
 
-/// Fills the wardrobe from a batch of library photos, without completing a
-/// challenge. A dev tool: the product path is capture → editor drawer → ✓.
-///
-/// Reviewing the whole batch in one pass is the point — a twenty-photo scan can
-/// find forty garments, and confirming each one mid-scan would be unusable.
 struct BulkScanView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var review: GarmentReviewModel

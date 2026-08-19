@@ -1,16 +1,11 @@
 import Foundation
 
-/// Stores the rendered composition of a completed challenge — what History
-/// shows instead of the raw capture.
-///
 /// The file *is* the export: the same bytes `ExportService` produces for Save
-/// and Share, so what History shows can never drift from what the user shared.
+/// and Share, so History can never drift from what the user shared.
 ///
-/// Like `GarmentThumbnailRepository`, the API deals in **file names, never
-/// paths**: an iOS container's UUID changes on every reinstall, so a persisted
-/// absolute path points at a directory that no longer exists.
+/// Deals in **file names, never paths**: an iOS container's UUID changes on
+/// every reinstall, so a persisted absolute path goes stale.
 public protocol CompletionPreviewRepository: Sendable {
-    /// Returns the file name to persist — never a path.
     @discardableResult
     func save(_ data: Data, id: UUID) throws -> String
     func data(forFile file: String) throws -> Data
@@ -27,10 +22,6 @@ public final class FileCompletionPreviewRepository: CompletionPreviewRepository,
             ?? URL.applicationSupportDirectory.appending(path: "CompletionPreviews")
     }
 
-    /// Takes `Data` rather than a `CGImage` for two reasons: `ExportService`
-    /// already hands back encoded JPEG, and only a `Data` write can carry
-    /// `.completeFileProtection` (§18.4) — `CGImageDestination` has no way to
-    /// ask for it. `FilePhotoRepository` writes originals the same way.
     @discardableResult
     public func save(_ data: Data, id: UUID) throws -> String {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -43,9 +34,7 @@ public final class FileCompletionPreviewRepository: CompletionPreviewRepository,
         return file
     }
 
-    /// Takes the last path component, so a name written before this rule —
-    /// holding a full path into a dead container — still resolves as long as
-    /// the file itself survived.
+    /// Last path component only, so a name written as a full path still resolves.
     public func data(forFile file: String) throws -> Data {
         try Data(contentsOf: url(file))
     }

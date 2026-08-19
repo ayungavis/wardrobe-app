@@ -1,10 +1,6 @@
 import Foundation
 import SwiftUI
 
-/// The fixed canvas background palette (FR-091). A content palette, the way
-/// `TextColor` is — a choice about the picture, not a design-system token.
-/// Users pick from it and cannot add to it, which is what keeps the editor
-/// bounded and every stored document renderable by every build.
 public enum CanvasBackground: String, CaseIterable, Identifiable, Sendable {
     case white, cream, blush, lavender, sky, mint, sunset, midnight
 
@@ -14,8 +10,6 @@ public enum CanvasBackground: String, CaseIterable, Identifiable, Sendable {
         rawValue
     }
 
-    /// Two stops, top-leading to bottom-trailing — except `sunset`, which needs
-    /// three to get through orange without going muddy.
     public var colors: [Color] {
         switch self {
         case .white: [.white, .white]
@@ -33,32 +27,16 @@ public enum CanvasBackground: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Resolved here rather than handed to a view as a key, the same way
-    /// `AppError.userMessage` does it — inside the package, where `.module` is
-    /// the bundle that actually holds the catalogue, and where a test can catch
-    /// a palette entry whose string was never written.
     public var name: String {
         LocalizedKey.resolve(Self.nameKey(for: self))
     }
 
-    /// Built from the raw value, so the string extractor never sees these keys
-    /// in source and marks them stale — which drops them from the compiled
-    /// catalogue and puts the key itself on screen. They are pinned
-    /// `"extractionState": "manual"` in `Localizable.xcstrings` for exactly
-    /// that reason; do not "clean" it off.
     static func nameKey(for background: CanvasBackground) -> String {
         "editor.background.\(background.rawValue)"
     }
 }
 
 extension CanvasBackground: Codable {
-    /// FR-091 to the letter: a palette token this build has never heard of
-    /// falls back to the safe default **without discarding layers**.
-    ///
-    /// Deliberately the opposite of `LayerContent`, where an unknown kind
-    /// refuses to decode at all. The stakes decide the rule: an unknown
-    /// background costs a colour the user can pick again, an unknown layer
-    /// would quietly delete work.
     public init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = CanvasBackground(rawValue: raw) ?? .default

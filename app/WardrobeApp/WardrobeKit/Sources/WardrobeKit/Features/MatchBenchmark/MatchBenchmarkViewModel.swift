@@ -1,12 +1,6 @@
 import Foundation
 import Observation
 
-/// Runs the real scan pipeline over photos the user has grouped by garment, and
-/// scores the matcher against those groups.
-///
-/// It calls `GarmentScanService` — the same service the editor and the bulk scan
-/// use — on purpose. A benchmark with its own copy of the pipeline would
-/// eventually measure something the app does not do.
 @MainActor
 @Observable
 final class MatchBenchmarkViewModel {
@@ -21,8 +15,6 @@ final class MatchBenchmarkViewModel {
     private(set) var report: BenchmarkReport?
 
     private var samples: [BenchmarkSample] = []
-    /// Assigned when the batch is picked, not when its scan finishes, so two
-    /// quick taps cannot land in the same group.
     private var nextGroupIndex = 0
 
     private let scanner: GarmentScanService
@@ -33,8 +25,6 @@ final class MatchBenchmarkViewModel {
         self.thumbnails = thumbnails
     }
 
-    /// One call per physical garment: every photo handed in here is the same
-    /// piece of clothing.
     func add(photos: [Data]) {
         guard !photos.isEmpty else { return }
         let index = nextGroupIndex
@@ -64,11 +54,6 @@ final class MatchBenchmarkViewModel {
         nextGroupIndex = 0
     }
 
-    /// Cut-outs are written by the scan and immediately deleted: the benchmark
-    /// needs the numbers, not the pictures, and nothing here belongs in the
-    /// user's wardrobe.
-    /// A loop rather than `flatMap`: the scan suspends now, and the sequence
-    /// operators cannot await.
     private func scan(_ photos: [Data], groupIndex: Int) async -> [BenchmarkSample] {
         var samples: [BenchmarkSample] = []
         for photo in photos {

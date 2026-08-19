@@ -2,8 +2,6 @@ import DesignSystem
 import PhotosUI
 import SwiftUI
 
-/// X top-left, tool rail top-right, Save + Share + the completing checkmark
-/// along the bottom.
 struct EditorControlsView: View {
     let isSaving: Bool
     let didSave: Bool
@@ -24,8 +22,6 @@ struct EditorControlsView: View {
     let onShare: () -> Void
     let onComplete: () -> Void
 
-    /// Held here rather than in the view model: it is the picker's own
-    /// transport, and it is cleared the moment the bytes are read.
     @State private var pickedItem: PhotosPickerItem?
 
     var body: some View {
@@ -78,10 +74,6 @@ struct EditorControlsView: View {
         }
     }
 
-    /// `PhotosPicker` rather than the app's own library grid: it runs out of
-    /// process, so it asks for no photo-library permission at all and cannot
-    /// see anything the user did not pick (§18.2). The grid earns its
-    /// authorization by browsing; sticking one photo on a canvas does not.
     private var photoPicker: some View {
         PhotosPicker(selection: $pickedItem, matching: .images, preferredItemEncoding: .current) {
             Image(systemName: "photo.on.rectangle.angled")
@@ -152,7 +144,6 @@ struct EditorControlsView: View {
         .accessibilityIdentifier("editor.share")
     }
 
-    /// FR-028: the checkmark is the only action that completes the challenge.
     private var completeButton: some View {
         Button(action: onComplete) {
             Group {
@@ -168,12 +159,8 @@ struct EditorControlsView: View {
             .frame(width: 56, height: 56)
             .background(AppColor.accent, in: Circle())
         }
-        // The double-tap guard already lives in `completeChallenge()`; this is
-        // so the wait for the garment scan is visible rather than silent.
         .disabled(isCompleting)
         .accessibilityLabel(Text("editor.complete", bundle: .module))
         .accessibilityIdentifier("editor.complete")
     }
 }
-
-// Crop tool with its own Cancel/Done bar, dark styled.

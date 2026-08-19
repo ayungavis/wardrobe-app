@@ -4,8 +4,6 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Camera stand-in for the simulator, macOS, previews, and tests — generates
-/// a solid-color JPEG so the full flow works without camera hardware.
 @MainActor
 public final class SampleCameraService: CameraService {
     public private(set) var permission: CameraPermission = .notDetermined
@@ -15,7 +13,6 @@ public final class SampleCameraService: CameraService {
 
     public init() {
         #if DEBUG
-            // UI-verification seams for scripted runs.
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("-cameraGranted") {
                 permission = .granted
@@ -34,10 +31,8 @@ public final class SampleCameraService: CameraService {
     public private(set) var isFlashOn = false
     public private(set) var isUsingFrontCamera = false
     public private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
-    /// Last focus request — no hardware to drive, but keeps the flow honest.
     public private(set) var lastFocusPoint: CGPoint?
 
-    /// Mirrors a typical iPhone: ultra-wide on the back, none on the front.
     public var zoomOptions: [CGFloat] {
         isUsingFrontCamera ? [1, 2] : CameraZoom.presets
     }

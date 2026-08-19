@@ -1,11 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// The drop zone a layer is dragged onto to delete it (FR-087).
-///
-/// Purely a signal: it never hit-tests, because what decides deletion is where
-/// the *layer* ended up, not where the finger is. Aiming the layer is what the
-/// shrinking and fading make legible.
 struct DeleteDropTargetView: View {
     let isActive: Bool
 

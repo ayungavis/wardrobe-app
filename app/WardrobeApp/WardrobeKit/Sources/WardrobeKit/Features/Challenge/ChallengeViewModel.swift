@@ -6,7 +6,6 @@ import Observation
 public final class ChallengeViewModel {
     public private(set) var deck: Loadable<[ChallengeCard]> = .idle
     public private(set) var activeChallenge: ActiveChallenge?
-    /// FR-012: one completed challenge per user-local calendar day.
     public private(set) var hasCompletedToday = false
     public var isCaptureFlowPresented = false
     public var isAbandonConfirmationPresented = false
@@ -33,7 +32,6 @@ public final class ChallengeViewModel {
         activeChallenge = activeRepository.load()
         hasCompletedToday = completedRepository.hasCompletion(on: Date())
         #if DEBUG
-            // UI-verification seam: `-autoResume` opens the capture flow without a tap.
             if ProcessInfo.processInfo.arguments.contains("-autoResume"), activeChallenge != nil {
                 isCaptureFlowPresented = true
             }
@@ -52,7 +50,6 @@ public final class ChallengeViewModel {
                 try Task.checkCancellation()
                 deck = .loaded(cards)
             } catch is CancellationError {
-                // Ignore cancellation.
             } catch {
                 Log.report(error, logger: Log.network)
                 deck = .failed(AppError(wrapping: error))
@@ -60,10 +57,8 @@ public final class ChallengeViewModel {
         }
     }
 
-    /// FR-011: explicit accept persists ONE active challenge; re-accepting the
-    /// same card is idempotent; accepting another requires explicit abandon.
     public func accept(_ card: ChallengeCard) {
-        guard !hasCompletedToday else { return } // deck is closed until reset
+        guard !hasCompletedToday else { return }
 
         if let active = activeChallenge {
             if active.card.id == card.id {
@@ -83,7 +78,6 @@ public final class ChallengeViewModel {
         isCaptureFlowPresented = true
     }
 
-    /// FR-017: confirm before discarding a photo or edits.
     public func requestAbandon() {
         guard let active = activeChallenge else { return }
         if active.hasDraftWork {
@@ -102,8 +96,6 @@ public final class ChallengeViewModel {
         Log.ui.info("Challenge abandoned")
     }
 
-    /// The capture flow mutates both stores (photo, draft, completion) —
-    /// re-read them when its cover closes.
     public func refreshActiveChallenge() {
         activeChallenge = activeRepository.load()
         hasCompletedToday = completedRepository.hasCompletion(on: Date())

@@ -2,9 +2,6 @@ import DesignSystem
 import SwiftUI
 
 public struct RootView: View {
-    /// FR-002: onboarding completion is an account preference, so it lives in
-    /// the preferences record rather than a standalone key — that is what stops
-    /// a second phone from replaying onboarding once the record syncs.
     @State private var hasCompletedOnboarding: Bool
 
     private let container: AppContainer
@@ -64,9 +61,6 @@ public struct RootView: View {
                 }
             }
         }
-        // The backdrop belongs to `RootView`, so the bar gets out of its way.
-        // `.tabBar` is iOS-only and this package also builds for macOS so
-        // `swift test` runs without a simulator.
         #if os(iOS)
         .toolbarBackground(.hidden, for: .tabBar)
         #endif
@@ -75,8 +69,6 @@ public struct RootView: View {
 }
 
 private extension RootView {
-    /// Written through the preferences record, not just held in `@State` —
-    /// otherwise onboarding replays on the next launch (FR-002).
     func completeOnboarding() {
         var preferences = container.preferencesRepository.load()
         preferences.hasCompletedOnboarding = true

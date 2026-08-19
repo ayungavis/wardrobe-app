@@ -1,8 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// The composer's bottom panel: alignment, background style, the character
-/// counter, the font chips, and the colour swatches.
 struct TextStyleBarView: View {
     @Binding var content: TextContent
 
@@ -45,8 +43,6 @@ struct TextStyleBarView: View {
         }
     }
 
-    /// Shows the style it will produce rather than naming it: an "A" on the
-    /// pill you are about to get.
     private var backgroundButton: some View {
         Button {
             content.backgroundStyleName = content.backgroundStyle.next.rawValue
@@ -89,8 +85,6 @@ struct TextStyleBarView: View {
                     Button {
                         content.fontName = style.rawValue
                     } label: {
-                        // Each chip is set in the face it names, so the row is
-                        // its own specimen sheet.
                         Text(verbatim: style.name)
                             .font(.system(size: 13, weight: style.weight, design: style.design))
                             .padding(.horizontal, Spacing.md)

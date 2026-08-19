@@ -1,7 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// FR-031: Save and Share are independent of completion.
 struct ExportSheetView: View {
     let viewModel: EditorViewModel
 
@@ -32,7 +31,6 @@ struct ExportSheetView: View {
                         DownsampledPhotoView(data: photo.data)
                             .clipShape(.rect(cornerRadius: 12))
 
-                        // Saving lives on the editor's bottom bar — one path.
                         ShareLink(
                             item: photo,
                             preview: SharePreview(String(localized: "editor.export.title", bundle: .module))
@@ -49,9 +47,6 @@ struct ExportSheetView: View {
                 .navigationBarTitleDisplayMode(.inline)
             #endif
         }
-        // The same recipe as the sticker, background, and layer sheets — a
-        // sheet is its own presentation context, so without the last line this
-        // one alone came up in the system colour scheme.
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(30)

@@ -4,10 +4,6 @@ import SwiftUI
 // ponytail: strings here are deliberately NOT localized (`Text(verbatim:)`),
 // same as the dev menu that opens it — no user ever reads them.
 
-/// Measures how well duplicate matching separates the user's own garments.
-///
-/// The labelling is the interaction: one batch of photos per physical garment.
-/// Anything richer would be an annotation tool, and we need a ruler, not a tool.
 struct MatchBenchmarkView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: MatchBenchmarkViewModel
@@ -119,7 +115,6 @@ struct MatchBenchmarkView: View {
             guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
             photos.append(data)
         }
-        // Cleared so picking the same photos again still fires onChange.
         selectedPhotos = []
         viewModel.add(photos: photos)
     }

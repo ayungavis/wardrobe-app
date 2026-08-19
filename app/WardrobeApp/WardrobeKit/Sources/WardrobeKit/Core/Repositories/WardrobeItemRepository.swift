@@ -3,24 +3,13 @@ import SwiftData
 
 @MainActor
 public protocol WardrobeItemRepository: AnyObject {
-    /// Newest first.
     func items() throws -> [WardrobeItem]
-    /// The whole matching index — small enough to hold in memory.
     func fingerprints() throws -> [ItemFingerprint]
     func wears(for itemID: UUID) throws -> [WearRecord]
-    /// One transaction: the item, its first fingerprint, and the wear that
-    /// created it. `fingerprint` is nil until fingerprinting lands (task A5).
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws
-    /// An item the user already owns, worn again. The fingerprint is kept too —
-    /// one per confirmed wear is what makes later matching stronger (§4).
     func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws
-    /// Updates the user-editable text fields of a wardrobe item.
     func update(_ item: WardrobeItem) throws
-    /// One item and everything derived from it — its fingerprints and its wear
-    /// records — in one transaction. The cut-out file is the caller's to remove.
     func delete(itemID: UUID) throws
-    /// Empties all three tables. Dev-menu reset; the thumbnail files are the
-    /// caller's to clean up.
     func deleteAll() throws
 }
 
@@ -34,8 +23,6 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         context = ModelContext(container)
     }
 
-    /// The schema this repository owns. `AppContainer` builds the shared
-    /// container from it; tests build an in-memory one.
     public static var schema: Schema {
         Schema([WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self])
     }
@@ -78,7 +65,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         let itemID = item.id
         let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
         guard let entity = try context.fetch(descriptor).first else {
-            throw AppError.unexpected // item doesn't exist — nothing to update
+            throw AppError.unexpected
         }
         entity.name = item.name
         entity.itemDescription = item.description
@@ -87,8 +74,6 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     }
 
     public func delete(itemID: UUID) throws {
-        // One save for all three, so a failure leaves the item whole rather than
-        // stripped of the wear history that gives it meaning.
         try context.delete(model: WardrobeItemEntity.self, where: #Predicate { $0.id == itemID })
         try context.delete(model: ItemFingerprintEntity.self, where: #Predicate { $0.itemID == itemID })
         try context.delete(model: WearRecordEntity.self, where: #Predicate { $0.itemID == itemID })
@@ -118,8 +103,6 @@ final class WardrobeItemEntity {
     var itemDescription: String = ""
     var category: String = GarmentCategory.top.rawValue
     var status: String = ItemStatus.pending.rawValue
-    /// Column keeps its old name so no schema migration is needed; the domain
-    /// calls it `cutoutFile` because that is what it now holds.
     var cutoutPath: String = ""
     var illustrationURL: URL?
     var styleVersion: String?

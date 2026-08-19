@@ -2,19 +2,12 @@ import Foundation
 
 public protocol CompletedChallengeRepository: Sendable {
     func load() -> [CompletedChallenge]
-    /// Ignores a completion for a day that already has one — FR-029 requires
-    /// completing to be idempotent, so a repeated tap can never double up.
     func append(_ completion: CompletedChallenge)
-    /// Drops every completion recorded on `date`. Used by the dev menu today;
-    /// the same call is what an "undo completion" feature would need.
     func removeCompletions(on date: Date)
-    /// Empties the whole history. Dev-menu only — FR-096 makes a completion
-    /// permanent for the user, so nothing in the product may call this.
     func removeAll()
 }
 
 public extension CompletedChallengeRepository {
-    /// FR-012: one completed challenge per user-local calendar day.
     func hasCompletion(on date: Date, calendar: Calendar = .current) -> Bool {
         load().contains { calendar.isDate($0.completedAt, inSameDayAs: date) }
     }
@@ -61,7 +54,7 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         guard !completions.contains(where: {
             calendar.isDate($0.completedAt, inSameDayAs: completion.completedAt)
         }) else {
-            return // already completed that day
+            return
         }
         completions.append(completion)
         save(completions)
@@ -72,8 +65,6 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         save(kept)
     }
 
-    /// Removes the key rather than storing an empty array, so `load` takes its
-    /// early exit instead of decoding nothing on every call.
     public func removeAll() {
         defaults.removeObject(forKey: Self.key)
     }
@@ -87,8 +78,6 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
     }
 }
 
-/// Decodes what it can and reports `nil` for what it cannot, so one unreadable
-/// element cannot fail the array around it.
 private struct LenientEntry<Value: Decodable>: Decodable {
     let value: Value?
 

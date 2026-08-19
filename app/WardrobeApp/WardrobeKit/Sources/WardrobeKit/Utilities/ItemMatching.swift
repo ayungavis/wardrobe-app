@@ -1,23 +1,12 @@
 import Foundation
 
-/// Decides which wardrobe items might be the garment just scanned
-/// (docs/wardrobe-generation.md §7).
-///
-/// Runs before anything is uploaded or generated: a garment the user already
-/// owns costs no render, and its illustration stays the same picture it has
-/// always been.
 enum ItemMatching {
     /// ponytail: every constant below is a first guess. §13 of the design doc
     /// says thresholds can only be calibrated once real user photos exist — they
     /// live here together so that calibration is a one-line change.
     enum Tuning {
-        /// ΔE in Lab at which two colours count as completely different.
         static let colorSpread: Float = 40
-        /// Feature-print L2 at which two garments count as unrelated. The scale
-        /// is revision-dependent and undocumented, so this is the least certain
-        /// number here.
         static let printSpread: Float = 1.2
-        /// Aspect-ratio gap at which two silhouettes count as unrelated.
         static let aspectSpread: Float = 0.5
 
         static let colorWeight: Float = 0.4
@@ -26,20 +15,16 @@ enum ItemMatching {
 
         static let likely: Float = 0.80
         static let uncertain: Float = 0.55
-        /// A torn mask makes the silhouette unreliable, so the bar goes up.
         static let maskQualityPenalty: Float = 0.1
         static let maxCandidates = 3
     }
 
-    /// Best first, capped at `Tuning.maxCandidates`.
     static func candidates(
         for fingerprint: ItemFingerprint,
         category: GarmentCategory,
         among stored: [ItemFingerprint],
         categories: [UUID: GarmentCategory]
     ) -> [ItemMatch] {
-        // Hard filters: a top is never a bottom, and vectors from different
-        // Vision revisions are not comparable.
         let comparable = stored.filter {
             $0.itemID != fingerprint.itemID
                 && $0.version == fingerprint.version
@@ -47,8 +32,6 @@ enum ItemMatching {
         }
         guard !comparable.isEmpty else { return [] }
 
-        // An item owns one fingerprint per confirmed wear; it is judged by its
-        // closest one, which is the whole reason all of them are kept.
         var best: [UUID: Float] = [:]
         for candidate in comparable {
             let score = score(fingerprint, candidate)
@@ -65,12 +48,8 @@ enum ItemMatching {
 
     // MARK: Scoring
 
-    /// The raw distances behind a score. Kept rather than discarded so the
-    /// spreads in `Tuning` can be calibrated from real photos instead of guessed
-    /// — the fused score alone says nothing about which signal was wrong.
     struct Comparison: Equatable {
         let colorDelta: Float
-        /// Nil when either side has no feature print (Vision failed at scan).
         let printDistance: Float?
         let aspectDelta: Float
         let maskQuality: Float
@@ -90,8 +69,6 @@ enum ItemMatching {
         let aspect = similarity(aspectDelta, spread: Tuning.aspectSpread)
         let print = printDistance.map { similarity($0, spread: Tuning.printSpread) }
 
-        // A torn mask makes the silhouette untrustworthy, so its weight moves to
-        // colour rather than being thrown away.
         let quality = min(lhs.maskQuality, rhs.maskQuality)
         let aspectWeight = Tuning.aspectWeight * quality
         let colorWeight = Tuning.colorWeight + (Tuning.aspectWeight - aspectWeight)
@@ -99,8 +76,6 @@ enum ItemMatching {
         let score: Float = if let print {
             color * colorWeight + print * Tuning.printWeight + aspect * aspectWeight
         } else {
-            // Vision failed for one side (§A5): renormalise over what is left
-            // instead of scoring the garment as a mismatch.
             (color * colorWeight + aspect * aspectWeight) / (colorWeight + aspectWeight)
         }
 

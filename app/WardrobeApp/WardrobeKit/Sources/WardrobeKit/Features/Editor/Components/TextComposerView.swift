@@ -2,19 +2,9 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// Full-screen text editing: the words render live in their own font, colour,
-/// alignment, and pill while you type.
-///
-/// The trick is a `TextField` whose own glyphs are transparent, stacked over a
-/// `TextItemLabelView` showing the same string. The field contributes only the
-/// caret and selection; everything visible is the real layer renderer — the
-/// same one the canvas and the exporter use, at the size the canvas will give
-/// it. So the preview is not a likeness of the result, it *is* the result.
 struct TextComposerView: View {
     let working: TextDraft
     let isExisting: Bool
-    /// The live canvas size, so the preview is drawn at the size this text will
-    /// actually be once it lands.
     let canvasSize: CGSize
     let onUpdate: (TextDraft) -> Void
     let onDelete: () -> Void
@@ -22,8 +12,6 @@ struct TextComposerView: View {
     let onDone: () -> Void
 
     @FocusState private var isFocused: Bool
-    /// Measured so the size slider can be given the room that is actually left
-    /// between them, instead of guessing and landing under the panel.
     @State private var topBarHeight: CGFloat = 66
     @State private var styleBarHeight: CGFloat = 170
 
@@ -49,17 +37,12 @@ struct TextComposerView: View {
         )
     }
 
-    /// No fallback for an unmeasured canvas on purpose. The canvas is laid out
-    /// long before any tool can open, and a plausible-looking stand-in is what
-    /// let a real size mismatch hide here once already.
     private var fontSize: CGFloat {
         TextRendering.baseFontSize(in: canvasSize) * working.transform.scale
     }
 
     var body: some View {
         ZStack {
-            // Dimmed, not opaque: the canvas behind is the thing this text has
-            // to look right against, so it stays visible while you type.
             AppColor.mediaBackground.opacity(0.6)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
@@ -100,10 +83,6 @@ struct TextComposerView: View {
                 field
             }
 
-            // Measured, never drawn. It must show exactly what the visible copy
-            // shows — measuring the real content while drawing the placeholder
-            // is what squeezed an empty draft into the 44pt minimum and left
-            // "Type something…" as "T…".
             TextItemLabelView(item: previewContent, fontSize: fontSize)
                 .lineLimit(1 ... 7)
                 .fixedSize(horizontal: false, vertical: true)
@@ -121,8 +100,6 @@ struct TextComposerView: View {
             .accessibilityHidden(true)
     }
 
-    /// An empty layer shows the placeholder through the very same renderer, so
-    /// the prompt already wears the style you are about to type in.
     private var previewContent: TextContent {
         guard working.content.content.isEmpty else { return working.content }
         var placeholder = working.content
@@ -170,8 +147,6 @@ struct TextComposerView: View {
 
             Spacer()
 
-            // Only for a text that already exists: deleting is otherwise a trip
-            // back to the canvas to drag it to the bin.
             if isExisting {
                 Button(role: .destructive) {
                     EditorHaptics.removed.play()
@@ -198,8 +173,6 @@ struct TextComposerView: View {
                     .background(AppColor.mediaBackground.opacity(0.66), in: .capsule)
             }
             .buttonStyle(.plain)
-            // Clearing the words is not how a text is deleted, and nothing on
-            // screen says it would be — so an empty draft simply cannot commit.
             .disabled(working.isBlank)
             .opacity(working.isBlank ? 0.45 : 1)
             .accessibilityIdentifier("editor.text.done")
@@ -207,16 +180,12 @@ struct TextComposerView: View {
         .foregroundStyle(AppColor.onMedia)
     }
 
-    /// Fitted into the gap the chrome leaves rather than centred on the screen,
-    /// which is what put its lower half under the style panel.
     private var sizeSlider: some View {
         GeometryReader { proxy in
             let topInset = topBarHeight + Spacing.sm
             let bottomInset = styleBarHeight + Spacing.md
             let available = max(proxy.size.height - topInset - bottomInset, 0)
 
-            // Below this it is too short to aim at; the adjustable action on the
-            // slider keeps size reachable without it.
             if available >= 96 {
                 let height = min(230, available)
                 TextSizeSliderView(scale: scale)
@@ -228,8 +197,6 @@ struct TextComposerView: View {
 }
 
 private extension View {
-    /// iOS-only; the package also builds for macOS so `swift test` can run
-    /// without a simulator.
     func sentenceCapitalized() -> some View {
         #if os(iOS)
             textInputAutocapitalization(.sentences)

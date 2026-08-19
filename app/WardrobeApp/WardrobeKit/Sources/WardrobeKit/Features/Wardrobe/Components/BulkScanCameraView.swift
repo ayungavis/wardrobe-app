@@ -5,9 +5,6 @@ import SwiftUI
     @preconcurrency import AVFoundation
 #endif
 
-/// A lightweight, repeatable capture loop for bulk-scanning outfits straight
-/// from the camera — snap several photos in a row, each fed into the same
-/// GarmentReviewModel pipeline BulkScanView uses for library photos.
 struct BulkScanCameraView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase

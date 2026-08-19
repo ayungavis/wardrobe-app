@@ -1,14 +1,10 @@
 import Foundation
 import Observation
 
-// What the dev menu shows about the current persisted state. Rebuilding it is
-// cheap (two UserDefaults reads), so it is recomputed after every action.
-
 @MainActor
 @Observable
 public final class DevMenuViewModel {
     public private(set) var summary = DevStateSummary()
-    /// Last action's result, shown inline so a tap has visible feedback.
     public private(set) var lastAction: String?
 
     private let activeRepository: ActiveChallengeRepository
@@ -49,8 +45,6 @@ public final class DevMenuViewModel {
         )
     }
 
-    /// Empties the wardrobe: rows first, then the cut-out files, so a failure
-    /// halfway cannot leave rows pointing at images that are already gone.
     public func resetWardrobe() {
         do {
             try wardrobeRepository.deleteAll()
@@ -63,9 +57,6 @@ public final class DevMenuViewModel {
         lastAction = "Wardrobe cleared"
     }
 
-    /// Puts today back to a clean slate: today's completion, the active
-    /// challenge, and every photo either of them holds are gone, so the deck
-    /// reopens.
     public func resetToday() {
         let today = Date()
 
@@ -79,8 +70,6 @@ public final class DevMenuViewModel {
 
         if let active = activeRepository.load() {
             photoRepository.deleteOriginals(of: active.document, and: active.photoID)
-            // Photos added and then deleted have nothing left in the document
-            // to name them, so this is the last chance to clean them up.
             photoRepository.deleteUnusedOriginals(
                 of: active.document, imported: active.importedPhotoIDs
             )
@@ -92,15 +81,10 @@ public final class DevMenuViewModel {
         Log.ui.info("Dev: today's challenge reset")
     }
 
-    /// Empties the whole history, photos included. The wardrobe is deliberately
-    /// untouched: the wear records those completions created stay, and "Reset
-    /// wardrobe" is the button that clears them.
     public func resetHistory() {
         for completion in completedRepository.load() {
             photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
         }
-        // Everything goes, so the directory goes — no per-file walk needed, and
-        // it collects any preview whose completion was already lost.
         do {
             try previews.deleteAll()
         } catch {
@@ -113,8 +97,6 @@ public final class DevMenuViewModel {
         Log.ui.info("Dev: history cleared")
     }
 
-    /// Reported rather than thrown, like the photos above: an orphaned file is
-    /// not worth blocking a reset over.
     private func deletePreview(of completion: CompletedChallenge) {
         guard let file = completion.previewFile else { return }
         do {

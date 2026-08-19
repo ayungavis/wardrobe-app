@@ -1,22 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Turns one photo into the garments it contains, each already fingerprinted and
-/// matched against the wardrobe — the pipeline described in
-/// docs/wardrobe-generation.md §3, steps 1–4.
-///
-/// A protocol because both the bulk-scan screen and the challenge editor drive
-/// it, and both need to fake it in tests. Copying this chain into two view
-/// models is the surest way to make them disagree.
-///
-/// `async` is load-bearing, not decoration: the pipeline runs Core ML, Vision,
-/// and Core Image, and the only caller is a `@MainActor` model. A synchronous
-/// method here has no suspension point, so the whole thing ran to completion on
-/// the main thread and froze the editor for as long as it took.
 @MainActor
 public protocol GarmentScanService {
-    /// Cut-outs are already written to disk; the caller decides which ones
-    /// survive confirmation and deletes the rest (FR-029).
     func scan(photo: Data) async throws -> [ScannedGarment]
 }
 
@@ -26,9 +12,6 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     private let thumbnails: GarmentThumbnailRepository
     private let repository: WardrobeItemRepository
 
-    /// Photos are decoded to at most this edge before segmentation.
-    /// `nonisolated`: an immutable number the detached pipeline reads, and the
-    /// main actor has no claim on it.
     private nonisolated static let maxPhotoPixel: CGFloat = 2048
 
     public init(
@@ -41,11 +24,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         self.repository = repository
     }
 
-    /// Only the two SwiftData reads stay here — they are small, and the store
-    /// genuinely belongs to the main actor. Everything expensive leaves.
     public func scan(photo: Data) async throws -> [ScannedGarment] {
-        // Read once per photo: the whole index is small, and threading it
-        // through the call chain leaked the caller's batching into every layer.
         let known = (try? repository.fingerprints()) ?? []
         let categories = Dictionary(
             (try? repository.items())?.map { ($0.id, $0.category) } ?? [],
@@ -58,13 +37,9 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         )
     }
 
-    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async
-    /// function stays on the caller's actor (SE-0461), and the caller is always
-    /// `@MainActor` — so without this nothing would actually move.
-    ///
-    /// Static, and taking its collaborators as parameters, because `self` is
-    /// main-actor isolated. Every argument is `Sendable`: the two services by
-    /// conformance, the rest by being value types.
+    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async function
+    /// stays on the caller's actor (SE-0461), so without this nothing moves.
+    /// Static because `self` is main-actor isolated.
     @concurrent
     private static func detect(
         photo: Data,
@@ -156,6 +131,5 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         }
     }
 
-    /// A fifty-item wardrobe must not print fifty lines per garment.
     private nonisolated static let calibrationSampleSize = 5
 }

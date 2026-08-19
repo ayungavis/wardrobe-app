@@ -1,13 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// One completed challenge as a print: the composition the user confirmed,
-/// inside a paper border with the date on the lip.
-///
-/// The frame is drawn rather than an image asset. The asset it replaces was a
-/// plain opaque white rectangle supplied at 1× only, so it blurred as soon as
-/// the card grew — and being a fixed bitmap it could not follow the window's
-/// aspect ratio.
 struct HistoryPolaroidCardView: View {
     let completion: CompletedChallenge
     let previewData: Data?
@@ -33,8 +26,6 @@ struct HistoryPolaroidCardView: View {
             .padding(.horizontal, inset)
             .padding(.top, inset)
             .background(
-                // A literal white, like `PolaroidPhotoView`: this is paper, and
-                // paper does not turn dark when the system does.
                 Color(red: 1, green: 1, blue: 1),
                 in: .rect(cornerRadius: inset * 1.5)
             )
@@ -51,8 +42,6 @@ struct HistoryPolaroidCardView: View {
         if let previewData {
             DownsampledPhotoView(data: previewData, contentMode: .fill)
         } else {
-            // A completion whose composition cannot be rendered still shows a
-            // print, so History never has a hole in it.
             AppColor.surface
         }
     }

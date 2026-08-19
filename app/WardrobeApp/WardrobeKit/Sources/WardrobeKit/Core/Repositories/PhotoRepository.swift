@@ -1,7 +1,5 @@
 import Foundation
 
-/// Storage for original captures. Originals are write-once (PRD §18.5) —
-/// there is deliberately no update API.
 public protocol PhotoRepository: Sendable {
     @discardableResult
     func saveOriginal(_ data: Data) throws -> String
@@ -10,18 +8,10 @@ public protocol PhotoRepository: Sendable {
 }
 
 public extension PhotoRepository {
-    /// Deletes every original a challenge is still holding: the capture itself
-    /// and every photo its document draws (FR-093).
-    ///
-    /// Reported rather than thrown — an orphaned file is not worth blocking a
-    /// retake or an abandon over.
     func deleteOriginals(of document: EditorDocument, and photoID: String?) {
         delete(Set(document.photoIDs).union([photoID].compactMap(\.self)))
     }
 
-    /// Deletes the photos a session created that its document no longer draws —
-    /// the ones added and then deleted, which nothing else can name once the
-    /// layer is gone.
     func deleteUnusedOriginals(of document: EditorDocument, imported: [String]) {
         delete(Set(imported).subtracting(document.photoIDs))
     }

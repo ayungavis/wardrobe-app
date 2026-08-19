@@ -2,7 +2,6 @@
     @preconcurrency import AVFoundation
     import SwiftUI
 
-    /// Live camera feed. UIKit bridge is confined to this file.
     struct CameraPreviewView: UIViewRepresentable {
         let session: AVCaptureSession
 

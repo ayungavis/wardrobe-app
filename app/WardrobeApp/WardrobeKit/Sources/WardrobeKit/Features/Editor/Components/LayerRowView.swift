@@ -2,24 +2,13 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// One layer in the panel: what it is, whether it is locked, and every
-/// operation §19 asks for without a precision gesture.
 struct LayerRowView: View {
     let layer: EditorLayer
-    /// A lookup rather than one image: a document can hold more than one photo
-    /// layer (FR-093), and handing the same pixels to every layer drew the same
-    /// picture twice.
     let photo: (String) -> CGImage?
     let isSelected: Bool
-    /// Counted from the bottom of the stack, the way `EditorDocument.layers` is
-    /// ordered — so the number VoiceOver reads is the number the document uses.
     let depth: Int
     let layerCount: Int
-    /// While the list owns the row for dragging, the row's own controls cannot
-    /// be tapped — so they are hidden rather than left looking live.
     let isReordering: Bool
-    /// The challenge's own photo cannot be deleted, and saying so is what
-    /// keeps the disabled Delete from being a mystery.
     let isChallengePhoto: Bool
     let onSelect: () -> Void
     let onToggleLock: () -> Void
@@ -85,8 +74,6 @@ struct LayerRowView: View {
         .accessibilityIdentifier("editor.layer.row")
     }
 
-    /// §19 asks for z-order and lock state to be announced; the panel is the
-    /// ordered list, so this is where they belong.
     private var accessibilityValue: String {
         let order = String(
             localized: "editor.layer.order \(layerCount - depth) \(layerCount)", bundle: .module

@@ -1,19 +1,8 @@
 import Foundation
 import SwiftUI
 
-/// Freehand strokes on the canvas (PRD FR-088's drawing layer).
-///
-/// Every coordinate is unit space, so a stroke drawn on one phone lands in the
-/// same place on another — the same rule the rest of the document follows.
 public struct DrawingContent: Equatable, Codable, Sendable {
     public var strokes: [DrawingStroke]
-    /// How much of the canvas this layer's box covers. A finished drawing is
-    /// trimmed to its own content, so a doodle in one corner becomes an object
-    /// the size of the doodle — selectable and draggable like any other layer,
-    /// instead of a canvas-sized sheet swallowing every tap beneath it.
-    ///
-    /// Points are 0…1 **within that box**, which is also what keeps a
-    /// transform from compounding with the coordinates.
     public var widthRatio: Double
     public var heightRatio: Double
 
@@ -36,11 +25,6 @@ public struct DrawingContent: Equatable, Codable, Sendable {
         strokes.isEmpty
     }
 
-    /// Applies one finished drag. Nil when the drag changed nothing — an
-    /// eraser that crossed empty space, or a stroke with no drawable points.
-    ///
-    /// Lives on the content rather than the view model because it is a rule
-    /// about what a drawing *is*, and here it can be tested without a finger.
     public func applying(
         _ stroke: DrawingStroke,
         pen: DrawingPen,
@@ -61,16 +45,6 @@ public struct DrawingContent: Equatable, Codable, Sendable {
         )
     }
 
-    /// Drops every stroke the eraser touched. Nil when it touched nothing, so
-    /// the caller can tell "erased" from "missed" without comparing documents.
-    ///
-    /// The eraser removes whole strokes rather than cutting geometry: a stroke
-    /// is an instruction, and half an instruction is not a thing the document
-    /// can hold.
-    ///
-    /// `heightOverWidth` un-does the anisotropic normalisation — x is a
-    /// fraction of the width and y of the height, so without it the eraser
-    /// would be an ellipse.
     public func erasingStrokes(
         touching eraserPoints: [DrawingPoint],
         radius: Double,
@@ -97,8 +71,6 @@ public struct DrawingContent: Equatable, Codable, Sendable {
 }
 
 public struct DrawingStroke: Identifiable, Equatable, Codable, Sendable {
-    /// A finger can emit thousands of points a second; past this the extra ones
-    /// cost storage and sync bandwidth without being visible.
     public static let maximumPointCount = 512
 
     public let id: UUID
@@ -136,10 +108,6 @@ public struct DrawingStroke: Identifiable, Equatable, Codable, Sendable {
             ?? DrawingWidth.medium.rawValue
     }
 
-    /// Drops what cannot be drawn and bounds what would be wasteful: NaN or
-    /// infinite points vanish, stray points are pulled back onto the canvas, and
-    /// the count is capped. A stroke with nothing left is nil rather than an
-    /// invisible entry that still costs bytes forever.
     public func sanitized(maximumPointCount: Int = DrawingStroke.maximumPointCount) -> DrawingStroke? {
         let cleaned = points
             .prefix(maximumPointCount)
@@ -158,10 +126,6 @@ public struct DrawingStroke: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-/// A point in unit space, 0…1 across the canvas.
-///
-/// Named for the space rather than `x`/`y`: every coordinate in a document is a
-/// fraction of the canvas, and a reader should not have to check.
 public struct DrawingPoint: Equatable, Codable, Sendable {
     public var unitX: Double
     public var unitY: Double
@@ -172,8 +136,6 @@ public struct DrawingPoint: Equatable, Codable, Sendable {
     }
 }
 
-/// Content palettes, not design-system tokens — these are choices the user
-/// makes about their picture, the way `TextColor` already is.
 public enum DrawingColor: String, CaseIterable, Codable, Sendable {
     case black, white, red, orange, yellow, green, blue, pink
 
@@ -190,12 +152,6 @@ public enum DrawingColor: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// Ink that reads on top of this colour — a border around the swatch, or a
-    /// checkmark inside it.
-    ///
-    /// One table, not two: the prototype had separate rules for the border and
-    /// the checkmark that disagreed only about orange, which is one question
-    /// answered twice.
     public var contrastInk: Color {
         switch self {
         case .white, .yellow, .orange: .black
@@ -207,8 +163,6 @@ public enum DrawingColor: String, CaseIterable, Codable, Sendable {
         LocalizedKey.resolve(Self.nameKey(for: self))
     }
 
-    /// Assembled at runtime, so the extractor prunes these as stale unless they
-    /// are pinned `"extractionState": "manual"`. A test fails if that pin goes.
     static func nameKey(for color: DrawingColor) -> String {
         "editor.drawing.color.\(color.rawValue)"
     }
@@ -217,8 +171,6 @@ public enum DrawingColor: String, CaseIterable, Codable, Sendable {
 public enum DrawingWidth: String, CaseIterable, Codable, Sendable {
     case thin, medium, thick
 
-    /// Fraction of the canvas width, so a stroke keeps its weight at any size —
-    /// on screen and at export, where the canvas is nearly three times wider.
     public var ratio: Double {
         switch self {
         case .thin: 0.006
@@ -227,11 +179,6 @@ public enum DrawingWidth: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// How far the eraser reaches, in the same width-relative units.
-    ///
-    /// The floor exists so a hairline is still catchable, but it is deliberately
-    /// low: the prototype's 0.025 swallowed two of the three widths, leaving a
-    /// control that did nothing for two of its values.
     public var eraserRadius: Double {
         max(ratio * 1.8, 0.010)
     }

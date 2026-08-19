@@ -1,7 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// PRD §17 "Challenge active": accepted prompt + resume/abandon.
 struct ActiveChallengeStateView: View {
     let challenge: ActiveChallenge
     let onResume: () -> Void

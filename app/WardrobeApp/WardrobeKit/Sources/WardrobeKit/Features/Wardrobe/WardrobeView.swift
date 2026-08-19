@@ -33,8 +33,6 @@ public struct WardrobeView: View {
                     .resizable()
                     .ignoresSafeArea()
 
-                // Single top-to-bottom layout: bar, then content below it —
-                // nothing floats independently anymore.
                 VStack(spacing: 0) {
                     topBar
 

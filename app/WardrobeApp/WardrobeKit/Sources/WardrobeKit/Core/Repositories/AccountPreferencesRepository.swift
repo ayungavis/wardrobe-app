@@ -12,16 +12,12 @@ public final class UserDefaultsAccountPreferencesRepository: AccountPreferencesR
     // @unchecked: UserDefaults is documented thread-safe.
     private let defaults: UserDefaults
     private static let key = "accountPreferences"
-    /// Where onboarding completion lived before preferences existed.
     private static let legacyOnboardingKey = "hasCompletedOnboarding"
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-    /// With no record yet, the old standalone onboarding flag is read across —
-    /// otherwise updating the app would walk every existing user back through
-    /// onboarding.
     public func load() -> AccountPreferences {
         guard let data = defaults.data(forKey: Self.key) else {
             return AccountPreferences(

@@ -1,19 +1,8 @@
 import CoreGraphics
 import SwiftUI
 
-/// Where a finger has to land to hit a layer.
-///
-/// For a photo, a text pill, and a sticker that is the whole box — they fill it.
-/// A drawing does not: one thin diagonal has a bounding box that is almost
-/// entirely empty, and a rectangle there swallows every tap inside it, leaving
-/// the layers underneath unreachable with nothing on screen explaining why.
-///
-/// One type that branches inside rather than two shapes at the call site, so no
-/// `AnyShape` is needed — CLAUDE.md treats that as the same family as `AnyView`.
 struct LayerHitShape: Shape {
     let content: LayerContent
-    /// The canvas width the strokes were drawn against, which is what their
-    /// weight is measured in.
     let referenceWidth: CGFloat
 
     /// ponytail: a stroke thickened to exactly its drawn width is nearly

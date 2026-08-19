@@ -12,17 +12,6 @@ public enum ExportService {
     // raise when a print/quality requirement appears.
     static let maxOutputPixel: CGFloat = 4096
 
-    /// Decodes to pixels (drops all source metadata), applies the crop, then
-    /// composes the story frame — the very same 9:16 layout the editor canvas
-    /// shows — and re-encodes through `CGImageDestination` writing zero source
-    /// properties. Save and Share both come through here, so the file always
-    /// matches the preview.
-    ///
-    /// Split in three because only the middle step has to be on the main
-    /// actor: `ImageRenderer` is main-actor-bound, but decoding a 12-megapixel
-    /// source and deflating the JPEG are not, and running them there is what
-    /// made exporting stall the canvas (PRD §17 asks for non-blocking
-    /// progress).
     public static func render(originals: [String: Data], document: EditorDocument) async throws -> Data {
         var photos: [String: CGImage] = [:]
         for layer in document.layers {
@@ -45,7 +34,6 @@ public enum ExportService {
     /// `@MainActor`, so without it this would not move at all.
     @concurrent
     static func prepare(original: Data, crop: CropSpec?) async throws -> CGImage {
-        // Orientation-corrected, metadata-free decode.
         guard let image = ImageDecoding.downsampledImage(from: original, maxPixel: maxOutputPixel) else {
             throw AppError.exportFailed
         }
@@ -61,9 +49,6 @@ public enum ExportService {
         return cropped
     }
 
-    /// The one step that must be here. Rendering at `exportSize` directly, with
-    /// no scale derived from the on-screen canvas, is why the output size is a
-    /// constant rather than something that has to be checked afterwards.
     @MainActor
     static func rasterize(document: EditorDocument, photos: [String: CGImage]) throws -> CGImage {
         let size = StoryCanvas.exportSize

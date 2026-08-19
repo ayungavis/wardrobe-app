@@ -1,10 +1,3 @@
-//
-//  HistoryViewModel.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 17/08/26.
-//
-
 import Foundation
 import Observation
 
@@ -18,8 +11,6 @@ public final class HistoryViewModel {
     private let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
     private let previews: CompletionPreviewRepository
-    /// Compositions rendered on demand for completions stored before ✓ began
-    /// writing a preview. Memory only, and cleared with the list.
     private var renderedPreviews: [UUID: Data] = [:]
 
     public init(
@@ -41,7 +32,6 @@ public final class HistoryViewModel {
         renderedPreviews = [:]
     }
 
-    /// The composition the user confirmed, not the capture behind it (FR-096).
     public func previewData(for completion: CompletedChallenge) -> Data? {
         if let file = completion.previewFile, let data = try? previews.data(forFile: file) {
             return data
@@ -49,10 +39,6 @@ public final class HistoryViewModel {
         return renderedPreviews[completion.id]
     }
 
-    /// Completions written before ✓ started storing a preview have to be
-    /// rendered to be seen. Held in memory rather than written back: a
-    /// completion is the one record the app never rewrites, and patching one to
-    /// carry a cache would be exactly that.
     public func renderMissingPreview(for completion: CompletedChallenge) async {
         guard previewData(for: completion) == nil else { return }
 

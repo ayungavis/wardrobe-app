@@ -1,12 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// The centre lines a layer snaps to (FR-089).
-///
-/// Drawn in canvas space rather than inside a layer's transform, so the lines
-/// stay axis-aligned however the layer is rotated. Hidden from VoiceOver on
-/// purpose: the non-visual channel is the layer's own accessibility value, and
-/// two voices saying the same thing is one too many.
 struct CanvasGuidesView: View {
     let alignment: CanvasAlignment
 

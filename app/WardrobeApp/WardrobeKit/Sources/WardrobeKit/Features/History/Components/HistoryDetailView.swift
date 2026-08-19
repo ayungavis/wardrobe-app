@@ -16,16 +16,13 @@ public struct HistoryDetailView: View {
 
     public var body: some View {
         ZStack {
-            // Main Background
             Image("appBG", bundle: .module)
                 .resizable()
                 .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .top) {
-                    // Main Content Stack
                     VStack(spacing: Spacing.lg) {
-                        // 1. Top Canvas / Polaroid
                         HistoryPolaroidCardView(
                             completion: completion,
                             previewData: previewData
@@ -35,7 +32,6 @@ public struct HistoryDetailView: View {
                         .zIndex(2)
                         .frame(width: 345, height: 614)
 
-                        // 2. Receipt Card Background + Content
                         receiptContent
                             .padding(.horizontal, Spacing.lg)
                             .zIndex(1)
@@ -52,14 +48,11 @@ public struct HistoryDetailView: View {
     }
 
     private var receiptContent: some View {
-        // Layer the text content directly over your existing receipt paper asset
         ZStack(alignment: .top) {
-            // Your custom torn paper asset
             Image("TornReceipt", bundle: .module)
                 .resizable()
 
             VStack(alignment: .leading, spacing: 16) {
-                // Header Info
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top) {
                         label("history.detail.date")
@@ -75,11 +68,8 @@ public struct HistoryDetailView: View {
                     }
                 }
 
-                // If your dotted line is a separate asset, place it here:
-
                 wearSection
             }
-            // Adjust these paddings to match the inner safe area of your specific receipt asset
             .padding(.horizontal, Spacing.sm)
             .padding(.top, Spacing.xxl)
         }
@@ -122,8 +112,6 @@ public struct HistoryDetailView: View {
         }
     }
 
-    /// The receipt prints "Field :" runs; the colon is layout, so it stays out
-    /// of the catalogue and off the translators' plate.
     private func label(_ key: LocalizedStringKey) -> Text {
         Text(key, bundle: .module).bold() + Text(verbatim: " :").bold()
     }

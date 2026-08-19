@@ -1,8 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// Displays JPEG data decoded off-main at bounded size (no 12MP decode on
-/// the render path).
 struct DownsampledPhotoView: View {
     let data: Data
     // ponytail: fixed decode budget; derive from displayScale when profiling says so.
