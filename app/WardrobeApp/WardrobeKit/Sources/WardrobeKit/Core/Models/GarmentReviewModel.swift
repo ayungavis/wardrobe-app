@@ -59,7 +59,11 @@ public final class GarmentReviewModel {
             do {
                 let photo = try load()
                 guard !Task.isCancelled else { return }
-                try stage(scanner.scan(photo: photo))
+                let start = ContinuousClock.now
+                try await stage(scanner.scan(photo: photo))
+                Log.ui.info(
+                    "Garment scan finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
+                )
             } catch {
                 Log.report(error) // a failed scan must never block the caller
             }

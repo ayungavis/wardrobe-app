@@ -251,6 +251,10 @@ public final class CaptureFlowViewModel {
         challenge.document.setCrop(crop, ofLayer: layerID)
         activeRepository.save(challenge)
         stage = .editor
+        // Started here rather than left to the editor's own `.task`, so the
+        // scan runs alongside the editor loading its photo instead of after it.
+        // Idempotent: the model refuses a photo it has already scanned.
+        review.scanIfNeeded(photoID: photoID)
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)

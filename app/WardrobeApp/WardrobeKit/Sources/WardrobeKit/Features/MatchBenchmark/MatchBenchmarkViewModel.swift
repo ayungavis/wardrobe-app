@@ -42,11 +42,9 @@ final class MatchBenchmarkViewModel {
         isScanning = true
         report = nil
 
-        // ponytail: segmentation runs on the main actor, same as the bulk scan.
-        // A dev tool waiting a second per photo is not worth an actor hop.
         Task {
             defer { isScanning = false }
-            let scanned = scan(photos, groupIndex: index)
+            let scanned = await scan(photos, groupIndex: index)
             samples.append(contentsOf: scanned)
             groups.append(Group(id: index, photoCount: photos.count, garmentCount: scanned.count))
         }
@@ -69,22 +67,25 @@ final class MatchBenchmarkViewModel {
     /// Cut-outs are written by the scan and immediately deleted: the benchmark
     /// needs the numbers, not the pictures, and nothing here belongs in the
     /// user's wardrobe.
-    private func scan(_ photos: [Data], groupIndex: Int) -> [BenchmarkSample] {
-        photos.flatMap { photo -> [BenchmarkSample] in
+    /// A loop rather than `flatMap`: the scan suspends now, and the sequence
+    /// operators cannot await.
+    private func scan(_ photos: [Data], groupIndex: Int) async -> [BenchmarkSample] {
+        var samples: [BenchmarkSample] = []
+        for photo in photos {
             do {
-                return try scanner.scan(photo: photo).map { garment in
+                for garment in try await scanner.scan(photo: photo) {
                     try? thumbnails.delete(file: garment.cutoutFile)
-                    return BenchmarkSample(
+                    samples.append(BenchmarkSample(
                         id: garment.id,
                         groupIndex: groupIndex,
                         category: garment.category,
                         fingerprint: garment.fingerprint
-                    )
+                    ))
                 }
             } catch {
                 Log.report(error) // one unreadable photo must not end the run
-                return []
             }
         }
+        return samples
     }
 }

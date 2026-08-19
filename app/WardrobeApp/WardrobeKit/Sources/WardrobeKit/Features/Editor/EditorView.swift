@@ -48,7 +48,10 @@ public struct EditorView<ReviewDrawer: View>: View {
         @Bindable var viewModel = viewModel
 
         ZStack {
-            // AppColor.mediaBackground.ignoresSafeArea()
+            // Opaque, and behind everything: without it a loading frame falls
+            // through to the capture flow's light background, which reads as a
+            // white flash in a screen that is otherwise black.
+            AppColor.mediaBackground.ignoresSafeArea()
             content
         }
         .environment(\.colorScheme, .dark)

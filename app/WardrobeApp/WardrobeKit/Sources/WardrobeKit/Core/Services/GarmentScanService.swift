@@ -8,11 +8,16 @@ import Foundation
 /// A protocol because both the bulk-scan screen and the challenge editor drive
 /// it, and both need to fake it in tests. Copying this chain into two view
 /// models is the surest way to make them disagree.
+///
+/// `async` is load-bearing, not decoration: the pipeline runs Core ML, Vision,
+/// and Core Image, and the only caller is a `@MainActor` model. A synchronous
+/// method here has no suspension point, so the whole thing ran to completion on
+/// the main thread and froze the editor for as long as it took.
 @MainActor
 public protocol GarmentScanService {
     /// Cut-outs are already written to disk; the caller decides which ones
     /// survive confirmation and deletes the rest (FR-029).
-    func scan(photo: Data) throws -> [ScannedGarment]
+    func scan(photo: Data) async throws -> [ScannedGarment]
 }
 
 @MainActor
@@ -22,7 +27,9 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     private let repository: WardrobeItemRepository
 
     /// Photos are decoded to at most this edge before segmentation.
-    private static let maxPhotoPixel: CGFloat = 2048
+    /// `nonisolated`: an immutable number the detached pipeline reads, and the
+    /// main actor has no claim on it.
+    private nonisolated static let maxPhotoPixel: CGFloat = 2048
 
     public init(
         segmentation: GarmentSegmentationService,
@@ -34,13 +41,9 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         self.repository = repository
     }
 
-    public func scan(photo: Data) throws -> [ScannedGarment] {
-        guard let image = ImageDecoding.downsampledImage(from: photo, maxPixel: Self.maxPhotoPixel) else {
-            Log.ui.error("Garment scan: undecodable photo")
-            return []
-        }
-        guard let segments = try segmentation.segment(image) else { return [] }
-
+    /// Only the two SwiftData reads stay here — they are small, and the store
+    /// genuinely belongs to the main actor. Everything expensive leaves.
+    public func scan(photo: Data) async throws -> [ScannedGarment] {
         // Read once per photo: the whole index is small, and threading it
         // through the call chain leaked the caller's batching into every layer.
         let known = (try? repository.fingerprints()) ?? []
@@ -49,16 +52,47 @@ public struct WardrobeGarmentScanService: GarmentScanService {
             uniquingKeysWith: { first, _ in first }
         )
 
+        return try await Self.detect(
+            photo: photo, known: known, categories: categories,
+            segmentation: segmentation, thumbnails: thumbnails
+        )
+    }
+
+    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async
+    /// function stays on the caller's actor (SE-0461), and the caller is always
+    /// `@MainActor` — so without this nothing would actually move.
+    ///
+    /// Static, and taking its collaborators as parameters, because `self` is
+    /// main-actor isolated. Every argument is `Sendable`: the two services by
+    /// conformance, the rest by being value types.
+    @concurrent
+    private static func detect(
+        photo: Data,
+        known: [ItemFingerprint],
+        categories: [UUID: GarmentCategory],
+        segmentation: any GarmentSegmentationService,
+        thumbnails: any GarmentThumbnailRepository
+    ) async throws -> [ScannedGarment] {
+        guard let image = ImageDecoding.downsampledImage(from: photo, maxPixel: maxPhotoPixel) else {
+            Log.ui.error("Garment scan: undecodable photo")
+            return []
+        }
+        guard let segments = try segmentation.segment(image) else { return [] }
+
         return try segmentation.cutouts(from: segments).map { category, cutout in
-            try garment(category: category, cutout: cutout, known: known, categories: categories)
+            try garment(
+                category: category, cutout: cutout,
+                known: known, categories: categories, thumbnails: thumbnails
+            )
         }
     }
 
-    private func garment(
+    private nonisolated static func garment(
         category: GarmentCategory,
         cutout: GarmentCutout,
         known: [ItemFingerprint],
-        categories: [UUID: GarmentCategory]
+        categories: [UUID: GarmentCategory],
+        thumbnails: any GarmentThumbnailRepository
     ) throws -> ScannedGarment {
         let id = UUID()
         let fingerprint = ItemFingerprint(
@@ -91,7 +125,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     /// without seeing them would be guesswork.
     ///
     /// Ids and numbers only: nothing about what the photo contains (PRD §18/§24).
-    private func logCalibration(
+    private nonisolated static func logCalibration(
         for fingerprint: ItemFingerprint,
         category: GarmentCategory,
         among known: [ItemFingerprint],
@@ -123,5 +157,5 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     }
 
     /// A fifty-item wardrobe must not print fifty lines per garment.
-    private static let calibrationSampleSize = 5
+    private nonisolated static let calibrationSampleSize = 5
 }

@@ -106,7 +106,7 @@ final class FakeGarmentScanService: GarmentScanService {
     var error: Error?
     private(set) var scannedPhotos: [Data] = []
 
-    func scan(photo: Data) throws -> [ScannedGarment] {
+    func scan(photo: Data) async throws -> [ScannedGarment] {
         scannedPhotos.append(photo)
         if let error {
             throw error
