@@ -9,6 +9,8 @@ public struct WardrobeView: View {
     @State private var expandedCategory: GarmentCategory?
     @State private var navigationPath = NavigationPath()
     @State private var sortOrder: SortOrder = .mostUsed
+    @State private var searchQuery = ""
+    @State private var isSearching = false
     @Namespace private var pileNamespace
 
     private let container: AppContainer
@@ -16,6 +18,14 @@ public struct WardrobeView: View {
     public init(viewModel: WardrobeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
+    }
+
+    private var searchResults: [WardrobeItem] {
+        WardrobeSearch.results(in: viewModel.items, matching: searchQuery)
+    }
+
+    private var isShowingSearchResults: Bool {
+        isSearching && !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private var topItems: [WardrobeItem] {
@@ -38,7 +48,14 @@ public struct WardrobeView: View {
 
                     ZStack {
                         Group {
-                            if viewModel.items.isEmpty {
+                            if isShowingSearchResults {
+                                WardrobeSearchResultsView(
+                                    items: searchResults,
+                                    thumbnailData: { viewModel.thumbnailData(for: $0) },
+                                    wearCount: { viewModel.wearCount(for: $0) },
+                                    onSelect: { navigationPath.append($0.id) }
+                                )
+                            } else if viewModel.items.isEmpty {
                                 emptyState
                             } else if expandedCategory == nil {
                                 pilesContent
@@ -48,7 +65,7 @@ public struct WardrobeView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        if let category = expandedCategory {
+                        if let category = expandedCategory, !isShowingSearchResults {
                             CategoryGridView(
                                 category: category,
                                 items: category == .top ? topItems : bottomItems,
@@ -65,9 +82,9 @@ public struct WardrobeView: View {
             }
             .navigationDestination(for: UUID.self) { itemID in
                 WardrobeItemDetailView(
-                    viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID),
-                    onDeleted: { viewModel.load() }
+                    viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID)
                 )
+                .onDisappear { viewModel.load() }
             }
         }
         .task { viewModel.load() }
@@ -75,14 +92,11 @@ public struct WardrobeView: View {
 
     private var topBar: some View {
         HStack {
-            Image(systemName: "magnifyingglass")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 20, height: 20)
-                .padding(Spacing.md)
-                .background(Capsule().fill(.ultraThinMaterial))
+            WardrobeSearchBarView(query: $searchQuery, isActive: $isSearching)
 
-            Spacer()
+            if !isSearching {
+                Spacer()
+            }
 
             Menu {
                 Button {
@@ -106,6 +120,12 @@ public struct WardrobeView: View {
         }
         .padding(.horizontal, Spacing.md)
         .padding(.top, Spacing.md)
+        .animation(.snappy, value: isSearching)
+        .onChange(of: isSearching) { _, searching in
+            if searching {
+                expandedCategory = nil
+            }
+        }
         .sheet(
             isPresented: $isBulkScanPresented,
             onDismiss: { viewModel.load() },

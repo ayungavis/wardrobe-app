@@ -10,11 +10,8 @@ public struct WardrobeItemDetailView: View {
     @State private var editableName: String = ""
     @State private var editableDescription: String = ""
 
-    private let onDeleted: () -> Void
-
-    public init(viewModel: WardrobeItemDetailViewModel, onDeleted: @escaping () -> Void) {
+    public init(viewModel: WardrobeItemDetailViewModel) {
         _viewModel = State(wrappedValue: viewModel)
-        self.onDeleted = onDeleted
     }
 
     public var body: some View {
@@ -106,7 +103,6 @@ public struct WardrobeItemDetailView: View {
         }
         .onChange(of: viewModel.isDeleted) { _, deleted in
             if deleted {
-                onDeleted()
                 dismiss()
             }
         }
