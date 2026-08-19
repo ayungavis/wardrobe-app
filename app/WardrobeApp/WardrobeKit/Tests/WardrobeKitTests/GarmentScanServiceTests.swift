@@ -19,22 +19,24 @@ struct GarmentScanServiceTests {
         try SampleCameraService.makeSampleJPEG(width: 120, height: 200)
     }
 
-    @Test func anUndecodablePhotoYieldsNothing() throws {
-        #expect(try makeSUT().scan(photo: Data([0x00, 0x01])).isEmpty)
+    @Test func anUndecodablePhotoYieldsNothing() async throws {
+        let garments = try await makeSUT().scan(photo: Data([0x00, 0x01]))
+        #expect(garments.isEmpty)
     }
 
-    @Test func aPhotoWithoutGarmentsYieldsNothing() throws {
+    @Test func aPhotoWithoutGarmentsYieldsNothing() async throws {
         let segmentation = StubGarmentSegmentationService()
         segmentation.segmentation = nil
 
-        #expect(try makeSUT(segmentation: segmentation).scan(photo: makePhoto()).isEmpty)
+        let garments = try await makeSUT(segmentation: segmentation).scan(photo: makePhoto())
+        #expect(garments.isEmpty)
     }
 
-    @Test func eachGarmentIsFingerprintedAndItsCutoutSaved() throws {
+    @Test func eachGarmentIsFingerprintedAndItsCutoutSaved() async throws {
         let thumbnails = InMemoryGarmentThumbnailRepository()
         let sut = makeSUT(thumbnails: thumbnails)
 
-        let garments = try sut.scan(photo: makePhoto())
+        let garments = try await sut.scan(photo: makePhoto())
 
         #expect(garments.count == 1)
         let garment = try #require(garments.first)
@@ -47,19 +49,21 @@ struct GarmentScanServiceTests {
 
     /// The proposal has to survive the extraction: this is the seam the editor
     /// will drive, and a scan without matches would silently break duplicates.
-    @Test func aGarmentLikeAStoredOneComesBackAsAProposal() throws {
+    @Test func aGarmentLikeAStoredOneComesBackAsAProposal() async throws {
         let repository = InMemoryWardrobeItemRepository()
         let thumbnails = InMemoryGarmentThumbnailRepository()
         let sut = makeSUT(thumbnails: thumbnails, repository: repository)
 
-        let first = try #require(try sut.scan(photo: makePhoto()).first)
+        let firstScan = try await sut.scan(photo: makePhoto())
+        let first = try #require(firstScan.first)
         let item = WardrobeItem(
             id: first.id, category: first.category, cutoutFile: first.cutoutFile,
             createdAt: Date(), updatedAt: Date()
         )
         try repository.insert(item, fingerprint: first.fingerprint, wear: WearRecord(itemID: first.id, wornAt: Date()))
 
-        let second = try #require(try sut.scan(photo: makePhoto()).first)
+        let secondScan = try await sut.scan(photo: makePhoto())
+        let second = try #require(secondScan.first)
 
         #expect(second.matches.first?.itemID == first.id)
         #expect(second.decision == .existing(first.id))

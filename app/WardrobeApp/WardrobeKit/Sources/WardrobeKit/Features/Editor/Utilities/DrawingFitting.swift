@@ -1,28 +1,12 @@
 import CoreGraphics
 import Foundation
 
-/// Trims a finished drawing to its own content.
-///
-/// A drawing session paints across the whole canvas, but a layer the size of the
-/// canvas is a bad layer: its hit region swallows every tap meant for what sits
-/// beneath it, its selection outline is the whole picture, and "keep 44pt on
-/// screen" means nothing. Fitting turns the session into an object the size of
-/// the marks in it.
-///
-/// Pure arithmetic on purpose — this is the part that has to be right, and it
-/// can be checked without a finger.
 enum DrawingFitting {
-    /// A drawing trimmed to its marks, and where to put it.
     struct Fitted: Equatable {
         var content: DrawingContent
         var transform: ElementTransform
     }
 
-    /// Nil when there is nothing to fit — an empty session commits no layer.
-    ///
-    /// `canvasSize` decides how wide a stroke actually is, which is why the box
-    /// has to grow by each stroke's own radius: a fat line drawn along the edge
-    /// of its own bounding box would otherwise be sliced in half.
     static func fit(_ content: DrawingContent, canvasSize: CGSize) -> Fitted? {
         guard canvasSize.width > 0, canvasSize.height > 0 else { return nil }
 
@@ -47,8 +31,6 @@ enum DrawingFitting {
         )
     }
 
-    /// The union of every point, each grown by half the weight of the line it
-    /// belongs to plus a hair of breathing room.
     private static func boundingBox(of strokes: [DrawingStroke], canvasSize: CGSize) -> CGRect? {
         var box: CGRect?
 

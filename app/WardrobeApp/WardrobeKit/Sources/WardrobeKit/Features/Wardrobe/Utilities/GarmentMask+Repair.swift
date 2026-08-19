@@ -1,25 +1,12 @@
 import Foundation
 
-/// Cleans up a raw segmentation mask before it is ever composited.
-///
-/// Real masks come out torn: an arm crossing the body punches a hole through
-/// the shirt, and a sleeve can end up as its own island. Both make the same
-/// garment look different from one photo to the next, which would poison
-/// fingerprint matching (docs/wardrobe-generation.md §7).
 extension GarmentMask {
     struct Repaired {
-        /// Strays dropped, interior holes closed.
         let mask: Mask
-        /// 255 where a hole was closed — those pixels have no garment colour of
-        /// their own and get filled from the garment's average.
         let holes: [UInt8]
-        /// 0...1. Low means a torn mask: matching lowers the silhouette's weight
-        /// and raises the confirmation threshold.
         let quality: Float
     }
 
-    /// Components smaller than this share of the largest one are noise, not
-    /// clothing. A detached sleeve clears the bar; a two-pixel speck does not.
     private static let strayThreshold = 0.05
 
     static func repair(_ mask: Mask) -> Repaired? {
@@ -53,8 +40,6 @@ extension GarmentMask {
             return Stripped(pixels: mask.pixels, kept: 0, dropped: 0)
         }
 
-        // Rounded up, and never below two pixels: truncation would let the
-        // threshold collapse to zero on small masks and keep every speck.
         let minimum = max(2, Int((Double(largest) * strayThreshold).rounded(.up)))
         var pixels = [UInt8](repeating: 0, count: mask.pixels.count)
         var kept = 0
@@ -73,8 +58,6 @@ extension GarmentMask {
         return Stripped(pixels: pixels, kept: kept, dropped: dropped)
     }
 
-    /// Iterative flood fill — a 384×576 mask would blow the stack if this
-    /// recursed.
     private static func connectedComponents(_ pixels: [UInt8], width: Int, height: Int) -> [[Int]] {
         var visited = [Bool](repeating: false, count: pixels.count)
         var components: [[Int]] = []
@@ -105,8 +88,6 @@ extension GarmentMask {
         let area: Int
     }
 
-    /// Background reachable from the border is the outside; anything else is a
-    /// hole punched through the garment.
     private static func closeHoles(
         _ pixels: [UInt8],
         width: Int,

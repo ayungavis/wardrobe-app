@@ -2,8 +2,6 @@ import DesignSystem
 import PhotosUI
 import SwiftUI
 
-/// In-app gallery, Instagram-style: a grid of recent photos where the first
-/// tap imports immediately — no select-then-confirm step.
 struct PhotoLibraryGridView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -57,8 +55,6 @@ struct PhotoLibraryGridView: View {
     }
 }
 
-/// One cell loads its own thumbnail, so a photo arriving never invalidates
-/// the rest of the grid.
 private struct PhotoGridCell: View {
     let assetID: String
     let library: PhotoLibraryService
@@ -84,8 +80,6 @@ private struct PhotoGridCell: View {
     }
 }
 
-/// Without library access the grid can't exist — but importing still can,
-/// through the system picker, which needs no permission at all.
 private struct PhotoLibraryDeniedView: View {
     @Environment(\.openURL) private var openURL
 

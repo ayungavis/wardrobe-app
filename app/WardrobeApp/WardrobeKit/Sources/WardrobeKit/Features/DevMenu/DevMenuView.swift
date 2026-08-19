@@ -3,20 +3,16 @@ import SwiftUI
 // ponytail: strings here are deliberately NOT localized (`Text(verbatim:)`).
 // The sheet never reaches an App Store build, so no user ever reads them.
 
-/// Developer configuration sheet — long-press the Challenge screen to open it.
 struct DevMenuView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DevMenuViewModel
     @State private var isResetConfirmationPresented = false
+    @State private var isHistoryResetConfirmationPresented = false
     @State private var isWardrobeResetConfirmationPresented = false
     @State private var isBulkScanPresented = false
     @State private var isBenchmarkPresented = false
-    /// Called after an action mutates a repository, so the screen behind the sheet
-    /// updates right away instead of waiting for dismissal.
     private let onStateChanged: () -> Void
-    /// Built on demand so a scan always starts from an empty queue.
     private let makeReview: () -> GarmentReviewModel
-    /// Same reason: every benchmark run starts from an empty set of labels.
     private let makeBenchmark: () -> MatchBenchmarkViewModel
 
     init(
@@ -37,6 +33,9 @@ struct DevMenuView: View {
                 DevStateSection(summary: viewModel.summary)
                 DevTodaySection(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
+                }
+                DevHistorySection {
+                    isHistoryResetConfirmationPresented = true
                 }
                 DevWardrobeSection(
                     onScan: { isBulkScanPresented = true },
@@ -73,6 +72,23 @@ struct DevMenuView: View {
                     }
                 } message: {
                     Text(verbatim: "Deletes today's completion, the active challenge, and their photos.")
+                }
+                .confirmationDialog(
+                    Text(verbatim: "Reset all history?"),
+                    isPresented: $isHistoryResetConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button(role: .destructive) {
+                        viewModel.resetHistory()
+                        onStateChanged()
+                    } label: {
+                        Text(verbatim: "Reset")
+                    }
+                    Button(role: .cancel) {} label: {
+                        Text("common.cancel", bundle: .module)
+                    }
+                } message: {
+                    Text(verbatim: "Deletes every completed challenge and its photos. The wardrobe is left alone.")
                 }
                 .confirmationDialog(
                     Text(verbatim: "Reset wardrobe?"),
@@ -156,9 +172,24 @@ private struct DevTodaySection: View {
         } header: {
             Text(verbatim: "Today")
         } footer: {
-            // New dev actions go here as extra rows — one method on the view
-            // model, one Button.
             Text(verbatim: lastAction ?? "Reopens the deck as if today had not started.")
+        }
+    }
+}
+
+private struct DevHistorySection: View {
+    let onReset: () -> Void
+
+    var body: some View {
+        Section {
+            Button(role: .destructive, action: onReset) {
+                Text(verbatim: "Reset all history")
+            }
+        } header: {
+            Text(verbatim: "History")
+        } footer: {
+            Text(verbatim: "Clears every completed challenge, not just today's. "
+                + "Wear counts survive; use Reset wardrobe.")
         }
     }
 }

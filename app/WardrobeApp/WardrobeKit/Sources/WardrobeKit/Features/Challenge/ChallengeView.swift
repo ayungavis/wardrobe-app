@@ -7,7 +7,6 @@ public struct ChallengeView: View {
     private let container: AppContainer
 
     private let backgroundStickers: [StickerPlacement] = [
-        // paste these directly from Figma: sticker's X, Y, Width, Height, and the SCREEN frame's total W/H
         StickerPlacement(
             "StampElement",
             figmaX: 284,

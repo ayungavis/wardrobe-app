@@ -13,8 +13,6 @@ import Foundation
 // read path, and everything that used to sit alongside them — `CropSpec` and
 // the text style palette — is live and moved out.
 
-/// Non-destructive edit instructions (PRD FR-018, §18.5). The original photo
-/// is never modified — rendering applies these on top at export time.
 public struct EditDraft: Codable, Equatable, Sendable {
     public var crop: CropSpec?
     public var texts: [TextItem]
@@ -26,7 +24,6 @@ public struct EditDraft: Codable, Equatable, Sendable {
         self.stickers = stickers
     }
 
-    /// Drafts persist across app updates — decode fields added later leniently.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         crop = try container.decodeIfPresent(CropSpec.self, forKey: .crop)
@@ -42,7 +39,6 @@ public struct EditDraft: Codable, Equatable, Sendable {
 public struct TextItem: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public var content: String
-    /// Center position in unit image space (0...1).
     public var position: CGPoint
     public var scale: CGFloat
     public var rotationDegrees: Double
@@ -100,11 +96,9 @@ public struct TextItem: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-/// Emoji sticker overlay (PRD FR-019 sticker set).
 public struct StickerItem: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public var emoji: String
-    /// Center position in unit image space (0...1).
     public var position: CGPoint
     public var scale: CGFloat
     public var rotationDegrees: Double

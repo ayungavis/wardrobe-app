@@ -1,10 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// Undo and redo for the whole document (FR-088).
-///
-/// One capsule rather than two circles, because the pair reads as a single
-/// control: the two halves are the same operation in opposite directions.
 struct HistoryControlsView: View {
     let canUndo: Bool
     let canRedo: Bool
@@ -39,9 +35,6 @@ struct HistoryControlsView: View {
         .environment(\.colorScheme, .dark)
     }
 
-    /// 44×44 rather than the prototype's 38×34: §19 sets that as the floor, and
-    /// a control whose whole purpose is undoing a mis-aimed gesture is the last
-    /// place to ask for a precise one.
     private func button(
         systemName: String,
         label: LocalizedStringKey,

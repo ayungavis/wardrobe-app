@@ -1,8 +1,6 @@
 import Foundation
 import Observation
 
-/// The wardrobe grid. Filling it is the challenge loop's job (PRD §17) and the
-/// dev-menu bulk scan's — this only reads.
 @MainActor
 @Observable
 public final class WardrobeViewModel {
@@ -22,8 +20,6 @@ public final class WardrobeViewModel {
             let loaded = try repository.items()
             items = loaded
 
-            // One count per item, derived the same way WardrobeItemDetailViewModel does —
-            // wearCount is never stored, always computed from WearRecords.
             var counts: [UUID: Int] = [:]
             for item in loaded {
                 counts[item.id] = try repository.wears(for: item.id).count

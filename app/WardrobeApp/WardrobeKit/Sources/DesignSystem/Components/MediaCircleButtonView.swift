@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Round translucent control used on top of media, story-editor style.
 public struct MediaCircleButtonView: View {
     private let systemName: String
     private let action: () -> Void

@@ -1,16 +1,5 @@
 import SwiftUI
 
-// The content palette for text layers: colour, background, font, alignment.
-//
-// One file rather than four because they are one decision — how a text layer
-// looks — and every caller reaches for them together. They are *content*, not
-// design tokens: `AppColor` decides what the app looks like, these decide what
-// the user drew, so they are stored by raw value and never restyled.
-
-/// Story-style text color palette (content palette, not a UI token).
-///
-/// Order is the swatch order on screen. Raw values are stored, so they never
-/// change — only the list may grow.
 public enum TextColor: String, CaseIterable, Sendable {
     case white, black, yellow, orange, red, pink, purple, blue, cyan, green
 
@@ -29,7 +18,6 @@ public enum TextColor: String, CaseIterable, Sendable {
         }
     }
 
-    /// Readable text color when this color is used as the pill background.
     public var contrastText: Color {
         switch self {
         case .black, .red, .purple, .blue: .white
@@ -41,22 +29,14 @@ public enum TextColor: String, CaseIterable, Sendable {
         LocalizedKey.resolve(Self.nameKey(for: self))
     }
 
-    /// Assembled at runtime, so the extractor never sees these keys in source
-    /// and prunes them as stale. They are pinned `"extractionState": "manual"`
-    /// in `Localizable.xcstrings`; a test fails if that pin is removed.
     static func nameKey(for color: TextColor) -> String {
         "editor.color.\(color.rawValue)"
     }
 }
 
-/// How a text layer sits on whatever is behind it (FR-019's "background
-/// style"). Three states rather than a boolean, cycled by one button.
 public enum TextBackgroundStyle: String, CaseIterable, Sendable {
-    /// Bare text with a thin shadow so it stays legible on a busy photo.
     case none
-    /// A pill filled with the chosen colour; the text flips to its contrast.
     case solid
-    /// A dark pill; the text keeps the chosen colour.
     case translucent
 
     public var next: TextBackgroundStyle {
@@ -72,8 +52,6 @@ public enum TextBackgroundStyle: String, CaseIterable, Sendable {
     }
 }
 
-/// Story-style typefaces, all built from system font designs — no font files
-/// to license or ship.
 public enum TextFontStyle: String, CaseIterable, Sendable {
     case classic, bold, rounded, serif, mono
 
@@ -89,19 +67,11 @@ public enum TextFontStyle: String, CaseIterable, Sendable {
     public var weight: Font.Weight {
         switch self {
         case .bold: .black
-        // Serif and monospace carry their own visual weight; at .bold they
-        // read as heavier than the sans faces rather than equal to them.
         case .serif, .mono: .semibold
         case .classic, .rounded: .bold
         }
     }
 
-    /// Shown on the chips, set in the typeface it names.
-    ///
-    /// The names describe the face, not the raw value — `classic` here is the
-    /// default sans, while the prototype's `classic` was its serif. Renaming
-    /// the raw values to match would have turned every stored `"classic"` into
-    /// a serif overnight, so the labels moved instead.
     public var name: String {
         LocalizedKey.resolve(Self.nameKey(for: self))
     }
@@ -138,7 +108,6 @@ public enum TextAlignmentStyle: String, CaseIterable, Sendable {
         }
     }
 
-    /// Cycled by the toolbar button, the way story editors do it.
     public var next: TextAlignmentStyle {
         switch self {
         case .leading: .center

@@ -1,11 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// One scanned garment and what the user wants done with it.
-///
-/// The proposal is shown as a **picture next to a picture**: judging whether two
-/// garments are the same from a name is guesswork, and matching is never certain
-/// enough to decide on the user's behalf (FR-029).
 struct ScannedGarmentRowView: View {
     let garment: ScannedGarment
     let scannedImage: Data?
@@ -23,9 +18,6 @@ struct ScannedGarmentRowView: View {
                     .foregroundStyle(AppColor.textPrimary)
             }
 
-            // Always shown, even with no candidates: a row with nothing to
-            // match against is exactly where "skip" is needed most, because a
-            // bogus detection rarely looks like anything already owned.
             choices
         }
         .padding(.vertical, Spacing.xs)

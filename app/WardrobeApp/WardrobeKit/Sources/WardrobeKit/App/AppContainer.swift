@@ -1,8 +1,6 @@
 import Foundation
 import SwiftData
 
-/// Composition root. Owns dependency construction so views and view models
-/// stay injectable and testable.
 @MainActor
 public final class AppContainer {
     private let challengeRepository: ChallengeRepository
@@ -10,6 +8,7 @@ public final class AppContainer {
     private let completedChallengeRepository: CompletedChallengeRepository
     private let photoRepository: PhotoRepository
     let preferencesRepository: AccountPreferencesRepository
+    private let completionPreviewRepository: CompletionPreviewRepository
     private let cameraService: CameraService
 
     public init(
@@ -18,6 +17,7 @@ public final class AppContainer {
         completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
+        completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
@@ -25,6 +25,7 @@ public final class AppContainer {
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
+        self.completionPreviewRepository = completionPreviewRepository
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -36,8 +37,6 @@ public final class AppContainer {
         #endif
     }
 
-    /// Makes the in-progress draft durable. Called when the app leaves the
-    /// screen, which is the last moment it is certain to get.
     public func flushDrafts() async {
         await activeChallengeRepository.flush()
     }
@@ -58,6 +57,7 @@ public final class AppContainer {
             activeRepository: activeChallengeRepository,
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
+            previews: completionPreviewRepository,
             library: Self.defaultPhotoLibrary(),
             scanner: makeGarmentScanService(),
             wardrobeRepository: makeWardrobeItemRepository(),
@@ -111,7 +111,6 @@ public final class AppContainer {
         )
     }
 
-    /// Internal: the benchmark is a dev tool and never leaves the package.
     func makeMatchBenchmarkViewModel() -> MatchBenchmarkViewModel {
         MatchBenchmarkViewModel(
             scanner: makeGarmentScanService(),
@@ -133,7 +132,6 @@ public final class AppContainer {
         SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
     }
 
-    /// Built once per process; `ModelContainer` is Sendable and cheap to share.
     private static let wardrobeContainer: ModelContainer = {
         do {
             return try ModelContainer(for: SwiftDataWardrobeItemRepository.schema)
@@ -165,7 +163,8 @@ public final class AppContainer {
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository
         )
     }
 
@@ -186,7 +185,8 @@ public final class AppContainer {
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository
         )
     }
 }

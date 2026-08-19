@@ -1,7 +1,5 @@
 import CoreGraphics
 
-/// Zoom presets, in display space. `0.5` needs an ultra-wide lens, so each
-/// service filters this list down to what its device supports.
 enum CameraZoom {
     static let presets: [CGFloat] = [0.5, 1, 2]
     static let standard: CGFloat = 1

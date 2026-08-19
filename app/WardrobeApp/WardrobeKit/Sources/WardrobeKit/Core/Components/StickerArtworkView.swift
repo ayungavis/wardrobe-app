@@ -2,12 +2,6 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// Draws a sticker at a given size — the picker's grid and the canvas both go
-/// through here, so a swatch cannot promise something the canvas will not draw.
-///
-/// Every dimension is a multiple of `size`, which is what lets the same view
-/// serve a 64pt cell and a 1080-point export frame without anything landing
-/// proportionally wrong.
 struct StickerArtworkView: View {
     let art: StickerArt
     let size: CGFloat

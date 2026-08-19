@@ -1,16 +1,8 @@
 import Foundation
 
-/// Scores the matcher against photos the user labelled, so "is this better?"
-/// stops being a matter of opinion.
-///
-/// Pure: fingerprints in, numbers out. Everything Core ML and camera-shaped
-/// lives in the view model, which is why this whole file is testable without a
-/// simulator.
 enum MatchBenchmark {
-    /// Enough failures to see the pattern, few enough to read on a phone.
     static let worstCaseCount = 5
 
-    /// One comparison plus the answer.
     private struct Judged {
         let isSame: Bool
         let pair: BenchmarkReport.Pair
@@ -53,10 +45,6 @@ enum MatchBenchmark {
         ]
     }
 
-    /// Same hard filters as `ItemMatching.candidates`: a top is never compared
-    /// with a bottom, and vectors from different Vision revisions are not
-    /// comparable. A benchmark run against pairs the matcher would never see
-    /// would flatter it.
     private static func judge(_ samples: [BenchmarkSample]) -> [Judged] {
         var judged: [Judged] = []
         for (index, left) in samples.enumerated() {
@@ -97,8 +85,6 @@ enum MatchBenchmark {
         _ judged: [Judged],
         _ value: (ItemMatching.Comparison) -> Float?
     ) -> BenchmarkReport.Signal {
-        // A pair with no feature print says nothing about the feature print, so
-        // it is dropped from that signal rather than counted as a mismatch.
         let values = judged.compactMap { entry -> (Float, Bool)? in
             guard let number = value(entry.comparison), number.isFinite else { return nil }
             return (number, entry.isSame)
@@ -133,9 +119,6 @@ enum MatchBenchmark {
         )
     }
 
-    /// Sweeps every observed value as a cut point. The set is small — a
-    /// benchmark run is tens of garments — so there is nothing to gain from
-    /// being cleverer than exhaustive.
     private static func bestOperating(
         higherIsCloser: Bool,
         values: [(Float, Bool)]

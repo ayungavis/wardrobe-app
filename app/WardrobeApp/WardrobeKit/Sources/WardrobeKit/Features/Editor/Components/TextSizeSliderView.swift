@@ -2,12 +2,6 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// The vertical size slider down the left edge of the composer — big at the
-/// top, small at the bottom.
-///
-/// It drives the layer's `scale`, not a point size. A point size would mean one
-/// number on a 6.9" screen and a different apparent size at 1080×1920, and the
-/// whole document is built on sizes being fractions of the canvas.
 struct TextSizeSliderView: View {
     static let range: ClosedRange<CGFloat> = 0.5 ... 3
 
@@ -75,8 +69,6 @@ struct TextSizeSliderView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            // Absolute, not incremental: tapping anywhere on the track jumps
-            // there, which is how every size slider of this shape behaves.
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { gesture in
@@ -102,7 +94,6 @@ struct TextSizeSliderView: View {
 
     private func setScale(_ value: CGFloat) {
         let clamped = min(max(value, Self.range.lowerBound), Self.range.upperBound)
-        // Quantised so a drag lands on repeatable values instead of noise.
         scale = (clamped * 20).rounded() / 20
     }
 }

@@ -1,12 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// One garment: what it looks like, how often it has been worn, and what else in
-/// the wardrobe resembles it (PRD FR-036).
-///
-/// Name, colour, and garment type are not shown because they do not exist yet
-/// (PRD §13.4). Empty fields promising future data would be worse than their
-/// absence.
 public struct WardrobeItemDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: WardrobeItemDetailViewModel
@@ -16,7 +10,6 @@ public struct WardrobeItemDetailView: View {
     @State private var editableName: String = ""
     @State private var editableDescription: String = ""
 
-    /// Called after the row is gone, so the grid behind can reload.
     private let onDeleted: () -> Void
 
     public init(viewModel: WardrobeItemDetailViewModel, onDeleted: @escaping () -> Void) {
@@ -50,7 +43,6 @@ public struct WardrobeItemDetailView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     if let item = viewModel.item {
-                        // 1. Hero Image
                         HeroView(
                             data: viewModel.thumbnailData(for: item),
                             isEditing: isEditing
@@ -58,15 +50,13 @@ public struct WardrobeItemDetailView: View {
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.xl)
 
-                        // 2. Wear Count
                         Text("wardrobe.wearCount \(viewModel.wearCount)", bundle: .module)
-                            .font(AppFont.title) // Adjusted to use your design system
+                            .font(AppFont.title)
                             .fontWeight(.black)
                             .stroke(color: .white, width: 3)
                             .padding(.top, Spacing.lg)
                             .zIndex(2)
 
-                        // 3. Receipt Card
                         EditableInfoCardView(
                             isEditing: isEditing,
                             name: $editableName,
@@ -76,7 +66,6 @@ public struct WardrobeItemDetailView: View {
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
 
-                        // 4. Delete Button (Edit Mode Only)
                         if isEditing {
                             Button(role: .destructive) {
                                 isDeleteConfirmationPresented = true
@@ -88,7 +77,6 @@ public struct WardrobeItemDetailView: View {
                             .padding(.top, Spacing.lg)
                         }
 
-                        // 5. Timeline & Similar Items (Only show in Read Mode to keep Edit UI clean)
                         if !isEditing {
                             VStack(spacing: Spacing.xl) {
                                 timeline
@@ -110,8 +98,6 @@ public struct WardrobeItemDetailView: View {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         if isEditing {
-                            // Trigger the save when exiting edit mode
-                            // IMPORTANT: Ensure your teammate adds this function to the ViewModel!
                             viewModel.updateItem(name: editableName, description: editableDescription)
                         }
                         isEditing.toggle()
@@ -129,7 +115,6 @@ public struct WardrobeItemDetailView: View {
         .task {
             viewModel.load()
         }
-        // Sync local editable state when the item data arrives
         .onChange(of: viewModel.item) { _, newItem in
             if let item = newItem {
                 editableName = item.name
@@ -166,8 +151,6 @@ public struct WardrobeItemDetailView: View {
     private var similar: some View {
         SectionView(title: "wardrobe.detail.similar") {
             if viewModel.similar.isEmpty {
-                // Nothing cleared the matcher's threshold. That is information,
-                // not a failure, so it is stated plainly.
                 Text("wardrobe.detail.similar.empty", bundle: .module)
                     .font(AppFont.caption)
                     .foregroundStyle(AppColor.textSecondary)
@@ -185,9 +168,6 @@ public struct WardrobeItemDetailView: View {
             }
         }
     }
-
-//    private var deleteButton: some View {
-//            isDeleteConfirmationPresented = true
 
     // MARK: - Sections
 
@@ -219,12 +199,10 @@ public struct WardrobeItemDetailView: View {
 
         var body: some View {
             ZStack(alignment: .top) {
-                // Replaces original UsageSummaryView with the paper asset
                 Image("WardrobeItemDetail", bundle: .module)
                     .resizable()
 
                 VStack(alignment: .leading, spacing: 16) {
-                    // NAME
                     HStack {
                         label("wardrobe.detail.name")
                         if isEditing {
@@ -233,10 +211,7 @@ public struct WardrobeItemDetailView: View {
                                 .padding(.vertical, 4)
                                 .background(Color.gray.opacity(0.2))
                                 .cornerRadius(4)
-                                // Triggers end of editing on 'Return' key
-                                .onSubmit {
-                                    // optional: can trigger save here too if desired
-                                }
+                                .onSubmit {}
                         } else {
                             Text(name)
                         }
@@ -244,7 +219,6 @@ public struct WardrobeItemDetailView: View {
 
                     Divider()
 
-                    // LAST USED
                     HStack {
                         label("wardrobe.detail.lastWorn")
                         Text(lastWornText(lastWornAt))
@@ -252,7 +226,6 @@ public struct WardrobeItemDetailView: View {
 
                     Divider()
 
-                    // DESCRIPTION
                     VStack(alignment: .leading, spacing: 8) {
                         label("wardrobe.detail.description")
                         if isEditing {

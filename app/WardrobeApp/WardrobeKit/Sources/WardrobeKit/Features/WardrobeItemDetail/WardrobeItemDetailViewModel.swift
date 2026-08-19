@@ -1,19 +1,12 @@
 import Foundation
 import Observation
 
-/// What one wardrobe item is, how often it has been worn, and what else in the
-/// wardrobe looks like it (PRD FR-036).
 @MainActor
 @Observable
 public final class WardrobeItemDetailViewModel {
     public private(set) var item: WardrobeItem?
-    /// Sorted newest first here rather than trusting the repository: the
-    /// protocol only promises an order for `items()`, and a screen that quietly
-    /// depends on an undocumented one breaks the day another implementation
-    /// appears.
     private(set) var wears: [WearRecord] = []
     private(set) var similar: [SimilarItem] = []
-    /// Set once the row is gone, so the view can close itself.
     public private(set) var isDeleted = false
 
     private let itemID: UUID
@@ -32,14 +25,10 @@ public final class WardrobeItemDetailViewModel {
 
     // MARK: Derived from the wear records
 
-    // Computed rather than stored: a second copy of these could disagree with
-    // the records they came from.
-
     var wearCount: Int {
         wears.count
     }
 
-    /// Nil when the item has never been worn — never a fabricated date (FR-023).
     var firstWornAt: Date? {
         wears.map(\.wornAt).min()
     }
@@ -60,11 +49,6 @@ public final class WardrobeItemDetailViewModel {
         }
     }
 
-    /// Runs the same matcher the review drawer uses, over every fingerprint this
-    /// item has accumulated, and keeps each candidate's best score.
-    ///
-    /// Often empty, and that is a real answer rather than a failure: nothing in
-    /// the wardrobe cleared the similarity threshold.
     private func loadSimilar() throws -> [SimilarItem] {
         let items = try repository.items()
         let categories = Dictionary(items.map { ($0.id, $0.category) }, uniquingKeysWith: { first, _ in first })
@@ -94,11 +78,6 @@ public final class WardrobeItemDetailViewModel {
 
     // MARK: Deleting
 
-    /// Rows first, file second — the same order as the dev-menu reset, so a
-    /// failure halfway cannot leave a row pointing at an image that is gone.
-    ///
-    /// A cut-out that has already vanished is not an error: the item still needs
-    /// to go, and refusing would strand it forever.
     public func delete() {
         guard let item else { return }
         do {

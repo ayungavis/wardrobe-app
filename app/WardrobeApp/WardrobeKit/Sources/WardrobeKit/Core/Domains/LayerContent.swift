@@ -1,10 +1,6 @@
 import CoreGraphics
 import Foundation
 
-/// The four layer kinds. An enum with payloads rather than a struct of
-/// optionals: a layer that is both a sticker and a drawing cannot be written.
-///
-/// FR-084 fixes this set — it is not extensible by users.
 public enum LayerContent: Equatable, Sendable {
     case photo(PhotoContent)
     case text(TextContent)
@@ -30,10 +26,6 @@ extension LayerContent: Codable {
         }
     }
 
-    /// Written by hand rather than synthesized. The compiler encodes enum
-    /// payloads under generated labels (`_0`), and this shape is stored on
-    /// people's phones and synced to the server — a format that outlives many
-    /// builds cannot rest on a name the compiler is free to change.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         // An unrecognised kind means the document knows something this build
@@ -64,8 +56,6 @@ extension LayerContent: Codable {
     }
 }
 
-/// The cropped capture inside its polaroid frame (FR-092). Only the id and the
-/// crop are stored; the pixels stay in the photo repository, untouched.
 public struct PhotoContent: Equatable, Codable, Sendable {
     public let photoID: String
     public var crop: CropSpec?
@@ -95,8 +85,6 @@ public struct TextContent: Equatable, Codable, Sendable {
         TextAlignmentStyle(rawValue: alignmentName) ?? .center
     }
 
-    /// An unrecognised style loses a look, not the words — so it falls back
-    /// rather than refusing, the same call `CanvasBackground` makes.
     public var backgroundStyle: TextBackgroundStyle {
         TextBackgroundStyle(rawValue: backgroundStyleName) ?? .none
     }
@@ -115,8 +103,6 @@ public struct TextContent: Equatable, Codable, Sendable {
         self.alignmentName = alignmentName
     }
 
-    /// Carries a flat draft's text across without losing its styling. The old
-    /// boolean only knew two of the three states.
     public init(_ item: TextItem) {
         self.init(
             content: item.content,
@@ -167,8 +153,6 @@ public struct StickerContent: Equatable, Sendable {
         self.art = art
     }
 
-    /// Convenience for the one thing that still speaks in glyphs: the flat
-    /// pre-canvas draft.
     public init(emoji: String) {
         art = StickerArt(legacyEmoji: emoji)
     }

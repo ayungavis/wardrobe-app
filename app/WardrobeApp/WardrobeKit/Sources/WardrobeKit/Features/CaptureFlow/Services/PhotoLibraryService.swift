@@ -1,20 +1,15 @@
 import CoreGraphics
 import Foundation
 
-/// Reads the user's photo library for the in-app gallery grid.
 public protocol PhotoLibraryService: Sendable {
-    /// Current authorization — never prompts.
     func access() async -> PhotoLibraryAccess
-    /// Prompts the system permission sheet.
     func requestAccess() async -> PhotoLibraryAccess
     func recentAssets(limit: Int) async -> [PhotoAsset]
     func thumbnail(for id: String, maxPixel: CGFloat) async -> CGImage?
-    /// Full-size bytes for the photo the user picked.
     func imageData(for id: String) async -> Data?
 }
 
 public extension PhotoLibraryService {
-    /// Newest photo, for the gallery button's thumbnail.
     func latestPhotoThumbnail(maxPixel: CGFloat) async -> CGImage? {
         guard let asset = await recentAssets(limit: 1).first else { return nil }
         return await thumbnail(for: asset.id, maxPixel: maxPixel)
@@ -24,8 +19,6 @@ public extension PhotoLibraryService {
 #if os(iOS)
     import Photos
 
-    /// An actor so Photos' non-`Sendable` types (`PHAsset`, `PHImageManager`)
-    /// stay inside; only values cross the boundary.
     public actor PHPhotoLibraryService: PhotoLibraryService {
         public init() {}
 
@@ -57,9 +50,6 @@ public extension PhotoLibraryService {
             let options = PHImageRequestOptions()
             options.isNetworkAccessAllowed = false
             options.resizeMode = .fast
-            // `.highQualityFormat` is documented to call the handler exactly
-            // once — `.opportunistic` calls it twice and would resume the
-            // continuation a second time.
             options.deliveryMode = .highQualityFormat
 
             let size = CGSize(width: maxPixel, height: maxPixel)
@@ -106,7 +96,6 @@ public extension PhotoLibraryService {
         }
     }
 #else
-    /// macOS host builds (unit tests) have no photo library.
     public struct NoopPhotoLibraryService: PhotoLibraryService {
         public init() {}
         public func access() async -> PhotoLibraryAccess {

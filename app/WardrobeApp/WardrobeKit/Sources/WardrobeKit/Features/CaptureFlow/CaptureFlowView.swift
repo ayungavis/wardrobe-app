@@ -65,7 +65,7 @@ public struct CaptureFlowView: View {
         }
         .onChange(of: viewModel.isCompleted) { _, completed in
             if completed {
-                dismiss() // back to Challenge, which now shows the daily state
+                dismiss()
             }
         }
         .alert(
@@ -85,8 +85,6 @@ public struct CaptureFlowView: View {
         }
     }
 
-    /// FR-083. Its own screen with its own view model, the way the editor
-    /// stage is — crop has loading and failure of its own.
     @ViewBuilder
     private var cropStage: some View {
         if let photoID = viewModel.challenge.photoID {
@@ -99,7 +97,6 @@ public struct CaptureFlowView: View {
     }
 }
 
-/// FR-013: plain-language explanation BEFORE the system camera prompt.
 private struct ConsentStageView: View {
     let onContinue: () -> Void
     let onNotNow: () -> Void
@@ -135,7 +132,6 @@ private struct ConsentStageView: View {
     }
 }
 
-/// FR-014: denied/restricted — settings guidance + safe return.
 private struct DeniedStageView: View {
     @Environment(\.openURL) private var openURL
     let onClose: () -> Void

@@ -1,16 +1,7 @@
 import DesignSystem
 import SwiftUI
 
-/// Frames the capture to 3:4 before it reaches the editor (PRD FR-083).
-///
-/// The result is an instruction, not a new image: **Use Crop** hands back a
-/// `CropSpec` in unit image space, which the editor preview and the exporter
-/// already know how to apply. The original photo is never touched.
 public struct CropView: View {
-    /// What leaving without cropping means here. After capture there is nothing
-    /// to go back to but the camera; reopened from the editor the photo and its
-    /// layers are still there, so leaving is a cancel and must not read as
-    /// "throw the photo away".
     public enum Exit {
         case retake
         case cancel
@@ -33,15 +24,10 @@ public struct CropView: View {
         self.onUseCrop = onUseCrop
     }
 
-    /// Committed framing. The in-flight gesture lives in `gesture` and resets
-    /// itself, so an interrupted pinch can never leave the photo somewhere the
-    /// user did not put it.
     @State private var scale: CGFloat = 1
     @State private var offset: CGSize = .zero
     @GestureState private var gesture = TransientGesture()
 
-    /// One discrete step for the zoom buttons — the non-gesture path §19
-    /// requires, using the same clamp as the pinch.
     private static let zoomStep: CGFloat = 0.5
     private static let canvasInsets = CGSize(width: 32, height: 220)
 
@@ -79,8 +65,6 @@ public struct CropView: View {
         }
     }
 
-    /// A photo that will not decode still belongs to the user, so the way out
-    /// is retake — never a dead screen (FR-083).
     private func failed(_ error: AppError) -> some View {
         ContentUnavailableView {
             Text("crop.failed.title", bundle: .module)
@@ -150,8 +134,6 @@ public struct CropView: View {
         .padding(.top, Spacing.lg)
     }
 
-    /// Pinch is not the only way in: §19 requires an alternative to precision
-    /// gestures, and these share the gesture's clamp so both paths agree.
     private func zoomButton(
         systemImage: String,
         by delta: CGFloat,
@@ -233,9 +215,6 @@ public struct CropView: View {
         .accessibilityLabel(Text("crop.canvas.label", bundle: .module))
     }
 
-    /// Pinch and drag together. Live values stay in `@GestureState` and the
-    /// committed ones are written once, on end — `onChanged` never does more
-    /// than arithmetic.
     private func framingGesture(imageSize: CGSize, cropSize: CGSize) -> some Gesture {
         MagnifyGesture()
             .simultaneously(with: DragGesture(minimumDistance: 0))
@@ -262,7 +241,6 @@ public struct CropView: View {
 
 // MARK: - Supporting types
 
-/// Resets itself when the gesture ends, so nothing has to undo it by hand.
 private struct TransientGesture: Equatable {
     var magnification: CGFloat = 1
     var translation: CGSize = .zero
@@ -272,7 +250,6 @@ private struct TransientGesture: Equatable {
     }
 }
 
-/// Rule-of-thirds guides, shown only while framing.
 private struct CropGridView: View {
     var body: some View {
         ZStack {

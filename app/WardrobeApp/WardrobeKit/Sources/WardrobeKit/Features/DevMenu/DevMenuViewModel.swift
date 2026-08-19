@@ -1,14 +1,10 @@
 import Foundation
 import Observation
 
-// What the dev menu shows about the current persisted state. Rebuilding it is
-// cheap (two UserDefaults reads), so it is recomputed after every action.
-
 @MainActor
 @Observable
 public final class DevMenuViewModel {
     public private(set) var summary = DevStateSummary()
-    /// Last action's result, shown inline so a tap has visible feedback.
     public private(set) var lastAction: String?
 
     private let activeRepository: ActiveChallengeRepository
@@ -16,6 +12,7 @@ public final class DevMenuViewModel {
     private let photoRepository: PhotoRepository
     private let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
+    private let previews: CompletionPreviewRepository
     private let calendar: Calendar
 
     public init(
@@ -24,6 +21,7 @@ public final class DevMenuViewModel {
         photoRepository: PhotoRepository,
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
+        previews: CompletionPreviewRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -31,6 +29,7 @@ public final class DevMenuViewModel {
         self.photoRepository = photoRepository
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
+        self.previews = previews
         self.calendar = calendar
     }
 
@@ -46,8 +45,6 @@ public final class DevMenuViewModel {
         )
     }
 
-    /// Empties the wardrobe: rows first, then the cut-out files, so a failure
-    /// halfway cannot leave rows pointing at images that are already gone.
     public func resetWardrobe() {
         do {
             try wardrobeRepository.deleteAll()
@@ -60,20 +57,22 @@ public final class DevMenuViewModel {
         lastAction = "Wardrobe cleared"
     }
 
-    /// Puts today back to a clean slate: today's completion, the active
-    /// challenge, and both of their photos are gone, so the deck reopens.
     public func resetToday() {
         let today = Date()
 
         let todaysCompletions = completedRepository.load()
             .filter { calendar.isDate($0.completedAt, inSameDayAs: today) }
         for completion in todaysCompletions {
-            deletePhoto(completion.photoID)
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
+            deletePreview(of: completion)
         }
         completedRepository.removeCompletions(on: today)
 
-        if let photoID = activeRepository.load()?.photoID {
-            deletePhoto(photoID)
+        if let active = activeRepository.load() {
+            photoRepository.deleteOriginals(of: active.document, and: active.photoID)
+            photoRepository.deleteUnusedOriginals(
+                of: active.document, imported: active.importedPhotoIDs
+            )
         }
         activeRepository.clear()
 
@@ -82,11 +81,28 @@ public final class DevMenuViewModel {
         Log.ui.info("Dev: today's challenge reset")
     }
 
-    private func deletePhoto(_ id: String) {
+    public func resetHistory() {
+        for completion in completedRepository.load() {
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
+        }
         do {
-            try photoRepository.deleteOriginal(id: id)
+            try previews.deleteAll()
         } catch {
-            Log.report(error) // an orphaned file must not block the reset
+            Log.report(error)
+        }
+        completedRepository.removeAll()
+
+        refresh()
+        lastAction = "History cleared"
+        Log.ui.info("Dev: history cleared")
+    }
+
+    private func deletePreview(of completion: CompletedChallenge) {
+        guard let file = completion.previewFile else { return }
+        do {
+            try previews.delete(file: file)
+        } catch {
+            Log.report(error)
         }
     }
 }

@@ -1,10 +1,3 @@
-//
-//  PileCardView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 16/08/26.
-//
-
 import DesignSystem
 import SwiftUI
 

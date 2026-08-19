@@ -1,23 +1,13 @@
 import CoreGraphics
 import Foundation
 
-/// The canvas's arithmetic, kept out of the views so it can be tested without
-/// a finger.
-///
-/// Positions are unit space (0…1 across the canvas), matching `ElementTransform`
-/// — sizes are points, because a layer's rendered box only exists in points.
-/// Every function here converts between the two explicitly rather than letting
-/// a point value leak into something that gets stored.
 enum CanvasGeometry {
-    /// How much of a layer must stay on the canvas after a drag. Below this a
-    /// layer could be flung out of reach with no way to get it back.
     static let minimumVisibleLength: CGFloat = 44
 
     static func point(for position: CGPoint, in canvasSize: CGSize) -> CGPoint {
         CGPoint(x: position.x * canvasSize.width, y: position.y * canvasSize.height)
     }
 
-    /// Converts a drag translation in points into a unit-space displacement.
     static func position(
         _ position: CGPoint,
         translatedBy translation: CGSize,
@@ -30,11 +20,6 @@ enum CanvasGeometry {
         )
     }
 
-    /// Pulls a layer back until `minimumVisibleLength` of it is on the canvas.
-    ///
-    /// Applied when the gesture ends, never during it — so a layer follows the
-    /// finger honestly and then settles, which is what the prototype does and
-    /// what stops the drag from feeling like it is fighting back.
     static func constrainedPosition(
         _ position: CGPoint,
         canvasSize: CGSize,
@@ -63,14 +48,10 @@ enum CanvasGeometry {
         )
     }
 
-    /// The bottom-centre drop zone (FR-087). What is tested is the layer's own
-    /// centre, not the finger: the layer visibly shrinks into the target, so
-    /// the thing the user is aiming is the layer.
     static func isOverDeleteTarget(_ position: CGPoint) -> Bool {
         abs(position.x - 0.5) < 0.15 && position.y > 0.85
     }
 
-    /// Half the axis-aligned box a rotated, scaled layer actually occupies.
     private static func rotatedHalfExtents(
         layerSize: CGSize,
         scale: CGFloat,

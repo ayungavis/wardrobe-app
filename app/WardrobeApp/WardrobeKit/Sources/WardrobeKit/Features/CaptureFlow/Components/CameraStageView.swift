@@ -1,8 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// FR-015/016: story-style full-screen camera — dark, big shutter ring, lens
-/// presets above it, gallery import on the left, flip on the right.
 struct CameraStageView: View {
     let viewModel: CaptureFlowViewModel
     let onClose: () -> Void
@@ -11,7 +9,6 @@ struct CameraStageView: View {
     @State private var zoomStartValue: CGFloat?
     @State private var focusIndicator: FocusIndicator?
 
-    /// A tap-to-focus square, identified so a new tap restarts the fade.
     private struct FocusIndicator: Equatable, Identifiable {
         let id = UUID()
         let point: CGPoint
@@ -82,7 +79,6 @@ struct CameraStageView: View {
 
             Spacer()
 
-            // Balances the X so the flash button sits centered.
             Color.clear.frame(width: 44, height: 44)
         }
     }
@@ -121,7 +117,6 @@ struct CameraStageView: View {
                     .ignoresSafeArea()
             #endif
         } else {
-            // Simulator / sample camera: no live feed.
             VStack(spacing: Spacing.md) {
                 Image(systemName: "camera.viewfinder")
                     .font(.system(size: 72))
@@ -133,7 +128,6 @@ struct CameraStageView: View {
         }
     }
 
-    /// Tap-to-focus square that fades out on its own.
     @ViewBuilder
     private var focusSquare: some View {
         if let focusIndicator, viewfinderSize != .zero {
@@ -178,8 +172,6 @@ struct CameraStageView: View {
     }
 }
 
-/// Lens presets (0.5x/1x/2x) on the back camera; a single in/out toggle on the
-/// front, matching the built-in Camera app.
 private struct CameraZoomControl: View {
     let options: [CGFloat]
     let selected: CGFloat
@@ -247,8 +239,6 @@ private struct CameraZoomControl: View {
     }
 }
 
-/// IG-style gallery entry point: the newest photo as a thumbnail once the
-/// library permission allows it, a plain icon otherwise.
 private struct GalleryButton: View {
     let thumbnail: CGImage?
     let action: () -> Void

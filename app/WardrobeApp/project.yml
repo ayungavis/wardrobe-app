@@ -29,6 +29,11 @@ targets:
         SWIFT_VERSION: "6.0"
         # PRD §20: MVP targets iPhone portrait only.
         TARGETED_DEVICE_FAMILY: "1"
+        # Binds AppIcon.icon (Icon Composer) to the target — the name must match
+        # the .icon file's base name. XcodeGen supplies this value by default,
+        # but an implicit default is not documentation, and the .xcodeproj that
+        # carries it is generated and gitignored.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         # CI overrides CURRENT_PROJECT_VERSION with the run number for TestFlight.
         MARKETING_VERSION: "1.0"

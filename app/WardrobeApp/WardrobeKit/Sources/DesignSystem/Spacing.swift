@@ -1,6 +1,5 @@
 import Foundation
 
-/// 4pt spacing scale. Views must use these instead of magic numbers.
 public enum Spacing {
     public static let xs: CGFloat = 4
     public static let sm: CGFloat = 8

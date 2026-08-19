@@ -1,12 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// Every layer operation §19 requires, as buttons.
-///
-/// "No operation may require drag, pinch, or rotation gestures as its only
-/// path" — so reordering, moving, resizing, and rotating all have an entry
-/// here, and the adjustments nest one level down to keep the top level
-/// readable.
 struct LayerMenuView: View {
     let isLocked: Bool
     let canDelete: Bool

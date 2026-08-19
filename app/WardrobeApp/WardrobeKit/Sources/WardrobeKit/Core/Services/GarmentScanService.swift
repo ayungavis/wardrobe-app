@@ -1,18 +1,9 @@
 import CoreGraphics
 import Foundation
 
-/// Turns one photo into the garments it contains, each already fingerprinted and
-/// matched against the wardrobe — the pipeline described in
-/// docs/wardrobe-generation.md §3, steps 1–4.
-///
-/// A protocol because both the bulk-scan screen and the challenge editor drive
-/// it, and both need to fake it in tests. Copying this chain into two view
-/// models is the surest way to make them disagree.
 @MainActor
 public protocol GarmentScanService {
-    /// Cut-outs are already written to disk; the caller decides which ones
-    /// survive confirmation and deletes the rest (FR-029).
-    func scan(photo: Data) throws -> [ScannedGarment]
+    func scan(photo: Data) async throws -> [ScannedGarment]
 }
 
 @MainActor
@@ -21,8 +12,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     private let thumbnails: GarmentThumbnailRepository
     private let repository: WardrobeItemRepository
 
-    /// Photos are decoded to at most this edge before segmentation.
-    private static let maxPhotoPixel: CGFloat = 2048
+    private nonisolated static let maxPhotoPixel: CGFloat = 2048
 
     public init(
         segmentation: GarmentSegmentationService,
@@ -34,31 +24,50 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         self.repository = repository
     }
 
-    public func scan(photo: Data) throws -> [ScannedGarment] {
-        guard let image = ImageDecoding.downsampledImage(from: photo, maxPixel: Self.maxPhotoPixel) else {
-            Log.ui.error("Garment scan: undecodable photo")
-            return []
-        }
-        guard let segments = try segmentation.segment(image) else { return [] }
-
-        // Read once per photo: the whole index is small, and threading it
-        // through the call chain leaked the caller's batching into every layer.
+    public func scan(photo: Data) async throws -> [ScannedGarment] {
         let known = (try? repository.fingerprints()) ?? []
         let categories = Dictionary(
             (try? repository.items())?.map { ($0.id, $0.category) } ?? [],
             uniquingKeysWith: { first, _ in first }
         )
 
+        return try await Self.detect(
+            photo: photo, known: known, categories: categories,
+            segmentation: segmentation, thumbnails: thumbnails
+        )
+    }
+
+    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async function
+    /// stays on the caller's actor (SE-0461), so without this nothing moves.
+    /// Static because `self` is main-actor isolated.
+    @concurrent
+    private static func detect(
+        photo: Data,
+        known: [ItemFingerprint],
+        categories: [UUID: GarmentCategory],
+        segmentation: any GarmentSegmentationService,
+        thumbnails: any GarmentThumbnailRepository
+    ) async throws -> [ScannedGarment] {
+        guard let image = ImageDecoding.downsampledImage(from: photo, maxPixel: maxPhotoPixel) else {
+            Log.ui.error("Garment scan: undecodable photo")
+            return []
+        }
+        guard let segments = try segmentation.segment(image) else { return [] }
+
         return try segmentation.cutouts(from: segments).map { category, cutout in
-            try garment(category: category, cutout: cutout, known: known, categories: categories)
+            try garment(
+                category: category, cutout: cutout,
+                known: known, categories: categories, thumbnails: thumbnails
+            )
         }
     }
 
-    private func garment(
+    private nonisolated static func garment(
         category: GarmentCategory,
         cutout: GarmentCutout,
         known: [ItemFingerprint],
-        categories: [UUID: GarmentCategory]
+        categories: [UUID: GarmentCategory],
+        thumbnails: any GarmentThumbnailRepository
     ) throws -> ScannedGarment {
         let id = UUID()
         let fingerprint = ItemFingerprint(
@@ -91,7 +100,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     /// without seeing them would be guesswork.
     ///
     /// Ids and numbers only: nothing about what the photo contains (PRD §18/§24).
-    private func logCalibration(
+    private nonisolated static func logCalibration(
         for fingerprint: ItemFingerprint,
         category: GarmentCategory,
         among known: [ItemFingerprint],
@@ -122,6 +131,5 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         }
     }
 
-    /// A fifty-item wardrobe must not print fifty lines per garment.
-    private static let calibrationSampleSize = 5
+    private nonisolated static let calibrationSampleSize = 5
 }

@@ -9,47 +9,36 @@ public final class CaptureFlowViewModel {
     public private(set) var challenge: ActiveChallenge
     public var alertError: AppError?
     public private(set) var isCapturing = false
-    /// Mirrored from the camera service so the view observes changes.
     public private(set) var isFlashOn = false
     public private(set) var isUsingFrontCamera = false
     public private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
     public private(set) var zoomOptions: [CGFloat] = [CameraZoom.standard]
-    /// Latest tap-to-focus point in unit preview space, for the indicator.
     public private(set) var focusPoint: CGPoint?
-    /// Newest library photo for the gallery button; nil when unavailable.
     public private(set) var galleryThumbnail: CGImage?
     public private(set) var libraryAccess: PhotoLibraryAccess = .notDetermined
     public private(set) var recentAssets: [PhotoAsset] = []
     public var isGalleryPresented = false
 
-    /// Grid cells load their own thumbnails straight from the browser, so a
-    /// thumbnail arriving never invalidates the whole grid.
     public let library: PhotoLibraryService
 
-    /// Set once the checkmark commits — the flow's cover closes on it.
-    public private(set) var isCompleted = false
-    /// Read by the editor so the ✓ can show the wait for the garment scan
-    /// rather than looking inert.
-    public private(set) var isCompleting = false
-    /// True when this session opened onto work that was already there, rather
-    /// than work it created. Read by the editor to state that a device-only
-    /// draft was restored (§17).
+    public internal(set) var isCompleted = false
+    public internal(set) var isCompleting = false
     public private(set) var didResumeDraft = false
 
-    /// The AI item review shown in the editor drawer (FR-027).
     public let review: GarmentReviewModel
 
     private let camera: CameraService
-    private let activeRepository: ActiveChallengeRepository
-    private let completedRepository: CompletedChallengeRepository
-    private let photoRepository: PhotoRepository
+    let activeRepository: ActiveChallengeRepository
+    let completedRepository: CompletedChallengeRepository
+    let photoRepository: PhotoRepository
+    let previews: CompletionPreviewRepository
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
     private(set) var sessionTask: Task<Void, Never>?
     private(set) var flipTask: Task<Void, Never>?
     private(set) var importTask: Task<Void, Never>?
     private(set) var thumbnailTask: Task<Void, Never>?
-    private(set) var completionTask: Task<Void, Never>?
+    var completionTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
@@ -57,6 +46,7 @@ public final class CaptureFlowViewModel {
         activeRepository: ActiveChallengeRepository,
         completedRepository: CompletedChallengeRepository,
         photoRepository: PhotoRepository,
+        previews: CompletionPreviewRepository,
         library: PhotoLibraryService,
         scanner: GarmentScanService,
         wardrobeRepository: WardrobeItemRepository,
@@ -67,6 +57,7 @@ public final class CaptureFlowViewModel {
         self.activeRepository = activeRepository
         self.completedRepository = completedRepository
         self.photoRepository = photoRepository
+        self.previews = previews
         self.library = library
         review = GarmentReviewModel(
             scanner: scanner,
@@ -75,19 +66,16 @@ public final class CaptureFlowViewModel {
             thumbnails: thumbnails
         )
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
-        // Landing straight in the editor can only mean the challenge came off
-        // disk with the crop already committed — which is exactly the "restored
-        // draft" §17 wants stated. No extra flag is persisted to say what the
-        // stage already says.
+        // Landing straight in the editor can only mean the challenge came off disk
+        // with the crop committed, which is exactly what §17 wants stated — so no
+        // extra flag is persisted to repeat what the stage already says.
         didResumeDraft = stage == .editor
         syncCameraState()
     }
 
     static func initialStage(challenge: ActiveChallenge, permission: CameraPermission) -> CaptureStage {
-        // Resume where the photo actually is (FR-017). A capture that never got
-        // framed reopens the crop step rather than skipping past it — the crop
-        // in the draft is what says the step is done, so no extra flag is
-        // persisted to say the same thing twice.
+        // Resume where the photo actually is (FR-017): the crop in the draft is
+        // what says the step is done, so no extra flag is persisted.
         if let photoID = challenge.photoID {
             // The *challenge* photo's crop, not any photo's: a second photo
             // added in the editor must not send the flow back to the crop step
@@ -112,14 +100,11 @@ public final class CaptureFlowViewModel {
         }
     }
 
-    /// Re-check on foreground — covers returning from Settings after a grant
-    /// or revocation. Only pre-photo stages are recomputed.
     public func recheckPermission() {
         switch stage {
         case .consent, .denied, .camera:
             stage = Self.initialStage(challenge: challenge, permission: camera.permission)
         case .crop, .editor:
-            // A photo already exists; camera permission cannot un-take it.
             break
         }
     }
@@ -132,7 +117,6 @@ public final class CaptureFlowViewModel {
             do {
                 try await camera.startSession()
             } catch is CancellationError {
-                // Ignore cancellation.
             } catch {
                 Log.report(error, logger: Log.ui)
                 alertError = .cameraUnavailable
@@ -156,7 +140,6 @@ public final class CaptureFlowViewModel {
         }
     }
 
-    /// Pulls the service's current framing state into observable properties.
     private func syncCameraState() {
         isFlashOn = camera.isFlashOn
         isUsingFrontCamera = camera.isUsingFrontCamera
@@ -170,8 +153,6 @@ public final class CaptureFlowViewModel {
 
     // MARK: Capture (FR-016)
 
-    /// Story-style: a successful shutter goes straight to the editor
-    /// (the editor is the preview; discarding is the retake — FR-016).
     public func capture() {
         guard !isCapturing else { return }
         isCapturing = true
@@ -185,7 +166,6 @@ public final class CaptureFlowViewModel {
                 Log.ui.info("Capture finished in \((ContinuousClock.now - start).ms, privacy: .public)ms")
                 persistPhoto(data)
             } catch is CancellationError {
-                // Ignore cancellation.
             } catch {
                 Log.report(error, logger: Log.ui)
                 alertError = .captureFailed // stay in .camera; no photo record
@@ -198,34 +178,25 @@ public final class CaptureFlowViewModel {
         isFlashOn = camera.isFlashOn
     }
 
-    /// Pinch-to-zoom and preset taps share this path; the service clamps and
-    /// we mirror whatever it accepted.
     public func setDisplayZoom(_ factor: CGFloat) {
         camera.setDisplayZoom(CameraZoom.clamp(factor, to: zoomOptions))
         displayZoomFactor = camera.displayZoomFactor
     }
 
-    /// Front camera has no lens row — one button toggles the two framings,
-    /// the way the built-in Camera app does.
     public func toggleFrontZoom() {
         guard let first = zoomOptions.first, let last = zoomOptions.last, first != last else { return }
         setDisplayZoom(displayZoomFactor >= last ? first : last)
     }
 
-    /// Tap-to-focus. `point` is in unit preview space (0...1).
     public func focus(at point: CGPoint) {
         camera.focus(at: point)
         focusPoint = point
     }
 
-    /// Ordering matters: file write first, then persist photoID, then the crop
-    /// step. A failed write leaves nothing persisted (FR-016).
     private func persistPhoto(_ data: Data) {
         do {
             let id = try photoRepository.saveOriginal(data)
             challenge.photoID = id
-            // The photo layer is born with the photo — the crop step and the
-            // editor both write into it rather than creating it later.
             challenge.document = EditorDocument(photoID: id)
             activeRepository.save(challenge)
             stage = .crop
@@ -235,10 +206,6 @@ public final class CaptureFlowViewModel {
         }
     }
 
-    /// **Use Crop** (FR-083): the framing is stored as an instruction, not as a
-    /// second image file. The editor's preview and the exporter both already
-    /// read `document.photoCrop`, so the original stays the only photo on disk
-    /// and is never overwritten (FR-092).
     public func useCrop(_ crop: CropSpec) {
         guard let photoID = challenge.photoID,
               let layerID = challenge.document.photoLayerID(showing: photoID)
@@ -248,56 +215,11 @@ public final class CaptureFlowViewModel {
         challenge.document.setCrop(crop, ofLayer: layerID)
         activeRepository.save(challenge)
         stage = .editor
+        review.scanIfNeeded(photoID: photoID)
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
 
-    /// The checkmark — the only action that completes the challenge (FR-028).
-    /// Guarded twice over: an in-flight flag here, and a same-day check in the
-    /// store, so repeated taps can never write two records (FR-029).
-    public func completeChallenge() {
-        guard !isCompleting, !isCompleted, challenge.photoID != nil else { return }
-        isCompleting = true
-
-        completionTask = Task {
-            defer { isCompleting = false }
-            await review.finishScanning()
-            commit()
-        }
-    }
-
-    private func commit() {
-        guard let photoID = challenge.photoID else { return }
-        let now = Date()
-        let completion = CompletedChallenge(
-            card: challenge.card,
-            photoID: photoID,
-            // Read back rather than trusted: the editor owns a separate copy of
-            // the challenge and saves its edits to the repository, so this
-            // value copy has been stale ever since the editor opened. Taking
-            // the local one here silently dropped every text and sticker at ✓.
-            document: activeRepository.load()?.document ?? challenge.document,
-            completedAt: now
-        )
-
-        // Wardrobe first, completion last. The two live in different stores, so
-        // one transaction is impossible; if the bookkeeping fails the challenge
-        // still completes rather than being held hostage by it.
-        review.commit(completionID: completion.id, at: now)
-        // Photos added and then deleted have nothing left in the document to
-        // name them, so this is the last chance to clean them up.
-        photoRepository.deleteUnusedOriginals(
-            of: completion.document, imported: challenge.importedPhotoIDs
-        )
-
-        completedRepository.append(completion)
-        activeRepository.clear() // the photo file stays — History will render it
-        isCompleted = true
-        let cardID = challenge.card.id.uuidString
-        Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
-    }
-
-    /// Editor X: throw the photo and its edits away, back to the camera.
     public func discardPhoto() {
         // Every photo the canvas holds, not just the capture (FR-093).
         photoRepository.deleteOriginals(of: challenge.document, and: challenge.photoID)
@@ -311,15 +233,7 @@ public final class CaptureFlowViewModel {
 
 // MARK: - Photo library import
 
-/// Grouped in an extension: bringing a photo in from the library is a
-/// self-contained errand next to the camera state machine above.
 public extension CaptureFlowViewModel {
-    /// Asks for library access as the camera opens, then fills the gallery
-    /// button and grid.
-    ///
-    /// This deliberately departs from PRD §18.1 (ask at the action that needs
-    /// it): the IG-style thumbnail has to read the library before the user
-    /// touches anything, and the product owner accepted that trade.
     func prepareLibraryAccess() {
         thumbnailTask?.cancel()
         thumbnailTask = Task { [library] in
@@ -346,7 +260,6 @@ public extension CaptureFlowViewModel {
     // shot; add paging if anyone scrolls to the bottom and complains.
     private static let recentAssetLimit = 120
 
-    /// Tapping a grid cell imports immediately — no confirm step.
     func importAsset(id: String) {
         importTask?.cancel()
         importTask = Task { [library] in
@@ -362,13 +275,10 @@ public extension CaptureFlowViewModel {
         }
     }
 
-    /// The picker itself failed to hand over any bytes.
     func reportImportFailure() {
         alertError = .photoImportFailed
     }
 
-    /// Same safe ordering as a capture: validate, write the file, persist the
-    /// id, then move on (FR-016). Undecodable data persists nothing.
     func usePickedPhoto(_ data: Data) {
         importTask?.cancel()
         importTask = Task {
@@ -376,7 +286,6 @@ public extension CaptureFlowViewModel {
         }
     }
 
-    /// Shared by the in-app grid and the system-picker fallback.
     private func persistPickedPhoto(_ data: Data) async {
         let bytes = data
         let isDecodable = await Task.detached(priority: .userInitiated) {

@@ -2,15 +2,6 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// Catches strokes while drawing mode is on.
-///
-/// Mounted above the layer loop, so it takes the touch before any layer's drag
-/// gesture can — which is what stops a stroke drawn across a sticker from
-/// dragging the sticker instead.
-///
-/// The in-progress stroke lives here, in the leaf, and not in the view model.
-/// A finger emits points every frame; holding them any higher would invalidate
-/// every sibling layer sixty times a second for a line only this view draws.
 struct DrawingSurfaceView: View {
     let session: DrawingContent
     let pen: DrawingPen
@@ -18,15 +9,11 @@ struct DrawingSurfaceView: View {
 
     @State private var points: [DrawingPoint] = []
 
-    /// Below this the samples are noise, and dropping them keeps a stroke well
-    /// under the model's 512-point ceiling without thinning the line.
     private let minimumPointDistance: CGFloat = 1.5
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                // Everything committed this session, plus the line being drawn
-                // right now — the live one on top so it is never hidden.
                 DrawingCanvasView(content: session, referenceWidth: proxy.size.width)
                     .allowsHitTesting(false)
 
@@ -44,7 +31,6 @@ struct DrawingSurfaceView: View {
         .accessibilityHidden(true)
     }
 
-    /// The eraser has no ink, so without this there is nothing to aim.
     @ViewBuilder
     private func eraserCursor(in size: CGSize) -> some View {
         if pen.isErasing, let last = points.last {

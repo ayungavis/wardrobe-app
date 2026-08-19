@@ -1,12 +1,5 @@
 import Foundation
 
-/// How cleanly matching separates "same garment" from "different garment" over
-/// a set of photos the user labelled by hand.
-///
-/// The per-signal rows are the whole point. If the feature print alone separates
-/// badly while colour alone separates well, the embedding is the weak link and a
-/// bigger model is worth its megabytes — if the print already separates well,
-/// swapping models buys nothing and the fix is in the thresholds.
 struct BenchmarkReport: Equatable, Sendable {
     struct Distribution: Equatable, Sendable {
         let count: Int
@@ -25,18 +18,13 @@ struct BenchmarkReport: Equatable, Sendable {
 
     struct Signal: Equatable, Sendable {
         let name: String
-        /// True when a bigger number means "more likely the same garment".
         let higherIsCloser: Bool
         let same: Distribution?
         let different: Distribution?
-        /// The best F1 any single threshold on this signal alone can reach.
         let best: Operating?
-        /// Where the thresholds we actually ship sit today.
         let current: [Operating]
     }
 
-    /// One comparison, flattened for printing. Ids only — never anything about
-    /// what the photo contains (PRD §18/§24).
     struct Pair: Equatable, Sendable {
         let left: String
         let right: String
@@ -52,17 +40,13 @@ struct BenchmarkReport: Equatable, Sendable {
     let samePairCount: Int
     let differentPairCount: Int
     let signals: [Signal]
-    /// Same garment, lowest scores — the merges we would have missed.
     let worstFalseNegatives: [Pair]
-    /// Different garments, highest scores — the merges we would have invented.
     let worstFalsePositives: [Pair]
 }
 
 // MARK: - Rendering
 
 extension BenchmarkReport {
-    /// Plain text, because it has to survive being read on a phone screen and
-    /// pasted into a chat.
     var formatted: String {
         ([
             "Samples \(sampleCount) in \(groupCount) garments",

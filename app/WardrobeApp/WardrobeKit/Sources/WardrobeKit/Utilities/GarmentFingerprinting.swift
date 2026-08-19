@@ -2,26 +2,13 @@ import CoreGraphics
 import Foundation
 import Vision
 
-/// Turns a normalized cut-out into the numbers that decide whether the user
-/// already owns this garment (docs/wardrobe-generation.md §7).
-///
-/// Everything here reads the **cut-out**, never a generated illustration: the
-/// illustration is stochastic and deliberately erases the detail that tells two
-/// beige shirts apart.
 enum GarmentFingerprinting {
-    /// Bumped whenever the maths changes; only fingerprints of the same version
-    /// may be compared.
     static var version: String {
         "v1+vision\(VNGenerateImageFeaturePrintRequest.currentRevision)"
     }
 
-    /// Colour statistics are scale-free, so a 256² sample says the same thing as
-    /// the full canvas for a sixteenth of the work.
     private static let sampleSize = 256
-    /// Below this the pixel is the mask's blurred edge, not the garment.
     private static let opaqueThreshold: UInt8 = 200
-    /// Share of the darkest garment pixels dropped before averaging. A hard
-    /// shadow band would otherwise drag a beige shirt toward brown.
     private static let shadowShare = 0.25
 
     private struct GarmentPixel {
@@ -33,12 +20,6 @@ enum GarmentFingerprinting {
 
     // MARK: Colour
 
-    /// Mean CIE Lab of the garment's lit pixels, as `[L, a, b]`. Empty when the
-    /// image holds no garment.
-    ///
-    /// One mean rather than k dominant colours: for a patterned garment the mean
-    /// is muddy but **stable**, which is what matching needs — the pattern is the
-    /// feature print's job. `[Float]` leaves room to grow into clusters later.
     static func colorSignature(of image: CGImage) -> [Float] {
         guard let pixels = sample(image) else { return [] }
 
@@ -66,8 +47,6 @@ enum GarmentFingerprinting {
         return lab(red: mean.red / count, green: mean.green / count, blue: mean.blue / count)
     }
 
-    /// Alpha's bounding box relative to the canvas — tall trousers and wide tops
-    /// separate on this even when their colours agree.
     static func aspectRatio(of image: CGImage) -> Float {
         guard let pixels = sample(image) else { return 0 }
 
@@ -87,8 +66,6 @@ enum GarmentFingerprinting {
 
     // MARK: Feature print
 
-    /// Empty when Vision fails: matching then falls back to colour and shape
-    /// rather than losing the garment entirely.
     static func featurePrint(of image: CGImage) -> Data {
         guard let flattened = flattenedOntoGrey(image) else { return Data() }
 
@@ -105,9 +82,6 @@ enum GarmentFingerprinting {
         return observation.data
     }
 
-    /// L2 distance over the stored vectors. `VNFeaturePrintObservation` cannot be
-    /// rebuilt from disk, so `computeDistance` is not an option — the floats are
-    /// compared directly.
     static func distance(_ lhs: Data, _ rhs: Data) -> Float? {
         let left = floats(lhs)
         let right = floats(rhs)
@@ -128,9 +102,6 @@ enum GarmentFingerprinting {
 
     // MARK: Pixels
 
-    /// Vision treats transparent regions inconsistently, so the cut-out is
-    /// flattened onto a constant grey first — without this the same garment
-    /// scores differently just because its hole changed shape.
     private static func flattenedOntoGrey(_ image: CGImage) -> CGImage? {
         guard let context = CGContext(
             data: nil, width: image.width, height: image.height,
@@ -164,7 +135,6 @@ enum GarmentFingerprinting {
         let linear = [red, green, blue].map { channel -> Double in
             channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
         }
-        // sRGB → XYZ (D65), then XYZ → Lab against the D65 white point.
         let xyzX = (0.4124 * linear[0] + 0.3576 * linear[1] + 0.1805 * linear[2]) / 0.95047
         let xyzY = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
         let xyzZ = (0.0193 * linear[0] + 0.1192 * linear[1] + 0.9505 * linear[2]) / 1.08883

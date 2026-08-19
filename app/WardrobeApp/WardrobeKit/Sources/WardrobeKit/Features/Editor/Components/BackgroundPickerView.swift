@@ -1,21 +1,11 @@
 import DesignSystem
 import SwiftUI
 
-/// The fixed canvas background palette (FR-091).
-///
-/// A short sheet with a horizontal strip of swatches, so most of the canvas
-/// stays visible behind it and picking never dismisses: choosing a background
-/// is comparing it against the picture, not guessing from a thumbnail. Only
-/// Done — or a drag — closes it.
 struct BackgroundPickerView: View {
     @Environment(\.dismiss) private var dismiss
 
     let onPick: (CanvasBackground) -> Void
 
-    /// Seeded from the document, then owned here. The checkmark has to move on
-    /// the same frame as the tap, and that cannot depend on when SwiftUI
-    /// re-evaluates the sheet's closure. Nothing else can change the background
-    /// while this is open, so the two cannot drift.
     @State private var selected: CanvasBackground
 
     init(selected: CanvasBackground, onPick: @escaping (CanvasBackground) -> Void) {

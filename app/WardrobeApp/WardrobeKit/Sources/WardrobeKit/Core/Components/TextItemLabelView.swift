@@ -1,13 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// Shared rendering for text layers — the canvas, the composer preview, and the
-/// export composition all draw through this, so what you arrange is what gets
-/// saved and shared.
-///
-/// Takes the layer's content rather than a whole `TextItem`: placement belongs
-/// to whoever positions the view, and passing it here would let the two
-/// disagree.
 struct TextItemLabelView: View {
     let item: TextContent
     let fontSize: CGFloat
@@ -26,8 +19,6 @@ struct TextItemLabelView: View {
             .shadow(color: shadowColor, radius: fontSize * 0.05)
     }
 
-    /// On a solid pill the text flips to whatever reads against it; on the dark
-    /// pill it keeps its colour, except black, which would vanish.
     private var foregroundStyle: Color {
         switch item.backgroundStyle {
         case .none: item.textColor.color
@@ -44,8 +35,6 @@ struct TextItemLabelView: View {
         }
     }
 
-    /// Proportional to the font size, so a pill keeps its shape at every scale
-    /// and at export size.
     private var padding: EdgeInsets {
         guard item.backgroundStyle != .none else { return EdgeInsets() }
         return EdgeInsets(
@@ -54,7 +43,6 @@ struct TextItemLabelView: View {
         )
     }
 
-    /// Only bare text needs lifting off the photo; a pill already separates it.
     private var shadowColor: Color {
         AppColor.mediaBackground.opacity(item.backgroundStyle == .none ? 0.4 : 0)
     }

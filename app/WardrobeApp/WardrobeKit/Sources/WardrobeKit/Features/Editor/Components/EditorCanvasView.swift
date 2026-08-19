@@ -5,21 +5,14 @@ import SwiftUI
     import UIKit
 #endif
 
-/// The 9:16 canvas: the photo behind, the document's layers over it, and a
-/// delete target that appears while one is being dragged.
-///
-/// Everything transient — which layer is under the finger, whether it is over
-/// the delete target — lives here rather than in the view model. It changes
-/// many times a second and means nothing once the finger lifts, so keeping it
-/// out of the document is what stops a gesture from writing sixty times.
 struct EditorCanvasView: View {
     let viewModel: EditorViewModel
     @Binding var canvasSize: CGSize
-    @State private var interactingLayerID: UUID?
+    @State private var heldLayerID: UUID?
     @State private var isOverDeleteTarget = false
-    /// What the current gesture last landed on. Transient like the two above —
-    /// it means nothing once the finger lifts.
     @State private var snap: CanvasSnap?
+    @State private var layerSizes: [UUID: CGSize] = [:]
+    @State private var gesture = TransientTransform()
 
     var body: some View {
         CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
@@ -29,11 +22,38 @@ struct EditorCanvasView: View {
             .overlay(alignment: .top) { snapBadges }
             .overlay { drawingSurface }
             .overlay(alignment: .bottom) { deleteTarget }
+            .modifier(CanvasTransformGestureModifier(
+                onChanged: { transformChanged($0, $1, $2) },
+                onEnded: { transformFinished($0, $1, $2) },
+                onCancelled: { gesture = TransientTransform() }
+            ))
     }
 
-    /// An empty spot dismisses the selection if there is one, and otherwise
-    /// starts a new text where it was tapped — so the existing shortcut
-    /// survives without becoming a mode.
+    private func transformChanged(
+        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
+    ) {
+        gesture = TransientTransform(
+            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        )
+        guard let layer = heldLayer else { return }
+        snapChanged(layer.id, to: snapping(
+            for: layer,
+            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        ))
+    }
+
+    private func transformFinished(
+        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
+    ) {
+        defer { gesture = TransientTransform() }
+        guard let layer = heldLayer else { return }
+        let proposed = snapping(
+            for: layer,
+            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        ).transform
+        transformEnded(layer.id, to: settled(proposed, layer: layer))
+    }
+
     private var backgroundTap: some Gesture {
         SpatialTapGesture()
             .onEnded { value in
@@ -56,26 +76,23 @@ struct EditorCanvasView: View {
                     EditorLayerView(
                         layer: layer,
                         canvasSize: canvasSize,
+                        transform: liveTransform(for: layer),
                         photo: viewModel.preview(forPhoto:),
                         isSelected: viewModel.selectedLayerID == layer.id,
-                        isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
+                        isOverDeleteTarget: isOverDeleteTarget && heldLayerID == layer.id,
                         isChallengePhoto: viewModel.challengePhotoLayerID == layer.id,
                         onSelect: { select(layer.id) },
                         onDoubleTap: { beginEditing(layer) },
-                        onSnapChanged: { snapChanged(layer.id, to: $0) },
-                        onTransformEnded: { transformEnded(layer.id, to: $0) },
+                        onPressChanged: { pressChanged(layer, isPressed: $0) },
+                        onSizeChanged: { layerSizes[layer.id] = $0 },
                         onDelete: { viewModel.removeLayer(id: layer.id) }
                     )
-                    // Array order is z-order; the index is the position, the
-                    // UUID stays the identity.
                     .zIndex(Double(index))
                 }
             }
         }
     }
 
-    /// Suppressed over the delete target: a layer about to be thrown away has
-    /// nothing to align to.
     @ViewBuilder
     private var guides: some View {
         if let snap, !isOverDeleteTarget {
@@ -110,8 +127,6 @@ struct EditorCanvasView: View {
         }
     }
 
-    /// Mounted above the layers on purpose: it takes the touch first, so a
-    /// stroke drawn across a sticker draws instead of dragging the sticker.
     @ViewBuilder
     private var drawingSurface: some View {
         if case let .drawing(session) = viewModel.activeTool {
@@ -123,17 +138,12 @@ struct EditorCanvasView: View {
 
     @ViewBuilder
     private var deleteTarget: some View {
-        // Never shown for a layer it could not take: dragging into a bin that
-        // then does nothing is worse than no bin at all.
-        if let interactingLayerID, viewModel.canRemove(layerID: interactingLayerID) {
+        if let heldLayerID, viewModel.canRemove(layerID: heldLayerID) {
             DeleteDropTargetView(isActive: isOverDeleteTarget)
                 .transition(.opacity)
         }
     }
 
-    /// Only the text open in the composer is skipped — the composer draws it
-    /// instead. The photo is a layer like any other now that it has a frame to
-    /// sit in (FR-092).
     private func isInteractive(_ layer: EditorLayer) -> Bool {
         if case let .text(working, _) = viewModel.activeTool, working.id == layer.id {
             return false
@@ -144,14 +154,12 @@ struct EditorCanvasView: View {
     // MARK: Interaction
 
     private func select(_ id: UUID) {
+        guard EditorGesture.canSelect(id, whileHolding: heldLayerID) else { return }
         guard viewModel.selectedLayerID != id else { return }
         viewModel.select(id)
         EditorHaptics.selection.play()
     }
 
-    /// Double-tap reopens whatever the layer is made of: text goes back to the
-    /// composer, the photo back to the crop screen. FR-019 says crop is not a
-    /// tool in the rail — this is where it lives instead.
     private func beginEditing(_ layer: EditorLayer) {
         if let draft = layer.textDraft {
             viewModel.beginEditingText(draft)
@@ -161,11 +169,8 @@ struct EditorCanvasView: View {
     }
 
     private func snapChanged(_ id: UUID, to snap: CanvasSnap) {
-        interactingLayerID = id
         select(id)
 
-        // Edge-triggered: feedback belongs to the moment something latches on,
-        // not to every frame it stays there.
         let landedOnSomething = (snap.alignment != .none && self.snap?.alignment == CanvasAlignment.none)
             || (snap.snappedRotationDegrees != nil
                 && snap.snappedRotationDegrees != self.snap?.snappedRotationDegrees)
@@ -185,9 +190,61 @@ struct EditorCanvasView: View {
         }
     }
 
+    private func pressChanged(_ layer: EditorLayer, isPressed: Bool) {
+        guard isPressed else {
+            if heldLayerID == layer.id {
+                heldLayerID = nil
+            }
+            return
+        }
+        heldLayerID = EditorGesture.hold(
+            current: heldLayerID, pressing: layer, activeTool: viewModel.activeTool
+        )
+    }
+
+    private func liveTransform(for layer: EditorLayer) -> ElementTransform {
+        guard layer.id == heldLayerID else { return layer.transform }
+        return snapping(
+            for: layer,
+            translation: gesture.translation,
+            magnification: gesture.magnification,
+            rotationDegrees: gesture.rotationDegrees
+        ).transform
+    }
+
+    private func snapping(
+        for layer: EditorLayer,
+        translation: CGSize,
+        magnification: CGFloat,
+        rotationDegrees: Double
+    ) -> CanvasSnap {
+        CanvasSnapping.snap(
+            committed: layer.transform,
+            translation: translation,
+            magnification: magnification,
+            rotationDelta: rotationDegrees,
+            canvasSize: canvasSize
+        )
+    }
+
+    private var heldLayer: EditorLayer? {
+        heldLayerID.flatMap { id in viewModel.document.layers.first { $0.id == id } }
+    }
+
+    private func settled(_ transform: ElementTransform, layer: EditorLayer) -> ElementTransform {
+        var settled = transform
+        settled.position = CanvasGeometry.constrainedPosition(
+            transform.position,
+            canvasSize: canvasSize,
+            layerSize: layerSizes[layer.id] ?? .zero,
+            scale: transform.scale,
+            rotationDegrees: transform.rotationDegrees
+        )
+        return settled
+    }
+
     private func transformEnded(_ id: UUID, to transform: ElementTransform) {
-        let shouldDelete = isOverDeleteTarget && interactingLayerID == id
-        interactingLayerID = nil
+        let shouldDelete = isOverDeleteTarget && heldLayerID == id
         isOverDeleteTarget = false
         snap = nil
 
@@ -200,11 +257,6 @@ struct EditorCanvasView: View {
     }
 }
 
-/// The 9:16 window the document is arranged inside, and the only thing that
-/// measures it.
-///
-/// The rounded corner is editor chrome — the exported picture is square-edged,
-/// because the corner belongs to the screen, not to the photograph.
 private struct CanvasFrameView: View {
     let background: CanvasBackground
     @Binding var canvasSize: CGSize
@@ -220,4 +272,10 @@ private struct CanvasFrameView: View {
                 canvasSize = newSize
             }
     }
+}
+
+private struct TransientTransform: Equatable {
+    var translation: CGSize = .zero
+    var magnification: CGFloat = 1
+    var rotationDegrees: Double = 0
 }

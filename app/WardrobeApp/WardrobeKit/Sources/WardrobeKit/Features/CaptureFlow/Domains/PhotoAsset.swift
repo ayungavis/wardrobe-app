@@ -11,9 +11,6 @@ public enum PhotoLibraryAccess: Sendable, Equatable {
     }
 }
 
-/// A library photo, reduced to the only thing that is safe to hand around:
-/// its identifier. `PHAsset` itself is not `Sendable`, so it never leaves the
-/// browser.
 public struct PhotoAsset: Identifiable, Sendable, Equatable {
     public let id: String
 

@@ -1,10 +1,3 @@
-//
-//  CurlingCardView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 14/08/26.
-//
-
 import SwiftUI
 
 struct CurlingCardView<Content: View>: View {
@@ -52,7 +45,6 @@ struct CurlingCardView<Content: View>: View {
                 DragGesture()
                     .onChanged { value in
                         guard !isAnimatingAway else { return }
-                        // Dragging UP peels the card away, from the top down
                         let upward = max(0, -value.translation.height)
                         dragProgress = min(1.0, upward / height)
                     }
@@ -76,10 +68,8 @@ struct CurlingCardView<Content: View>: View {
         }
     }
 
-    /// Each slice's own "local progress" — slices near the top curl first, bottom slices lag behind
     private func localProgress(forSlice slice: Int) -> CGFloat {
         let sliceFraction = CGFloat(slice) / CGFloat(sliceCount) // 0 (top) to 1 (bottom)
-        // top slices reach full curl before bottom slices even start — creates the rolling curl look
         let adjusted = (dragProgress - sliceFraction * 0.6) / 0.4
         return min(max(adjusted, 0), 1)
     }
@@ -95,7 +85,6 @@ struct CurlingCardView<Content: View>: View {
 
     private func curlOpacity(forSlice slice: Int) -> Double {
         let progress = localProgress(forSlice: slice)
-        // fades out near the very end of its own curl, like the paper rolling out of view
         return progress > 0.85 ? Double(1 - (progress - 0.85) / 0.15) : 1
     }
 }

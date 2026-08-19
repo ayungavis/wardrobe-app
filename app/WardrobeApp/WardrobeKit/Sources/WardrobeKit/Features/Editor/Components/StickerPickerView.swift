@@ -1,11 +1,6 @@
 import DesignSystem
 import SwiftUI
 
-/// The categorised sticker catalogue (FR-019).
-///
-/// Recent leads the row when there is one, because the sticker you want next is
-/// usually the one you just used. Picking closes the sheet — one sticker, then
-/// straight back to placing it.
 struct StickerPickerView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -24,8 +19,6 @@ struct StickerPickerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // The sheet draws its own grabber, so the system one is hidden at
-            // the call site — otherwise there would be two.
             Capsule()
                 .fill(AppColor.onMedia.opacity(0.34))
                 .frame(width: 38, height: 5)
@@ -133,7 +126,6 @@ struct StickerPickerView: View {
         .scrollIndicators(.hidden)
     }
 
-    /// Recent earns its pill only once there is something in it.
     private var availableCategories: [StickerCategory] {
         recentIDs.isEmpty ? [.emoji, .stickers] : StickerCategory.allCases
     }

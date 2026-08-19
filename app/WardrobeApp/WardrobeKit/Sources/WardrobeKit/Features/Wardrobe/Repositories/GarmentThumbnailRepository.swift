@@ -9,12 +9,9 @@ import UniformTypeIdentifiers
 /// on every reinstall, so a persisted absolute path points at a directory that
 /// no longer exists. The directory is resolved fresh on every call instead.
 public protocol GarmentThumbnailRepository: Sendable {
-    /// Returns the file name to persist — never a path.
     @discardableResult
     func save(_ image: CGImage, id: UUID) throws -> String
     func data(forFile file: String) throws -> Data
-    /// Removes a single cut-out — used when a scanned garment turns out to be a
-    /// duplicate and its image is never needed.
     func delete(file: String) throws
     func deleteAll() throws
 }
@@ -42,9 +39,6 @@ public final class FileGarmentThumbnailRepository: GarmentThumbnailRepository, @
         return file
     }
 
-    /// Takes the last path component, so rows written before this rule — which
-    /// hold a full path into a dead container — still resolve as long as the
-    /// file itself survived.
     public func data(forFile file: String) throws -> Data {
         try Data(contentsOf: directory.appending(path: URL(filePath: file).lastPathComponent))
     }

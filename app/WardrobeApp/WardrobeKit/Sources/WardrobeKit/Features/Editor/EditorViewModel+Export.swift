@@ -2,14 +2,7 @@ import Foundation
 
 // MARK: - Export / save / share (FR-031/032 — independent of completion)
 
-// Its own file only because `EditorViewModel.swift` reached the file-length
-// limit. The three pieces of state written here are `internal(set)` for the
-// same reason — this extension is still part of the type, just not part of
-// the file.
-
 public extension EditorViewModel {
-    /// PRD §17: duplicate export actions have to be prevented, and the pill is
-    /// where that is visible.
     var isExporting: Bool {
         if case .loading = exportState {
             return true
@@ -34,7 +27,6 @@ public extension EditorViewModel {
                 )
                 exportState = .loaded(ExportedPhoto(data: photo))
             } catch is CancellationError {
-                // Ignore cancellation.
             } catch {
                 Log.report(error)
                 exportState = .failed(.exportFailed)
@@ -42,7 +34,6 @@ public extension EditorViewModel {
         }
     }
 
-    /// Save-pill path: render + save to the library in one step, no sheet.
     func saveDirectly() {
         guard case let .loaded(originals) = originals, !isSaving, !didSaveToPhotos else { return }
         isSaving = true
@@ -56,11 +47,8 @@ public extension EditorViewModel {
                 try await librarySaver.save(photo)
                 didSaveToPhotos = true
             } catch is CancellationError {
-                // Ignore cancellation.
             } catch {
                 Log.report(error)
-                // Kept typed rather than flattened: a refused permission and a
-                // failed write ask the user for different things.
                 alertError = error as? AppError ?? .photoSaveFailed
             }
         }

@@ -3,8 +3,6 @@ import CoreImage
 import CoreML
 import Foundation
 
-/// Mask geometry and compositing. Free of UIKit and of the model, so the host
-/// build and the tests can exercise all of it.
 enum GarmentMask {
     struct Bounds: Equatable {
         var minX: Int
@@ -20,8 +18,6 @@ enum GarmentMask {
         let bounds: Bounds
     }
 
-    /// Turns the class map into one binary mask per category, tracking each
-    /// one's bounding box in the same pass.
     static func build(from classMap: [[Int]]) -> [GarmentCategory: Mask] {
         guard let firstRow = classMap.first, !firstRow.isEmpty else { return [:] }
 
@@ -62,12 +58,6 @@ enum GarmentMask {
         return box
     }
 
-    /// Applies the repaired mask to the photo, paints the closed holes with the
-    /// garment's own average colour, and crops to the bounding box.
-    ///
-    /// Holes must not simply show the photo through: what sits behind them is
-    /// the wearer's arm, which looks worse than the hole did. Padding is left to
-    /// `GarmentNormalization` so framing has a single owner.
     static func cutout(photo: CIImage, repaired: Repaired, context: CIContext) -> CGImage? {
         let mask = repaired.mask
         guard let garmentMask = softenedMask(repaired.holes.isEmpty ? mask.pixels : withoutHoles(repaired),
@@ -120,8 +110,6 @@ enum GarmentMask {
     // ponytail: average rather than median — one GPU call instead of a
     // histogram pass, and the difference is invisible in a flat fill.
 
-    /// `CIAreaAverage` includes the transparent pixels, so the premultiplied
-    /// result is divided by the alpha average to recover the garment's colour.
     private static func averageColor(of image: CIImage, context: CIContext) -> CIColor {
         let average = image.applyingFilter(
             "CIAreaAverage",
@@ -160,7 +148,6 @@ enum GarmentMask {
         return context.makeImage()
     }
 
-    /// Highest-scoring class per pixel from a `[1, classes, height, width]` tensor.
     static func argmax(logits: MLMultiArray) -> [[Int]] {
         let shape = logits.shape.map(\.intValue)
         guard shape.count == 4 else { return [] }

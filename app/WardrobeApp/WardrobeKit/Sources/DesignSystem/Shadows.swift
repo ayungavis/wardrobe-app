@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Elevation presets so shadows stay consistent across screens.
 public enum Elevation {
     case card
     case overlay

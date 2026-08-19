@@ -21,6 +21,7 @@ struct CaptureFlowGarmentReviewTests {
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository,
+            previews: InMemoryCompletionPreviewRepository(),
             library: library,
             scanner: scanner,
             wardrobeRepository: wardrobeRepository,
@@ -59,6 +60,60 @@ struct CaptureFlowGarmentReviewTests {
 
         #expect(sut.review.garments.count == 1)
         #expect(scanner.scannedPhotos.count == 1)
+    }
+
+    /// Started at the transition rather than left to the editor's own `.task`,
+    /// so the Core ML pass overlaps the editor loading its photo instead of
+    /// queueing behind it.
+    @Test func useCropStartsTheScan() async throws {
+        let photoRepository = SpyPhotoRepository()
+        let photoID = try photoRepository.saveOriginal(Data([0x01]))
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = photoID
+        challenge.document = EditorDocument(photoID: photoID)
+        let scanner = FakeGarmentScanService()
+        scanner.result = [makeScannedGarment(decision: .new, file: "a.png")]
+        let sut = makeSUT(challenge: challenge, photoRepository: photoRepository, scanner: scanner)
+
+        sut.useCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75)))
+        await sut.review.finishScanning()
+
+        #expect(sut.review.garments.count == 1)
+        #expect(scanner.scannedPhotos.count == 1)
+    }
+
+    /// The editor's `.task` still fires after `useCrop` already started the
+    /// scan; the same photo must not be run through the model twice.
+    @Test func theEditorAppearingAfterUseCropDoesNotRescan() async throws {
+        let photoRepository = SpyPhotoRepository()
+        let photoID = try photoRepository.saveOriginal(Data([0x01]))
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = photoID
+        challenge.document = EditorDocument(photoID: photoID)
+        let scanner = FakeGarmentScanService()
+        let sut = makeSUT(challenge: challenge, photoRepository: photoRepository, scanner: scanner)
+
+        sut.useCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.75)))
+        sut.review.scanIfNeeded(photoID: sut.challenge.photoID) // the editor's .task
+        await sut.review.finishScanning()
+
+        #expect(scanner.scannedPhotos.count == 1)
+    }
+
+    /// `isScanning` is what raises the drawer's spinner, so it has to be true
+    /// from the moment the scan starts, not only once it finishes.
+    @Test func isScanningIsTrueWhileTheScanRuns() async throws {
+        let photoRepository = SpyPhotoRepository()
+        let photoID = try photoRepository.saveOriginal(Data([0x01]))
+        var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
+        challenge.photoID = photoID
+        let sut = makeSUT(challenge: challenge, photoRepository: photoRepository)
+
+        sut.review.scanIfNeeded(photoID: sut.challenge.photoID)
+        #expect(sut.review.isScanning)
+
+        await sut.review.finishScanning()
+        #expect(!sut.review.isScanning)
     }
 
     @Test func aFailedScanLeavesTheEditorUsable() async {

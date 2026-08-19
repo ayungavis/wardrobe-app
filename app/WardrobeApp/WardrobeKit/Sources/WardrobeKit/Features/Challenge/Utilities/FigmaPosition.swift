@@ -1,8 +1,5 @@
 import Foundation
 
-/// A rectangle measured in a Figma frame, expressed as fractions of whatever
-/// frame it is finally drawn in — so a layout copied off a 170×312 artboard
-/// survives every screen size.
 struct FigmaPosition {
     let x: CGFloat // fraction 0-1, relative to its container
     let y: CGFloat

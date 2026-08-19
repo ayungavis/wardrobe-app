@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// A solid outline around text, drawn by stacking eight offset copies behind
-/// the original. Cheaper than a real stroked glyph path and, at the one-point
-/// widths this is used at, indistinguishable from one.
 public struct StrokeTextModifier: ViewModifier {
     public let color: Color
     public let width: CGFloat
@@ -32,7 +29,6 @@ public struct StrokeTextModifier: ViewModifier {
 }
 
 public extension View {
-    /// Adds a solid outline stroke around text.
     func stroke(color: Color, width: CGFloat = 1) -> some View {
         modifier(StrokeTextModifier(color: color, width: width))
     }
