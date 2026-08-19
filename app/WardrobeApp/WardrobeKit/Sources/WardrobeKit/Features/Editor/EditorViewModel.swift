@@ -154,6 +154,13 @@ public final class EditorViewModel {
         }
     }
 
+    /// The background fills the 9:16 story canvas, so framing it at the
+    /// polaroid's 3:4 would only be cropped again when it is drawn.
+    public var croppingAspectRatio: CGFloat {
+        guard case .crop(.background) = activeTool else { return CropGeometry.photoAspectRatio }
+        return StoryCanvas.aspectRatio
+    }
+
     private func photoID(for target: CropTarget) -> String? {
         switch target {
         case let .layer(id):

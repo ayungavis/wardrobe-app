@@ -116,7 +116,7 @@ struct CropGeometryTests {
         )
 
         let pixels = CGSize(width: rect.width * wide.width, height: rect.height * wide.height)
-        #expect(abs(pixels.width / pixels.height - CropGeometry.aspectRatio) < 0.01)
+        #expect(abs(pixels.width / pixels.height - CropGeometry.photoAspectRatio) < 0.01)
     }
 
     @Test func zoomingInSelectsLessOfThePhoto() {
@@ -138,7 +138,7 @@ struct CropGeometryTests {
             fitting: CGSize(width: 390, height: 844), insets: CGSize(width: 32, height: 220)
         )
 
-        #expect(abs(size.width / size.height - CropGeometry.aspectRatio) < 0.001)
+        #expect(abs(size.width / size.height - CropGeometry.photoAspectRatio) < 0.001)
         #expect(size.width <= 390 - 32 + 0.001)
         #expect(size.height <= 844 - 220 + 0.001)
     }
@@ -213,5 +213,42 @@ struct CropGeometryTests {
         )
         #expect(noImage.scale.isFinite)
         #expect(noImage.offset.width.isFinite)
+    }
+
+    /// The background fills the story canvas, so its frame has to be the story
+    /// canvas's shape — the same code path, a different argument.
+    @Test func theCropBoxFollowsTheAspectItIsGiven() {
+        let size = CropGeometry.cropSize(
+            fitting: CGSize(width: 390, height: 844),
+            insets: CGSize(width: 32, height: 220),
+            aspectRatio: StoryCanvas.aspectRatio
+        )
+
+        #expect(abs(size.width / size.height - StoryCanvas.aspectRatio) < 0.001)
+        #expect(size.width <= 390 - 32 + 0.001)
+        #expect(size.height <= 844 - 220 + 0.001)
+    }
+
+    /// Restoring a stored crop goes through the same formulas, so no assumption
+    /// about 3:4 may be left in them.
+    @Test(arguments: [
+        CGRect(x: 0.25, y: 0.2, width: 0.5, height: 0.6),
+        CGRect(x: 0, y: 0, width: 0.35, height: 0.45),
+        CGRect(x: 0.55, y: 0.4, width: 0.45, height: 0.55),
+    ])
+    func aStoredBackgroundCropSurvivesARoundTrip(rect: CGRect) {
+        let storyCrop = CropGeometry.cropSize(
+            fitting: CGSize(width: 390, height: 844),
+            insets: CGSize(width: 32, height: 220),
+            aspectRatio: StoryCanvas.aspectRatio
+        )
+        let framing = CropGeometry.framing(for: rect, imageSize: image, cropSize: storyCrop)
+        let restored = CropGeometry.normalizedRect(
+            scale: framing.scale, offset: framing.offset, imageSize: image, cropSize: storyCrop
+        )
+
+        #expect(abs(restored.minX - rect.minX) < 0.0001)
+        #expect(abs(restored.minY - rect.minY) < 0.0001)
+        #expect(abs(restored.width - rect.width) < 0.0001)
     }
 }

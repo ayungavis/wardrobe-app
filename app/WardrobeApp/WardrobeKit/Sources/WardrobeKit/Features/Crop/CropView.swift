@@ -12,6 +12,7 @@ public struct CropView: View {
     /// Nil for the capture flow's first framing, which by definition has no
     /// stored frame — `initialStage` only routes there while the crop is nil.
     private let initialCrop: CropSpec?
+    private let aspectRatio: CGFloat
     private let onExit: () -> Void
     private let onUseCrop: (CropSpec) -> Void
 
@@ -19,12 +20,14 @@ public struct CropView: View {
         viewModel: CropViewModel,
         exit: Exit = .retake,
         initialCrop: CropSpec? = nil,
+        aspectRatio: CGFloat,
         onExit: @escaping () -> Void,
         onUseCrop: @escaping (CropSpec) -> Void
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.exit = exit
         self.initialCrop = initialCrop
+        self.aspectRatio = aspectRatio
         self.onExit = onExit
         self.onUseCrop = onUseCrop
     }
@@ -58,7 +61,9 @@ public struct CropView: View {
         let imageSize = CGSize(width: image.width, height: image.height)
 
         return GeometryReader { proxy in
-            let cropSize = CropGeometry.cropSize(fitting: proxy.size, insets: Self.canvasInsets)
+            let cropSize = CropGeometry.cropSize(
+                fitting: proxy.size, insets: Self.canvasInsets, aspectRatio: aspectRatio
+            )
 
             VStack(spacing: 0) {
                 topBar

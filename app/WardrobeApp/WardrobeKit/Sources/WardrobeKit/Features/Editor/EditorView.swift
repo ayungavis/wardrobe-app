@@ -124,6 +124,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                     viewModel: makeCropViewModel(photoID),
                     exit: .cancel,
                     initialCrop: viewModel.croppingCrop,
+                    aspectRatio: viewModel.croppingAspectRatio,
                     onExit: viewModel.cancelTool,
                     onUseCrop: { viewModel.commitCrop($0, for: target) }
                 )

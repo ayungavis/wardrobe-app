@@ -1,11 +1,17 @@
 import CoreGraphics
 
 enum CropGeometry {
-    static let aspectRatio: CGFloat = 3.0 / 4.0
+    /// The polaroid photo well's shape, which is what a layer photo is framed
+    /// to. The canvas background is framed to `StoryCanvas.aspectRatio` instead.
+    static let photoAspectRatio: CGFloat = 3.0 / 4.0
 
     static let scaleRange: ClosedRange<CGFloat> = 1 ... 6
 
-    static func cropSize(fitting available: CGSize, insets: CGSize) -> CGSize {
+    static func cropSize(
+        fitting available: CGSize,
+        insets: CGSize,
+        aspectRatio: CGFloat = photoAspectRatio
+    ) -> CGSize {
         let maxWidth = max(0, available.width - insets.width)
         let maxHeight = max(0, available.height - insets.height)
 
