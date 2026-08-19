@@ -44,13 +44,13 @@ public extension EditorViewModel {
     private func restore(_ snapshot: EditorDocument?) {
         guard let snapshot else { return }
 
-        let previousCrop = document.photoCrop
+        let previousCrops = document.photoCrops
         document = snapshot
         if let selectedLayerID, document.layer(id: selectedLayerID) == nil {
             self.selectedLayerID = nil
         }
-        if document.photoCrop != previousCrop {
-            updateCroppedPreview()
+        if document.photoCrops != previousCrops {
+            updateCroppedPreviews()
         }
         write(document)
     }

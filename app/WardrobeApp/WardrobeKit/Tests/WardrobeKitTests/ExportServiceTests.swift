@@ -52,7 +52,10 @@ struct ExportServiceTests {
         let sourceProps = try properties(of: original)
         #expect(sourceProps[kCGImagePropertyGPSDictionary] != nil)
 
-        let exported = try await ExportService.render(original: original, document: EditorDocument(photoID: "photo-1"))
+        let exported = try await ExportService.render(
+            originals: ["photo-1": original],
+            document: EditorDocument(photoID: "photo-1")
+        )
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
@@ -72,7 +75,7 @@ struct ExportServiceTests {
     func exportAlwaysUsesStoryCanvasSize(document: EditorDocument) async throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 100, height: 200)
 
-        let exported = try await ExportService.render(original: original, document: document)
+        let exported = try await ExportService.render(originals: ["photo-1": original], document: document)
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyPixelWidth] as? Int == Int(StoryCanvas.exportSize.width))
@@ -96,7 +99,7 @@ struct ExportServiceTests {
             )]
         )
 
-        let exported = try await ExportService.render(original: original, document: document)
+        let exported = try await ExportService.render(originals: ["photo-1": original], document: document)
         let props = try properties(of: exported)
 
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)

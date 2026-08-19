@@ -23,9 +23,20 @@ public enum ExportService {
     /// source and deflating the JPEG are not, and running them there is what
     /// made exporting stall the canvas (PRD §17 asks for non-blocking
     /// progress).
-    public static func render(original: Data, document: EditorDocument) async throws -> Data {
-        let photo = try await prepare(original: original, crop: document.photoCrop)
-        let rendered = try await rasterize(document: document, photo: photo)
+    public static func render(originals: [String: Data], document: EditorDocument) async throws -> Data {
+        var photos: [String: CGImage] = [:]
+        for layer in document.layers {
+            guard case let .photo(content) = layer.content,
+                  let original = originals[content.photoID]
+            else {
+                continue
+            }
+            // Each layer's own crop: FR-093 lets a document hold several photos,
+            // and framing belongs to the layer that shows it.
+            photos[content.photoID] = try await prepare(original: original, crop: content.crop)
+        }
+
+        let rendered = try await rasterize(document: document, photos: photos)
         return try await encode(rendered)
     }
 
@@ -54,10 +65,10 @@ public enum ExportService {
     /// no scale derived from the on-screen canvas, is why the output size is a
     /// constant rather than something that has to be checked afterwards.
     @MainActor
-    static func rasterize(document: EditorDocument, photo: CGImage) throws -> CGImage {
+    static func rasterize(document: EditorDocument, photos: [String: CGImage]) throws -> CGImage {
         let size = StoryCanvas.exportSize
         let renderer = ImageRenderer(
-            content: DocumentCanvasView(document: document, photo: photo, size: size)
+            content: DocumentCanvasView(document: document, photo: { photos[$0] }, size: size)
         )
         renderer.proposedSize = ProposedViewSize(size)
         guard let rendered = renderer.cgImage else { throw AppError.exportFailed }

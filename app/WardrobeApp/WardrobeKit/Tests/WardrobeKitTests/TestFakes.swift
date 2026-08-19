@@ -270,6 +270,32 @@ final class FakeCameraService: CameraService {
 // MARK: - Document fixtures and readers
 
 extension EditorDocument {
+    /// The same document with every photo layer pointed at `photoID`.
+    func showingPhoto(_ photoID: String) -> EditorDocument {
+        var copy = self
+        copy.layers = layers.map { layer in
+            guard case let .photo(content) = layer.content else { return layer }
+            var updated = layer
+            updated.content = .photo(PhotoContent(photoID: photoID, crop: content.crop))
+            return updated
+        }
+        return copy
+    }
+
+    /// The bottom photo layer's crop — the single-photo shape most tests still
+    /// speak in. Production says which layer it means (FR-093); a test with one
+    /// photo has nothing to disambiguate.
+    var firstPhotoCrop: CropSpec? {
+        photoIDs.first
+            .flatMap { photoLayerID(showing: $0) }
+            .flatMap { crop(ofLayer: $0) }
+    }
+
+    /// The layer showing the first photo, for tests that need to name it.
+    var firstPhotoLayerID: UUID? {
+        photoIDs.first.flatMap { photoLayerID(showing: $0) }
+    }
+
     /// Builds a document from the flat shape tests already read well in.
     /// Routed through the migration on purpose rather than reimplementing it —
     /// the migration has its own tests, so a break there fails loudly at the

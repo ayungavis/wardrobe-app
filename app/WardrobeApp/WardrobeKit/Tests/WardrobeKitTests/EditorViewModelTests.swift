@@ -11,10 +11,10 @@ struct EditorViewModelTests {
         sut.load()
         await sut.loadTask?.value
 
-        if case .loaded = sut.originalData {} else {
-            Issue.record("expected loaded, got \(sut.originalData)")
+        if case .loaded = sut.originals {} else {
+            Issue.record("expected loaded, got \(sut.originals)")
         }
-        #expect(sut.previewImage != nil)
+        #expect(!sut.previewImages.isEmpty)
     }
 
     @Test func commitCropPersistsDraftToStore() throws {
@@ -22,10 +22,10 @@ struct EditorViewModelTests {
         let sut = try makeEditorSUT(activeRepository: activeRepository)
         let spec = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
 
-        sut.commitCrop(spec)
+        try sut.commitCrop(spec, ofLayer: #require(sut.document.firstPhotoLayerID))
 
-        #expect(sut.document.photoCrop == spec)
-        #expect(activeRepository.stored?.document.photoCrop == spec)
+        #expect(sut.document.firstPhotoCrop == spec)
+        #expect(activeRepository.stored?.document.firstPhotoCrop == spec)
         #expect(sut.activeTool == nil)
     }
 
@@ -34,7 +34,7 @@ struct EditorViewModelTests {
     @Test func cropDoesNotOpenWithoutAPhotoLayer() throws {
         let sut = try makeEditorSUT(document: EditorDocument(layers: []))
 
-        sut.beginCrop()
+        sut.beginCrop(layerID: UUID())
 
         #expect(sut.activeTool == nil)
     }
@@ -44,10 +44,15 @@ struct EditorViewModelTests {
     /// leaving the tool is not itself an edit.
     @Test func cancellingCropLeavesTheDocumentAlone() throws {
         let activeRepository = InMemoryActiveChallengeRepository()
-        let committed = EditorDocument.fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
-        let sut = try makeEditorSUT(activeRepository: activeRepository, document: committed)
+        let sut = try makeEditorSUT(
+            activeRepository: activeRepository,
+            document: .fixture(crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)))
+        )
+        // Read back rather than reused: the SUT points the fixture's photo layer
+        // at the id the repository actually minted.
+        let committed = sut.document
 
-        sut.beginCrop()
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
         sut.cancelTool()
 
         #expect(sut.document == committed)
@@ -215,15 +220,19 @@ struct EditorViewModelTests {
         sut.load()
         await sut.loadTask?.value
 
-        let afterLoad = try #require(sut.croppedPreviewImage)
+        let photoID = try #require(sut.document.photoIDs.first)
+        let afterLoad = try #require(sut.preview(forPhoto: photoID))
         #expect(afterLoad.width == 100) // full preview, no crop yet
 
         sut.commitTransform(layerID: text.id, to: ElementTransform(position: CGPoint(x: 0.2, y: 0.2)))
-        #expect(sut.croppedPreviewImage === afterLoad) // untouched by layer edits
+        #expect(sut.preview(forPhoto: photoID) === afterLoad) // untouched by layer edits
 
-        sut.beginCrop()
-        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
-        let afterCrop = try #require(sut.croppedPreviewImage)
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
+        try sut.commitCrop(
+            CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)),
+            ofLayer: #require(sut.document.firstPhotoLayerID)
+        )
+        let afterCrop = try #require(sut.preview(forPhoto: photoID))
         #expect(afterCrop.width == 50) // recomputed exactly once, on crop commit
     }
 
@@ -291,8 +300,11 @@ struct EditorViewModelTests {
         let sut = try makeEditorSUT(photoRepository: photoRepository)
         let originalBytes = photoRepository.saved.values.first
 
-        sut.beginCrop()
-        sut.commitCrop(CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)))
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
+        try sut.commitCrop(
+            CropSpec(rect: CGRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6)),
+            ofLayer: #require(sut.document.firstPhotoLayerID)
+        )
 
         #expect(photoRepository.saved.values.first == originalBytes) // §18.5 write-once
     }

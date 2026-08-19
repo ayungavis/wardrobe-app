@@ -9,6 +9,34 @@ public protocol PhotoRepository: Sendable {
     func deleteOriginal(id: String) throws
 }
 
+public extension PhotoRepository {
+    /// Deletes every original a challenge is still holding: the capture itself
+    /// and every photo its document draws (FR-093).
+    ///
+    /// Reported rather than thrown — an orphaned file is not worth blocking a
+    /// retake or an abandon over.
+    func deleteOriginals(of document: EditorDocument, and photoID: String?) {
+        delete(Set(document.photoIDs).union([photoID].compactMap(\.self)))
+    }
+
+    /// Deletes the photos a session created that its document no longer draws —
+    /// the ones added and then deleted, which nothing else can name once the
+    /// layer is gone.
+    func deleteUnusedOriginals(of document: EditorDocument, imported: [String]) {
+        delete(Set(imported).subtracting(document.photoIDs))
+    }
+
+    private func delete(_ ids: Set<String>) {
+        for id in ids {
+            do {
+                try deleteOriginal(id: id)
+            } catch {
+                Log.report(error)
+            }
+        }
+    }
+}
+
 public final class FilePhotoRepository: PhotoRepository, @unchecked Sendable {
     // @unchecked: FileManager is thread-safe for these operations.
     private let directory: URL

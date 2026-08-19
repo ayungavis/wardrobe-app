@@ -3597,6 +3597,22 @@
         }
       }
     },
+    "editor.tool.photo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Photo"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah Foto"
+          }
+        }
+      }
+    },
     "editor.tool.sticker": {
       "localizations": {
         "en": {

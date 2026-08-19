@@ -9,26 +9,53 @@ import Foundation
 /// exactly one layer — are product rules (FR-085, FR-086, FR-087) that must
 /// hold wherever the edit comes from, canvas or layer panel.
 public extension EditorDocument {
-    /// The crop on the bottom photo layer. A document has at most one photo
-    /// until FR-093 allows more; the setter is a no-op when there is none, so a
-    /// crop can never be stored somewhere it would not render.
-    var photoCrop: CropSpec? {
-        get {
-            for layer in layers {
-                if case let .photo(photo) = layer.content {
-                    return photo.crop
-                }
+    /// The crop belongs to the photo layer that carries it, not to the
+    /// document: FR-093 allows more than one photo, and "the first one" was
+    /// only ever right while there could not be a second. Duplicating a photo
+    /// layer already made two, so this was reachable before the picker exists.
+    func crop(ofLayer id: UUID) -> CropSpec? {
+        guard case let .photo(photo) = layer(id: id)?.content else { return nil }
+        return photo.crop
+    }
+
+    mutating func setCrop(_ crop: CropSpec?, ofLayer id: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == id }),
+              case let .photo(photo) = layers[index].content
+        else {
+            return
+        }
+        layers[index].content = .photo(PhotoContent(photoID: photo.photoID, crop: crop))
+    }
+
+    /// Which layer shows a given photo. The challenge photo is found this way
+    /// rather than flagged in the document — `ActiveChallenge.photoID` already
+    /// holds that truth, and a second copy of it could disagree.
+    func photoLayerID(showing photoID: String) -> UUID? {
+        layers.first {
+            if case let .photo(photo) = $0.content {
+                return photo.photoID == photoID
+            }
+            return false
+        }?.id
+    }
+
+    /// Every photo's crop, keyed by photo id — what an undo has to compare to
+    /// know whether a preview needs rebuilding.
+    var photoCrops: [String: CropSpec?] {
+        layers.reduce(into: [:]) { result, layer in
+            if case let .photo(photo) = layer.content {
+                result[photo.photoID] = photo.crop
+            }
+        }
+    }
+
+    /// Every photo the document draws, in stack order.
+    var photoIDs: [String] {
+        layers.compactMap {
+            if case let .photo(photo) = $0.content {
+                return photo.photoID
             }
             return nil
-        }
-        set {
-            guard let index = layers.firstIndex(where: {
-                if case .photo = $0.content {
-                    return true
-                }
-                return false
-            }), case let .photo(photo) = layers[index].content else { return }
-            layers[index].content = .photo(PhotoContent(photoID: photo.photoID, crop: newValue))
         }
     }
 
@@ -75,6 +102,11 @@ public extension EditorDocument {
         let layer = EditorLayer(content: .drawing(fitted.content), transform: fitted.transform)
         layers.append(layer)
         return layer.id
+    }
+
+    /// A photo added in the editor lands on top, like every other new layer.
+    mutating func appendPhoto(_ photoID: String) {
+        layers.append(EditorLayer(content: .photo(PhotoContent(photoID: photoID))))
     }
 
     mutating func appendSticker(_ art: StickerArt) {

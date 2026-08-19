@@ -1,4 +1,5 @@
 import DesignSystem
+import PhotosUI
 import SwiftUI
 
 /// X top-left, tool rail top-right, Save + Share + the completing checkmark
@@ -15,12 +16,17 @@ struct EditorControlsView: View {
     let onRedo: () -> Void
     let onText: () -> Void
     let onSticker: () -> Void
+    let onPickPhoto: (Data) -> Void
     let onBackground: () -> Void
     let onDrawing: () -> Void
     let onLayers: () -> Void
     let onSave: () -> Void
     let onShare: () -> Void
     let onComplete: () -> Void
+
+    /// Held here rather than in the view model: it is the picker's own
+    /// transport, and it is cleared the moment the bytes are read.
+    @State private var pickedItem: PhotosPickerItem?
 
     var body: some View {
         VStack {
@@ -59,6 +65,7 @@ struct EditorControlsView: View {
             MediaCircleButtonView(systemName: "face.smiling", action: onSticker)
                 .accessibilityLabel(Text("editor.tool.sticker", bundle: .module))
                 .accessibilityIdentifier("editor.tool.sticker")
+            photoPicker
             MediaCircleButtonView(systemName: "paintpalette", action: onBackground)
                 .accessibilityLabel(Text("editor.tool.background", bundle: .module))
                 .accessibilityIdentifier("editor.tool.background")
@@ -68,6 +75,32 @@ struct EditorControlsView: View {
             MediaCircleButtonView(systemName: "square.3.layers.3d", action: onLayers)
                 .accessibilityLabel(Text("editor.tool.layers", bundle: .module))
                 .accessibilityIdentifier("editor.tool.layers")
+        }
+    }
+
+    /// `PhotosPicker` rather than the app's own library grid: it runs out of
+    /// process, so it asks for no photo-library permission at all and cannot
+    /// see anything the user did not pick (§18.2). The grid earns its
+    /// authorization by browsing; sticking one photo on a canvas does not.
+    private var photoPicker: some View {
+        PhotosPicker(selection: $pickedItem, matching: .images, preferredItemEncoding: .current) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(AppColor.onMedia)
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
+                .environment(\.colorScheme, .dark)
+        }
+        .accessibilityLabel(Text("editor.tool.photo", bundle: .module))
+        .accessibilityIdentifier("editor.tool.photo")
+        .onChange(of: pickedItem) { _, item in
+            guard let item else { return }
+            pickedItem = nil
+            Task {
+                guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+                EditorHaptics.commit.play()
+                onPickPhoto(data)
+            }
         }
     }
 

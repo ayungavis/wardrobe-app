@@ -11,7 +11,10 @@ import SwiftUI
 /// picture.
 struct DocumentCanvasView: View {
     let document: EditorDocument
-    let photo: CGImage?
+    /// A lookup rather than one image: a document can hold more than one photo
+    /// layer (FR-093), and handing the same pixels to every layer drew the same
+    /// picture twice.
+    let photo: (String) -> CGImage?
     let size: CGSize
 
     var body: some View {

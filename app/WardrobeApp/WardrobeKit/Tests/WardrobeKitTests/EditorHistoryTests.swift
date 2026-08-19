@@ -76,14 +76,18 @@ struct EditorHistoryTests {
         let sut = try makeEditorSUT()
         sut.load()
         await sut.loadTask?.value
-        sut.beginCrop()
-        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)))
-        #expect(sut.croppedPreviewImage?.width == 50)
+        let photoID = try #require(sut.document.photoIDs.first)
+        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
+        try sut.commitCrop(
+            CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)),
+            ofLayer: #require(sut.document.firstPhotoLayerID)
+        )
+        #expect(sut.preview(forPhoto: photoID)?.width == 50)
 
         sut.undo()
 
-        #expect(sut.document.photoCrop == nil)
-        #expect(sut.croppedPreviewImage?.width == 100)
+        #expect(sut.document.firstPhotoCrop == nil)
+        #expect(sut.preview(forPhoto: photoID)?.width == 100)
     }
 
     /// Selection is view-model state, deliberately outside the document, so

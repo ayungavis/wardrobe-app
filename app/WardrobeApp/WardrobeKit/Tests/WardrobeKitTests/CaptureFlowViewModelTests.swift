@@ -216,7 +216,7 @@ struct CaptureFlowViewModelTests {
         sut.useCrop(crop)
 
         #expect(sut.stage == .editor)
-        #expect(activeRepository.stored?.document.photoCrop == crop)
+        #expect(activeRepository.stored?.document.firstPhotoCrop == crop)
         #expect(photoRepository.saved.isEmpty, "cropping must not write a second photo")
     }
 
@@ -259,7 +259,9 @@ struct CaptureFlowViewModelTests {
         // The crop is stored on the photo layer, so the document has to have one
         // — setting it on an empty document is a no-op by design.
         challenge.document = EditorDocument(photoID: photoID)
-        challenge.document.photoCrop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1))
+        if let layerID = challenge.document.firstPhotoLayerID {
+            challenge.document.setCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)), ofLayer: layerID)
+        }
         let camera = FakeCameraService()
         camera.permission = .granted
 

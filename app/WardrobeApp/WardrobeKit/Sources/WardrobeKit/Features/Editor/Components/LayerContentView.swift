@@ -12,12 +12,18 @@ struct LayerContentView: View {
     let canvasSize: CGSize
     /// ponytail: one photo per document today. FR-093 (more than one) turns
     /// this into a lookup by `PhotoContent.photoID`.
-    let photo: CGImage?
+    /// A lookup rather than one image: a document can hold more than one photo
+    /// layer (FR-093), and handing the same pixels to every layer drew the same
+    /// picture twice.
+    let photo: (String) -> CGImage?
 
     var body: some View {
         switch content {
-        case .photo:
-            PolaroidPhotoView(photo: photo, width: canvasSize.width * PolaroidPhotoView.widthRatio)
+        case let .photo(content):
+            PolaroidPhotoView(
+                photo: photo(content.photoID),
+                width: canvasSize.width * PolaroidPhotoView.widthRatio
+            )
         case let .text(text):
             TextItemLabelView(item: text, fontSize: TextRendering.baseFontSize(in: canvasSize))
         case let .sticker(sticker):

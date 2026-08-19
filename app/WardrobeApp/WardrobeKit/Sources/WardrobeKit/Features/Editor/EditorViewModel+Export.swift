@@ -18,7 +18,7 @@ public extension EditorViewModel {
     }
 
     func beginExport() {
-        guard case let .loaded(data) = originalData else { return }
+        guard case let .loaded(originals) = originals else { return }
         exportTask?.cancel()
         exportState = .loading
         isExportPresented = true
@@ -27,7 +27,7 @@ public extension EditorViewModel {
         exportTask = Task {
             do {
                 let start = ContinuousClock.now
-                let photo = try await ExportService.render(original: data, document: document)
+                let photo = try await ExportService.render(originals: originals, document: document)
                 try Task.checkCancellation()
                 Log.ui.info(
                     "Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
@@ -44,14 +44,14 @@ public extension EditorViewModel {
 
     /// Save-pill path: render + save to the library in one step, no sheet.
     func saveDirectly() {
-        guard case let .loaded(data) = originalData, !isSaving, !didSaveToPhotos else { return }
+        guard case let .loaded(originals) = originals, !isSaving, !didSaveToPhotos else { return }
         isSaving = true
 
         let document = document
         saveTask = Task {
             defer { isSaving = false }
             do {
-                let photo = try await ExportService.render(original: data, document: document)
+                let photo = try await ExportService.render(originals: originals, document: document)
                 try Task.checkCancellation()
                 try await librarySaver.save(photo)
                 didSaveToPhotos = true

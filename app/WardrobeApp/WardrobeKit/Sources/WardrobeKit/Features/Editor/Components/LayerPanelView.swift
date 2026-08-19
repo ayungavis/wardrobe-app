@@ -107,7 +107,7 @@ struct LayerPanelView: View {
     private func row(_ layer: EditorLayer) -> some View {
         LayerRowView(
             layer: layer,
-            photo: viewModel.croppedPreviewImage,
+            photo: viewModel.preview(forPhoto:),
             isSelected: viewModel.selectedLayerID == layer.id,
             depth: depth(of: layer),
             layerCount: viewModel.document.layers.count,

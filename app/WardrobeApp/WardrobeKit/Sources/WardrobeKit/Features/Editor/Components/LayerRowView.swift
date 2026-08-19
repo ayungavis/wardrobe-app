@@ -6,7 +6,10 @@ import SwiftUI
 /// operation §19 asks for without a precision gesture.
 struct LayerRowView: View {
     let layer: EditorLayer
-    let photo: CGImage?
+    /// A lookup rather than one image: a document can hold more than one photo
+    /// layer (FR-093), and handing the same pixels to every layer drew the same
+    /// picture twice.
+    let photo: (String) -> CGImage?
     let isSelected: Bool
     /// Counted from the bottom of the stack, the way `EditorDocument.layers` is
     /// ordered — so the number VoiceOver reads is the number the document uses.

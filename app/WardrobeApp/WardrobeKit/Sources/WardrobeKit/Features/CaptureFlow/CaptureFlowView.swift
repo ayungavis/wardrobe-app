@@ -40,9 +40,7 @@ public struct CaptureFlowView: View {
                     viewModel: makeEditorViewModel(viewModel.challenge),
                     isCompleting: viewModel.isCompleting,
                     didResumeDraft: viewModel.didResumeDraft,
-                    makeCropViewModel: {
-                        viewModel.challenge.photoID.map { makeCropViewModel($0) }
-                    },
+                    makeCropViewModel: makeCropViewModel,
                     onDiscard: { viewModel.discardPhoto() },
                     onComplete: { viewModel.completeChallenge() },
                     reviewDrawer: {

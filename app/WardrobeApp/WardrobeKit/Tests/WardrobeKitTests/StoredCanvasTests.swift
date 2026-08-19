@@ -38,7 +38,7 @@ struct StoredCanvasTests {
         let challenge = try JSONDecoder().decode(ActiveChallenge.self, from: legacy)
 
         #expect(challenge.photoID == "photo-1")
-        #expect(challenge.document.photoCrop?.rect.width == 0.6)
+        #expect(challenge.document.firstPhotoCrop?.rect.width == 0.6)
         #expect(challenge.document.textContents == ["OOTD"])
         #expect(challenge.document.layers.contains { $0.id == textID })
     }

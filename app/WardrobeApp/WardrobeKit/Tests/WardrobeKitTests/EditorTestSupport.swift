@@ -27,7 +27,10 @@ func makeEditorSUT(
     let photoID = try photoRepository.saveOriginal(SampleCameraService.makeSampleJPEG(width: 100, height: 200))
     var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
     challenge.photoID = photoID
-    challenge.document = document ?? EditorDocument(photoID: photoID)
+    // The fixture documents name a stand-in photo id; the repository mints a
+    // real one. Loading now reads the *document's* photo ids (FR-093), so the
+    // two have to be the same id rather than merely both present.
+    challenge.document = document.map { $0.showingPhoto(photoID) } ?? EditorDocument(photoID: photoID)
     activeRepository.stored = challenge
     return EditorViewModel(
         challenge: challenge,

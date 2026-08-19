@@ -88,8 +88,13 @@ public final class CaptureFlowViewModel {
         // framed reopens the crop step rather than skipping past it — the crop
         // in the draft is what says the step is done, so no extra flag is
         // persisted to say the same thing twice.
-        if challenge.photoID != nil {
-            return challenge.document.photoCrop == nil ? .crop : .editor
+        if let photoID = challenge.photoID {
+            // The *challenge* photo's crop, not any photo's: a second photo
+            // added in the editor must not send the flow back to the crop step
+            // (FR-093).
+            let layerID = challenge.document.photoLayerID(showing: photoID)
+            let crop = layerID.flatMap { challenge.document.crop(ofLayer: $0) }
+            return crop == nil ? .crop : .editor
         }
         switch permission {
         case .granted: return .camera
@@ -235,8 +240,12 @@ public final class CaptureFlowViewModel {
     /// read `document.photoCrop`, so the original stays the only photo on disk
     /// and is never overwritten (FR-092).
     public func useCrop(_ crop: CropSpec) {
-        guard challenge.photoID != nil else { return }
-        challenge.document.photoCrop = crop
+        guard let photoID = challenge.photoID,
+              let layerID = challenge.document.photoLayerID(showing: photoID)
+        else {
+            return
+        }
+        challenge.document.setCrop(crop, ofLayer: layerID)
         activeRepository.save(challenge)
         stage = .editor
     }
@@ -275,6 +284,11 @@ public final class CaptureFlowViewModel {
         // one transaction is impossible; if the bookkeeping fails the challenge
         // still completes rather than being held hostage by it.
         review.commit(completionID: completion.id, at: now)
+        // Photos added and then deleted have nothing left in the document to
+        // name them, so this is the last chance to clean them up.
+        photoRepository.deleteUnusedOriginals(
+            of: completion.document, imported: challenge.importedPhotoIDs
+        )
 
         completedRepository.append(completion)
         activeRepository.clear() // the photo file stays — History will render it
@@ -285,15 +299,11 @@ public final class CaptureFlowViewModel {
 
     /// Editor X: throw the photo and its edits away, back to the camera.
     public func discardPhoto() {
-        if let photoID = challenge.photoID {
-            do {
-                try photoRepository.deleteOriginal(id: photoID)
-            } catch {
-                Log.report(error) // orphaned file is not worth blocking the retake
-            }
-        }
+        // Every photo the canvas holds, not just the capture (FR-093).
+        photoRepository.deleteOriginals(of: challenge.document, and: challenge.photoID)
         challenge.photoID = nil
         challenge.document = EditorDocument(layers: [])
+        challenge.importedPhotoIDs = []
         activeRepository.save(challenge)
         stage = .camera
     }

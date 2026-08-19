@@ -10,16 +10,29 @@ public final class EditorViewModel {
     public static let maximumTextLength = 280
 
     public enum Tool: Equatable {
-        case crop
+        case crop(UUID)
         case text(TextDraft, isNew: Bool)
         case drawing(DrawingContent)
     }
 
-    public private(set) var originalData: Loadable<Data> = .idle
-    public private(set) var previewImage: CGImage?
-    /// Derived from `previewImage` + the committed crop. Stored (not computed)
-    /// so moving an overlay never re-crops the image on the render path.
-    public private(set) var croppedPreviewImage: CGImage?
+    /// Whether the document's photos are on hand. One `Loadable` for all of
+    /// them: a canvas with a photo it cannot decode is not half-loaded, it is
+    /// broken, and FR-093 wants that said at the layer rather than as a state
+    /// of the whole editor.
+    /// Every photo's bytes, keyed by id. The exporter re-crops the original
+    /// rather than the preview, so the bytes have to stay reachable.
+    ///
+    /// One `Loadable` for all of them: a canvas with a photo it cannot decode
+    /// is not half-loaded, it is broken.
+    ///
+    /// ponytail: every photo's bytes live here at once. Two or three is fine;
+    /// if a document ever holds many, read them back from the repository at
+    /// export time instead.
+    public internal(set) var originals: Loadable<[String: Data]> = .idle
+    public internal(set) var previewImages: [String: CGImage] = [:]
+    /// Derived from `previewImages` + each layer's committed crop. Stored (not
+    /// computed) so moving an overlay never re-crops on the render path.
+    public internal(set) var croppedPreviews: [String: CGImage] = [:]
     /// The layered canvas (FR-084) — what every edit changes, what gets
     /// stored, and what the exporter renders. One shape, so there is nothing
     /// to keep in step.
@@ -41,12 +54,14 @@ public final class EditorViewModel {
     public internal(set) var didSaveToPhotos = false
     public internal(set) var isSaving = false
 
-    private var challenge: ActiveChallenge
+    /// Internal rather than private because this type spans five files;
+    /// nothing outside `EditorViewModel*.swift` touches it.
+    var challenge: ActiveChallenge
     let activeRepository: ActiveChallengeRepository
-    private let photoRepository: PhotoRepository
+    let photoRepository: PhotoRepository
     let librarySaver: PhotoLibrarySaveService
     private let preferencesRepository: AccountPreferencesRepository
-    private(set) var loadTask: Task<Void, Never>?
+    var loadTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
     var saveTask: Task<Void, Never>?
 
@@ -66,59 +81,8 @@ public final class EditorViewModel {
     }
 
     public func onAppear() {
-        guard case .idle = originalData else { return }
+        guard case .idle = originals else { return }
         load()
-    }
-
-    public func load() {
-        guard let photoID = challenge.photoID else {
-            originalData = .failed(.unexpected)
-            return
-        }
-
-        loadTask?.cancel()
-        originalData = .loading
-
-        loadTask = Task {
-            do {
-                let photoRepository = photoRepository
-                // Full decode + downsample stay off the main actor.
-                let (data, preview) = try await Task.detached(priority: .userInitiated) {
-                    let data = try photoRepository.loadOriginal(id: photoID)
-                    let preview = ImageDecoding.downsampledImage(from: data, maxPixel: 1600)
-                    return (data, preview)
-                }.value
-                try Task.checkCancellation()
-                previewImage = preview
-                updateCroppedPreview()
-                originalData = .loaded(data)
-            } catch is CancellationError {
-                // Ignore cancellation.
-            } catch {
-                Log.report(error)
-                originalData = .failed(AppError(wrapping: error))
-            }
-        }
-    }
-
-    /// Recomputes the cropped preview. Called only when its inputs change —
-    /// after the photo loads and after a crop is committed.
-    func updateCroppedPreview() {
-        guard let previewImage else {
-            croppedPreviewImage = nil
-            return
-        }
-        guard let crop = document.photoCrop else {
-            croppedPreviewImage = previewImage
-            return
-        }
-        let rect = CGRect(
-            x: crop.rect.origin.x * CGFloat(previewImage.width),
-            y: crop.rect.origin.y * CGFloat(previewImage.height),
-            width: crop.rect.width * CGFloat(previewImage.width),
-            height: crop.rect.height * CGFloat(previewImage.height)
-        ).integral
-        croppedPreviewImage = previewImage.cropping(to: rect) ?? previewImage
     }
 
     // MARK: Tools (FR-019: cancel restores last committed state)
@@ -186,27 +150,29 @@ public final class EditorViewModel {
         persistDocument()
     }
 
-    /// FR-019: crop is not a tool in the rail. It is reached by double-tapping
-    /// the photo itself, and only when there is a photo to reframe.
-    public func beginCrop() {
-        guard hasPhotoLayer else { return }
-        activeTool = .crop
+    /// FR-019: crop is not a tool in the rail — it is reached by double-tapping
+    /// a photo. FR-093 lets a document hold more than one, so *which* photo is
+    /// part of the question.
+    public func beginCrop(layerID: UUID) {
+        guard case .photo = document.layer(id: layerID)?.content else { return }
+        activeTool = .crop(layerID)
     }
 
-    private var hasPhotoLayer: Bool {
-        document.layers.contains {
-            if case .photo = $0.content {
-                return true
-            }
-            return false
+    /// The photo a crop in progress belongs to.
+    public var croppingPhotoID: String? {
+        guard case let .crop(layerID) = activeTool,
+              case let .photo(content) = document.layer(id: layerID)?.content
+        else {
+            return nil
         }
+        return content.photoID
     }
 
     /// One finished framing, straight from the crop screen — there is no
     /// in-flight spec for the editor to hold any more.
-    public func commitCrop(_ crop: CropSpec) {
-        document.photoCrop = crop
-        updateCroppedPreview()
+    public func commitCrop(_ crop: CropSpec, ofLayer layerID: UUID) {
+        document.setCrop(crop, ofLayer: layerID)
+        updateCroppedPreviews()
         activeTool = nil
         persistDocument()
     }

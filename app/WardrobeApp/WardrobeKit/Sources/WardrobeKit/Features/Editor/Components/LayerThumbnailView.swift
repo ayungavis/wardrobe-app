@@ -14,7 +14,10 @@ struct LayerThumbnailView: View {
     private static let cornerRadius: CGFloat = 11
 
     let content: LayerContent
-    let photo: CGImage?
+    /// A lookup rather than one image: a document can hold more than one photo
+    /// layer (FR-093), and handing the same pixels to every layer drew the same
+    /// picture twice.
+    let photo: (String) -> CGImage?
 
     var body: some View {
         artwork
@@ -26,8 +29,8 @@ struct LayerThumbnailView: View {
     @ViewBuilder
     private var artwork: some View {
         switch content {
-        case .photo:
-            photoFill
+        case let .photo(content):
+            photoFill(content.photoID)
         case let .text(text):
             textPreview(text)
         case let .sticker(sticker):
@@ -41,8 +44,8 @@ struct LayerThumbnailView: View {
     /// The cropped capture itself, not the polaroid frame: at this size the
     /// border and lip would be most of the cell.
     @ViewBuilder
-    private var photoFill: some View {
-        if let photo {
+    private func photoFill(_ photoID: String) -> some View {
+        if let photo = photo(photoID) {
             Image(decorative: photo, scale: 1)
                 .resizable()
                 .scaledToFill()

@@ -56,7 +56,7 @@ struct EditorCanvasView: View {
                     EditorLayerView(
                         layer: layer,
                         canvasSize: canvasSize,
-                        photo: viewModel.croppedPreviewImage,
+                        photo: viewModel.preview(forPhoto:),
                         isSelected: viewModel.selectedLayerID == layer.id,
                         isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
                         onSelect: { select(layer.id) },
@@ -153,7 +153,7 @@ struct EditorCanvasView: View {
         if let draft = layer.textDraft {
             viewModel.beginEditingText(draft)
         } else if case .photo = layer.content {
-            viewModel.beginCrop()
+            viewModel.beginCrop(layerID: layer.id)
         }
     }
 

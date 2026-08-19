@@ -121,13 +121,31 @@ struct EditorDocumentEditingTests {
 
     // MARK: Photo crop
 
-    @Test func theCropIsReadAndWrittenOnThePhotoLayer() {
+    @Test func theCropIsReadAndWrittenOnThePhotoLayer() throws {
         var document = makeDocument()
         let crop = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.4))
+        let layerID = try #require(document.firstPhotoLayerID)
 
-        document.photoCrop = crop
+        document.setCrop(crop, ofLayer: layerID)
 
-        #expect(document.photoCrop == crop)
+        #expect(document.crop(ofLayer: layerID) == crop)
+    }
+
+    /// FR-093: a document can hold several photos, so a crop belongs to the
+    /// layer it was asked for — not to whichever photo happens to be lowest.
+    /// Duplicating a photo layer already made this reachable.
+    @Test func aCropWritesToTheLayerItNamesAndNoOther() throws {
+        var document = makeDocument()
+        let bottom = try #require(document.firstPhotoLayerID)
+        // Hoisted: `duplicateLayer` mutates, and the macro expansion cannot.
+        let duplicated = document.duplicateLayer(id: bottom)
+        let copy = try #require(duplicated)
+        let crop = CropSpec(rect: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
+
+        document.setCrop(crop, ofLayer: copy)
+
+        #expect(document.crop(ofLayer: copy) == crop)
+        #expect(document.crop(ofLayer: bottom) == nil, "the layer below must be untouched")
     }
 
     /// No photo means no place a crop could render, so storing one would only
@@ -137,9 +155,9 @@ struct EditorDocumentEditingTests {
             EditorLayer(content: .text(TextContent(content: "hi"))),
         ])
 
-        document.photoCrop = CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1))
+        document.setCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 1)), ofLayer: document.layers[0].id)
 
-        #expect(document.photoCrop == nil)
+        #expect(document.firstPhotoCrop == nil)
         #expect(document.layers.count == 1)
     }
 
@@ -163,7 +181,7 @@ struct EditorDocumentEditingTests {
             photoID: "photo-1"
         )
 
-        #expect(document.photoCrop == crop)
+        #expect(document.firstPhotoCrop == crop)
         let restoredText = try #require(document.textItems.first)
         #expect(restoredText == text)
         guard case let .sticker(restoredSticker) = document.layers[1].content else {
@@ -179,7 +197,7 @@ struct EditorDocumentEditingTests {
         let document = EditorDocument(migrating: EditDraft(), photoID: "photo-1")
 
         #expect(document.layers.count == 1)
-        #expect(document.photoCrop == nil)
+        #expect(document.firstPhotoCrop == nil)
     }
 
     /// A challenge that never got a photo has no photo layer to build.
