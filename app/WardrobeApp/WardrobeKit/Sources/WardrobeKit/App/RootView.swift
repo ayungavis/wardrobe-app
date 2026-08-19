@@ -20,6 +20,7 @@ public struct RootView: View {
                 OnboardingView(viewModel: container.makeOnboardingViewModel())
             }
         }
+        .preferredColorScheme(.light)
     }
 
     private var tabs: some View {
