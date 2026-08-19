@@ -251,4 +251,60 @@ struct CropGeometryTests {
         #expect(abs(restored.minY - rect.minY) < 0.0001)
         #expect(abs(restored.width - rect.width) < 0.0001)
     }
+
+    // MARK: Zooming about the centre
+
+    private func centre(scale: CGFloat, offset: CGSize) -> CGPoint {
+        let rect = CropGeometry.normalizedRect(
+            scale: scale, offset: offset, imageSize: image, cropSize: crop
+        )
+        return CGPoint(x: rect.midX, y: rect.midY)
+    }
+
+    /// What "zoom about the centre" means, said through the function that
+    /// actually stores the crop: whatever sits in the middle of the box stays
+    /// in the middle, whichever way the scale moves.
+    @Test(arguments: [CGFloat(1.5), 2, 4.5, 6])
+    func zoomKeepsTheCentredPointCentred(target: CGFloat) {
+        let from: CGFloat = 3
+        let offset = CGSize(width: 24, height: -18)
+
+        let after = centre(
+            scale: target,
+            offset: CropGeometry.offset(offset, rescaledFrom: from, to: target)
+        )
+        let before = centre(scale: from, offset: offset)
+
+        #expect(abs(after.x - before.x) < 0.0001)
+        #expect(abs(after.y - before.y) < 0.0001)
+    }
+
+    /// The glitch itself: leave the offset alone while the scale changes and the
+    /// picture slides out from under the middle of the box.
+    @Test func keepingTheOffsetWhileZoomingMovesTheCentre() {
+        let offset = CGSize(width: 24, height: -18)
+
+        let before = centre(scale: 2, offset: offset)
+        let after = centre(scale: 4, offset: offset)
+
+        #expect(abs(after.x - before.x) > 0.001)
+    }
+
+    @Test func zoomingInAndBackOutRestoresTheOffset() {
+        let offset = CGSize(width: 24, height: -18)
+
+        let out = CropGeometry.offset(
+            CropGeometry.offset(offset, rescaledFrom: 2, to: 5), rescaledFrom: 5, to: 2
+        )
+
+        #expect(abs(out.width - offset.width) < 0.0001)
+        #expect(abs(out.height - offset.height) < 0.0001)
+    }
+
+    @Test func aDegenerateScaleLeavesTheOffsetAlone() {
+        let offset = CGSize(width: 10, height: 10)
+
+        #expect(CropGeometry.offset(offset, rescaledFrom: 0, to: 2) == offset)
+        #expect(CropGeometry.offset(offset, rescaledFrom: 2, to: 0) == offset)
+    }
 }

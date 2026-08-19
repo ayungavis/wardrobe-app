@@ -55,6 +55,12 @@ enum CropGeometry {
         )
     }
 
+    static func offset(_ offset: CGSize, rescaledFrom old: CGFloat, to new: CGFloat) -> CGSize {
+        guard old > 0, new > 0 else { return offset }
+        let ratio = new / old
+        return CGSize(width: offset.width * ratio, height: offset.height * ratio)
+    }
+
     static func normalizedRect(
         scale: CGFloat,
         offset: CGSize,
