@@ -27,7 +27,10 @@ struct EditorCanvasView: View {
         // ordering `EditorLayerView` already relies on.
         .onTapGesture(count: 2) { beginBackgroundCrop() }
         .gesture(backgroundTap)
-        .overlay { layers }
+        // Inside the overlay, not on the composed stack: clipping out here
+        // would also clip the canvas gesture's touch area, and the corners of
+        // the canvas rect would stop reaching the recogniser.
+        .overlay { layers.clipShape(.rect(cornerRadius: 12)) }
         .overlay { guides }
         .overlay(alignment: .top) { snapBadges }
         .overlay { drawingSurface }
