@@ -65,6 +65,11 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedWears.filter { $0.itemID == itemID }
     }
 
+    func update(_ item: WardrobeItem) throws {
+        guard let index = storedItems.firstIndex(where: { $0.id == item.id }) else { return }
+        storedItems[index] = item
+    }
+
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
         storedItems.append(item)
         if let fingerprint {

@@ -14,6 +14,8 @@ public protocol WardrobeItemRepository: AnyObject {
     /// An item the user already owns, worn again. The fingerprint is kept too —
     /// one per confirmed wear is what makes later matching stronger (§4).
     func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws
+    /// Updates the user-editable text fields of a wardrobe item.
+    func update(_ item: WardrobeItem) throws
     /// One item and everything derived from it — its fingerprints and its wear
     /// records — in one transaction. The cut-out file is the caller's to remove.
     func delete(itemID: UUID) throws
@@ -72,6 +74,18 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         try context.save()
     }
 
+    public func update(_ item: WardrobeItem) throws {
+        let itemID = item.id
+        let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+        guard let entity = try context.fetch(descriptor).first else {
+            throw AppError.unexpected // item doesn't exist — nothing to update
+        }
+        entity.name = item.name
+        entity.itemDescription = item.description
+        entity.updatedAt = item.updatedAt
+        try context.save()
+    }
+
     public func delete(itemID: UUID) throws {
         // One save for all three, so a failure leaves the item whole rather than
         // stripped of the wear history that gives it meaning.
@@ -100,6 +114,8 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
 final class WardrobeItemEntity {
     #Unique<WardrobeItemEntity>([\.id])
     private(set) var id: UUID = UUID()
+    var name: String = ""
+    var itemDescription: String = ""
     var category: String = GarmentCategory.top.rawValue
     var status: String = ItemStatus.pending.rawValue
     /// Column keeps its old name so no schema migration is needed; the domain
@@ -112,6 +128,8 @@ final class WardrobeItemEntity {
 
     init(_ item: WardrobeItem) {
         id = item.id
+        name = item.name
+        itemDescription = item.description
         category = item.category.rawValue
         status = item.status.rawValue
         cutoutPath = item.cutoutFile
@@ -124,6 +142,8 @@ final class WardrobeItemEntity {
     var domain: WardrobeItem {
         WardrobeItem(
             id: id,
+            name: name,
+            description: itemDescription,
             category: GarmentCategory(rawValue: category) ?? .top,
             status: ItemStatus(rawValue: status) ?? .pending,
             cutoutFile: cutoutPath,

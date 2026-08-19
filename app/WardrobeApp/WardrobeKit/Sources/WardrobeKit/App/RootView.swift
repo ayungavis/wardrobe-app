@@ -17,47 +17,66 @@ public struct RootView: View {
     }
 
     public var body: some View {
-        if hasCompletedOnboarding {
-            TabView {
-                Tab {
-                    ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
-                } label: {
-                    Label {
-                        Text("tab.challenge", bundle: .module)
-                    } icon: {
-                        Image(systemName: "sparkles")
-                    }
-                }
+        ZStack {
+            Image("appBG", bundle: .module)
+                .resizable()
+                .ignoresSafeArea()
 
-                Tab {
-                    WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
-                } label: {
-                    Label {
-                        Text("tab.wardrobe", bundle: .module)
-                    } icon: {
-                        Image(systemName: "tshirt")
-                    }
+            if hasCompletedOnboarding {
+                tabs
+            } else {
+                WelcomeView {
+                    completeOnboarding()
                 }
-
-                Tab {
-                    HistoryView()
-                } label: {
-                    Label {
-                        Text("tab.history", bundle: .module)
-                    } icon: {
-                        Image(systemName: "photo.on.rectangle.angled")
-                    }
-                }
-            }
-        } else {
-            WelcomeView {
-                completeOnboarding()
             }
         }
+    }
+
+    private var tabs: some View {
+        TabView {
+            Tab {
+                ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
+            } label: {
+                Label {
+                    Text("tab.challenge", bundle: .module)
+                } icon: {
+                    Image(systemName: "sparkles")
+                }
+            }
+
+            Tab {
+                WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
+            } label: {
+                Label {
+                    Text("tab.wardrobe", bundle: .module)
+                } icon: {
+                    Image(systemName: "tshirt")
+                }
+            }
+
+            Tab {
+                HistoryView(viewModel: container.makeHistoryViewModel(), container: container)
+            } label: {
+                Label {
+                    Text("tab.history", bundle: .module)
+                } icon: {
+                    Image(systemName: "photo.on.rectangle.angled")
+                }
+            }
+        }
+        // The backdrop belongs to `RootView`, so the bar gets out of its way.
+        // `.tabBar` is iOS-only and this package also builds for macOS so
+        // `swift test` runs without a simulator.
+        #if os(iOS)
+        .toolbarBackground(.hidden, for: .tabBar)
+        #endif
+        .background(.clear)
     }
 }
 
 private extension RootView {
+    /// Written through the preferences record, not just held in `@State` —
+    /// otherwise onboarding replays on the next launch (FR-002).
     func completeOnboarding() {
         var preferences = container.preferencesRepository.load()
         preferences.hasCompletedOnboarding = true

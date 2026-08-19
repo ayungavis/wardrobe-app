@@ -5,6 +5,8 @@ import Foundation
 public struct WardrobeItem: Identifiable, Equatable, Sendable {
     public let id: UUID
     /// User-confirmed, never AI-final (FR-029).
+    public var name: String
+    public var description: String
     public var category: GarmentCategory
     public var status: ItemStatus
     /// File name of the normalized cut-out: the placeholder shown until an
@@ -18,6 +20,8 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
 
     public init(
         id: UUID = UUID(),
+        name: String? = nil,
+        description: String = "",
         category: GarmentCategory,
         status: ItemStatus = .pending,
         cutoutFile: String,
@@ -27,6 +31,8 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
         updatedAt: Date
     ) {
         self.id = id
+        self.name = name ?? category.defaultName
+        self.description = description
         self.category = category
         self.status = status
         self.cutoutFile = cutoutFile

@@ -4,21 +4,29 @@ import SwiftUI
 struct WardrobeItemCellView: View {
     let item: WardrobeItem
     let data: Data?
+    let wearCount: Int
 
     private static let thumbnailHeight: CGFloat = 150
 
     var body: some View {
         VStack(spacing: Spacing.xs) {
-            if let data {
-                DownsampledPhotoView(data: data)
-                    .frame(height: Self.thumbnailHeight)
-                    .frame(maxWidth: .infinity)
-                    .background(AppColor.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(AppColor.surface)
-                    .frame(height: Self.thumbnailHeight)
+            ZStack(alignment: .bottomTrailing) {
+                if let data {
+                    DownsampledPhotoView(data: data)
+                        .frame(height: Self.thumbnailHeight)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppColor.surface)
+                        .frame(height: Self.thumbnailHeight)
+                }
+
+                Text("wardrobe.wearCount \(wearCount)", bundle: .module)
+                    .font(AppFont.title.bold())
+                    .stroke(color: .white, width: 3)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, 4)
+                    .padding(Spacing.sm)
             }
 
             Text(item.category.title, bundle: .module)

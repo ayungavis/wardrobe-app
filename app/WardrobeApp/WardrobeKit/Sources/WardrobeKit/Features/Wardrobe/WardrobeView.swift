@@ -1,11 +1,16 @@
 import DesignSystem
 import SwiftUI
 
-/// PRD §17: the wardrobe grows from completed challenges, so this screen only
-/// shows what is already there.
 public struct WardrobeView: View {
+    @State private var isBulkScanPresented = false
+    @State private var isCameraScanPresented = false
+
     @State private var viewModel: WardrobeViewModel
-    @State private var filter: CategoryFilter = .all
+    @State private var expandedCategory: GarmentCategory?
+    @State private var navigationPath = NavigationPath()
+    @State private var sortOrder: SortOrder = .mostUsed
+    @Namespace private var pileNamespace
+
     private let container: AppContainer
 
     public init(viewModel: WardrobeViewModel, container: AppContainer) {
@@ -13,42 +18,53 @@ public struct WardrobeView: View {
         self.container = container
     }
 
-    enum CategoryFilter: CaseIterable {
-        case all, top, bottom
-
-        var category: GarmentCategory? {
-            switch self {
-            case .all: nil
-            case .top: .top
-            case .bottom: .bottom
-            }
-        }
+    private var topItems: [WardrobeItem] {
+        viewModel.items.filter { $0.category == .top }
     }
 
-    private var filteredItems: [WardrobeItem] {
-        guard let category = filter.category else { return viewModel.items }
-        return viewModel.items.filter { $0.category == category }
+    private var bottomItems: [WardrobeItem] {
+        viewModel.items.filter { $0.category == .bottom }
     }
-
-    private let columns = [
-        GridItem(.flexible(), spacing: Spacing.md),
-        GridItem(.flexible(), spacing: Spacing.md),
-    ]
 
     public var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.items.isEmpty {
-                    emptyState
-                } else {
-                    content
+        NavigationStack(path: $navigationPath) {
+            ZStack {
+                Image("appBG", bundle: .module)
+                    .resizable()
+                    .ignoresSafeArea()
+
+                // Single top-to-bottom layout: bar, then content below it —
+                // nothing floats independently anymore.
+                VStack(spacing: 0) {
+                    topBar
+
+                    ZStack {
+                        Group {
+                            if viewModel.items.isEmpty {
+                                emptyState
+                            } else if expandedCategory == nil {
+                                pilesContent
+                            } else {
+                                Color.clear
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        if let category = expandedCategory {
+                            CategoryGridView(
+                                category: category,
+                                items: category == .top ? topItems : bottomItems,
+                                thumbnailData: { viewModel.thumbnailData(for: $0) },
+                                wearCount: { viewModel.wearCount(for: $0) },
+                                namespace: pileNamespace,
+                                onClose: { close() },
+                                onSelect: { navigationPath.append($0.id) },
+                                sortOrder: $sortOrder
+                            )
+                        }
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColor.background)
-            .navigationTitle(Text("tab.wardrobe", bundle: .module))
-            // Navigating by id rather than by a copy of the item: the detail
-            // screen re-reads, so it can never render a stale snapshot.
             .navigationDestination(for: UUID.self) { itemID in
                 WardrobeItemDetailView(
                     viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID),
@@ -57,6 +73,53 @@ public struct WardrobeView: View {
             }
         }
         .task { viewModel.load() }
+    }
+
+    private var topBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 20, height: 20)
+                .padding(Spacing.md)
+                .background(Capsule().fill(.ultraThinMaterial))
+
+            Spacer()
+
+            Menu {
+                Button {
+                    isCameraScanPresented = true
+                } label: {
+                    Label { Text("wardrobe.add.camera", bundle: .module) } icon: { Image(systemName: "camera") }
+                }
+                Button {
+                    isBulkScanPresented = true
+                } label: {
+                    Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 20, height: 20)
+                    .padding(Spacing.md)
+                    .background(Capsule().fill(.ultraThinMaterial))
+            }
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.top, Spacing.md)
+        .sheet(isPresented: $isBulkScanPresented) {
+            BulkScanView(review: container.makeGarmentReviewModel())
+        }
+        .sheet(isPresented: $isCameraScanPresented) {
+            BulkScanCameraView(camera: container.makeCameraService(), review: container.makeGarmentReviewModel())
+        }
+    }
+
+    private func close() {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+            expandedCategory = nil
+        }
     }
 
     private var emptyState: some View {
@@ -71,40 +134,47 @@ public struct WardrobeView: View {
         }
     }
 
-    private var content: some View {
-        VStack(spacing: Spacing.md) {
-            Picker(String(localized: "wardrobe.filter", bundle: .module), selection: $filter) {
-                ForEach(CategoryFilter.allCases, id: \.self) { option in
-                    Text(option.title, bundle: .module).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, Spacing.lg)
-
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: Spacing.md) {
-                    ForEach(filteredItems) { item in
-                        // ponytail: reads the file on each body pass; fine for a
-                        // few dozen items, revisit when the wardrobe outgrows a
-                        // screenful.
-                        NavigationLink(value: item.id) {
-                            WardrobeItemCellView(item: item, data: viewModel.thumbnailData(for: item))
+    private var pilesContent: some View {
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                PileCardView(
+                    category: .top,
+                    items: topItems,
+                    thumbnailData: { viewModel.thumbnailData(for: $0) },
+                    namespace: pileNamespace,
+                    onTap: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            expandedCategory = .top
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-                .padding(Spacing.lg)
+                )
+                PileCardView(
+                    category: .bottom,
+                    items: bottomItems,
+                    thumbnailData: { viewModel.thumbnailData(for: $0) },
+                    namespace: pileNamespace,
+                    onTap: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            expandedCategory = .bottom
+                        }
+                    }
+                )
             }
+            .padding(Spacing.lg)
         }
     }
 }
 
-private extension WardrobeView.CategoryFilter {
-    var title: LocalizedStringKey {
-        switch self {
-        case .all: "wardrobe.filter.all"
-        case .top: "wardrobe.filter.top"
-        case .bottom: "wardrobe.filter.bottom"
+extension WardrobeView {
+    enum SortOrder: String, CaseIterable {
+        case mostUsed
+        case leastUsed
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .mostUsed: "wardrobe.sort.mostUsed"
+            case .leastUsed: "wardrobe.sort.leastUsed"
+            }
         }
     }
 }

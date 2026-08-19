@@ -110,4 +110,19 @@ public final class WardrobeItemDetailViewModel {
             Log.report(error)
         }
     }
+
+    public func updateItem(name: String, description: String) {
+        guard var updated = item else { return }
+        updated.name = name
+        updated.description = description
+        updated.updatedAt = Date()
+
+        do {
+            try repository.update(updated)
+            item = updated
+            Log.ui.info("Wardrobe: item updated")
+        } catch {
+            Log.report(error)
+        }
+    }
 }
