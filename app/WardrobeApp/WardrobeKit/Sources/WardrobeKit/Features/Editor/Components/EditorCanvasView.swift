@@ -15,11 +15,20 @@ import SwiftUI
 struct EditorCanvasView: View {
     let viewModel: EditorViewModel
     @Binding var canvasSize: CGSize
-    @State private var interactingLayerID: UUID?
+    /// The layer a finger is currently down on. The canvas owns the transform
+    /// gesture, so this is what says which layer it acts on — and it is why a
+    /// pinch works with only one finger on a tiny sticker.
+    @State private var heldLayerID: UUID?
     @State private var isOverDeleteTarget = false
-    /// What the current gesture last landed on. Transient like the two above —
-    /// it means nothing once the finger lifts.
+    /// What the current gesture last landed on. Transient like the rest — it
+    /// means nothing once the finger lifts.
     @State private var snap: CanvasSnap?
+    /// Each layer's drawn size, reported up, because clamping the settled
+    /// position to the frame needs it and only the layer knows it.
+    @State private var layerSizes: [UUID: CGSize] = [:]
+    /// Plain `@State`: the recogniser reports its own end, so this is cleared
+    /// there rather than by SwiftUI unwinding a gesture it no longer owns.
+    @State private var gesture = TransientTransform()
 
     var body: some View {
         CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
@@ -29,6 +38,40 @@ struct EditorCanvasView: View {
             .overlay(alignment: .top) { snapBadges }
             .overlay { drawingSurface }
             .overlay(alignment: .bottom) { deleteTarget }
+            // Outside every overlay on purpose. `backgroundTap` above is
+            // attached before them so it only sees the bare background; this
+            // one has to be recognised *over* the layers, and over empty space
+            // too, because the second finger of a pinch lands wherever it likes.
+            .modifier(CanvasTransformGestureModifier(
+                onChanged: { transformChanged($0, $1, $2) },
+                onEnded: { transformFinished($0, $1, $2) },
+                onCancelled: { gesture = TransientTransform() }
+            ))
+    }
+
+    private func transformChanged(
+        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
+    ) {
+        gesture = TransientTransform(
+            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        )
+        guard let layer = heldLayer else { return }
+        snapChanged(layer.id, to: snapping(
+            for: layer,
+            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        ))
+    }
+
+    private func transformFinished(
+        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
+    ) {
+        defer { gesture = TransientTransform() }
+        guard let layer = heldLayer else { return }
+        let proposed = snapping(
+            for: layer,
+            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        ).transform
+        transformEnded(layer.id, to: settled(proposed, layer: layer))
     }
 
     /// An empty spot dismisses the selection if there is one, and otherwise
@@ -56,14 +99,15 @@ struct EditorCanvasView: View {
                     EditorLayerView(
                         layer: layer,
                         canvasSize: canvasSize,
+                        transform: liveTransform(for: layer),
                         photo: viewModel.preview(forPhoto:),
                         isSelected: viewModel.selectedLayerID == layer.id,
-                        isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
+                        isOverDeleteTarget: isOverDeleteTarget && heldLayerID == layer.id,
                         isChallengePhoto: viewModel.challengePhotoLayerID == layer.id,
                         onSelect: { select(layer.id) },
                         onDoubleTap: { beginEditing(layer) },
-                        onSnapChanged: { snapChanged(layer.id, to: $0) },
-                        onTransformEnded: { transformEnded(layer.id, to: $0) },
+                        onPressChanged: { pressChanged(layer, isPressed: $0) },
+                        onSizeChanged: { layerSizes[layer.id] = $0 },
                         onDelete: { viewModel.removeLayer(id: layer.id) }
                     )
                     // Array order is z-order; the index is the position, the
@@ -125,7 +169,7 @@ struct EditorCanvasView: View {
     private var deleteTarget: some View {
         // Never shown for a layer it could not take: dragging into a bin that
         // then does nothing is worse than no bin at all.
-        if let interactingLayerID, viewModel.canRemove(layerID: interactingLayerID) {
+        if let heldLayerID, viewModel.canRemove(layerID: heldLayerID) {
             DeleteDropTargetView(isActive: isOverDeleteTarget)
                 .transition(.opacity)
         }
@@ -144,6 +188,7 @@ struct EditorCanvasView: View {
     // MARK: Interaction
 
     private func select(_ id: UUID) {
+        guard EditorGesture.canSelect(id, whileHolding: heldLayerID) else { return }
         guard viewModel.selectedLayerID != id else { return }
         viewModel.select(id)
         EditorHaptics.selection.play()
@@ -161,7 +206,6 @@ struct EditorCanvasView: View {
     }
 
     private func snapChanged(_ id: UUID, to snap: CanvasSnap) {
-        interactingLayerID = id
         select(id)
 
         // Edge-triggered: feedback belongs to the moment something latches on,
@@ -185,9 +229,68 @@ struct EditorCanvasView: View {
         }
     }
 
+    /// A press latches the layer the gesture will act on; lifting clears it.
+    /// Refused for a locked layer and while a tool is open, so the pinch falls
+    /// through to nothing rather than being silently ignored later.
+    private func pressChanged(_ layer: EditorLayer, isPressed: Bool) {
+        guard isPressed else {
+            if heldLayerID == layer.id {
+                heldLayerID = nil
+            }
+            return
+        }
+        heldLayerID = EditorGesture.hold(
+            current: heldLayerID, pressing: layer, activeTool: viewModel.activeTool
+        )
+    }
+
+    /// What a layer should draw right now: its committed transform, unless it
+    /// is the one being held, in which case the live gesture is folded in.
+    private func liveTransform(for layer: EditorLayer) -> ElementTransform {
+        guard layer.id == heldLayerID else { return layer.transform }
+        return snapping(
+            for: layer,
+            translation: gesture.translation,
+            magnification: gesture.magnification,
+            rotationDegrees: gesture.rotationDegrees
+        ).transform
+    }
+
+    private func snapping(
+        for layer: EditorLayer,
+        translation: CGSize,
+        magnification: CGFloat,
+        rotationDegrees: Double
+    ) -> CanvasSnap {
+        CanvasSnapping.snap(
+            committed: layer.transform,
+            translation: translation,
+            magnification: magnification,
+            rotationDelta: rotationDegrees,
+            canvasSize: canvasSize
+        )
+    }
+
+    private var heldLayer: EditorLayer? {
+        heldLayerID.flatMap { id in viewModel.document.layers.first { $0.id == id } }
+    }
+
+    /// Boundary clamping happens here, once, at the end — during the drag the
+    /// layer follows the finger anywhere and then settles back.
+    private func settled(_ transform: ElementTransform, layer: EditorLayer) -> ElementTransform {
+        var settled = transform
+        settled.position = CanvasGeometry.constrainedPosition(
+            transform.position,
+            canvasSize: canvasSize,
+            layerSize: layerSizes[layer.id] ?? .zero,
+            scale: transform.scale,
+            rotationDegrees: transform.rotationDegrees
+        )
+        return settled
+    }
+
     private func transformEnded(_ id: UUID, to transform: ElementTransform) {
-        let shouldDelete = isOverDeleteTarget && interactingLayerID == id
-        interactingLayerID = nil
+        let shouldDelete = isOverDeleteTarget && heldLayerID == id
         isOverDeleteTarget = false
         snap = nil
 
@@ -220,4 +323,12 @@ private struct CanvasFrameView: View {
                 canvasSize = newSize
             }
     }
+}
+
+/// Resets itself when the gesture ends, so a released layer never keeps a
+/// stale offset — the same shape `CropView` uses.
+private struct TransientTransform: Equatable {
+    var translation: CGSize = .zero
+    var magnification: CGFloat = 1
+    var rotationDegrees: Double = 0
 }

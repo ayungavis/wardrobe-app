@@ -2,16 +2,22 @@ import CoreGraphics
 import DesignSystem
 import SwiftUI
 
-/// One layer on the canvas: its content, its selection chrome, and the drag /
-/// pinch / rotate that move it (FR-085).
+/// One layer on the canvas: its content, its selection chrome, and the press
+/// that makes it the one a canvas gesture acts on.
 ///
-/// The layer owns the *live* transform and the view model only ever sees the
-/// settled one, so a gesture that is interrupted leaves the document exactly as
-/// it was — FR-085's restore rule holds because nothing was written, not
-/// because something was undone.
+/// It draws the *live* transform but does not compose it. The canvas owns the
+/// drag, pinch, and rotate now, because a pinch has to be recognised wherever
+/// the second finger lands — a sticker shrunk to thumbnail size cannot hold two
+/// fingers. What stays here is the part that must be bounded by the layer's own
+/// shape: knowing that a finger is on *this* layer.
 struct EditorLayerView: View {
     let layer: EditorLayer
     let canvasSize: CGSize
+    /// Composed by the canvas from the committed transform plus whatever the
+    /// live gesture is doing, so an interrupted gesture leaves the document
+    /// exactly as it was — FR-085's restore rule holds because nothing was
+    /// written, not because something was undone.
+    let transform: ElementTransform
     /// A lookup rather than one image: a document can hold more than one photo
     /// layer (FR-093), and handing the same pixels to every layer drew the same
     /// picture twice.
@@ -21,34 +27,23 @@ struct EditorLayerView: View {
     let isChallengePhoto: Bool
     let onSelect: () -> Void
     let onDoubleTap: () -> Void
-    /// Reports the live snap so the canvas can light up the delete target and
-    /// show the guides and badges.
-    let onSnapChanged: (CanvasSnap) -> Void
-    let onTransformEnded: (ElementTransform) -> Void
+    /// Touch down and touch up on this layer. The canvas keeps the id so a
+    /// pinch anywhere knows what it is acting on.
+    let onPressChanged: (Bool) -> Void
+    /// The canvas clamps the settled position to the frame, and needs the
+    /// layer's drawn size to do it.
+    let onSizeChanged: (CGSize) -> Void
     let onDelete: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var gesture = TransientTransform()
-    @State private var contentSize: CGSize = .zero
-
-    private var liveSnap: CanvasSnap {
-        CanvasSnapping.snap(
-            committed: layer.transform,
-            translation: gesture.translation,
-            magnification: gesture.magnification,
-            rotationDelta: gesture.rotationDegrees,
-            canvasSize: canvasSize
-        )
-    }
+    @GestureState private var isPressed = false
 
     var body: some View {
-        let transform = liveSnap.transform
-
         LayerContentView(content: layer.content, canvasSize: canvasSize, photo: photo)
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size
             } action: { newSize in
-                contentSize = newSize
+                onSizeChanged(newSize)
             }
             .contentShape(LayerHitShape(content: layer.content, referenceWidth: canvasSize.width))
             .overlay { selectionChrome(scale: transform.scale) }
@@ -59,7 +54,17 @@ struct EditorLayerView: View {
             .animation(settleAnimation, value: layer.transform)
             .onTapGesture(count: 2, perform: onDoubleTap)
             .onTapGesture(perform: onSelect)
-            .gesture(transformGesture, including: layer.isLocked ? .subviews : .all)
+            // Zero distance so a finger that never moves still latches the
+            // layer — that is the whole point, since the other finger is the
+            // one doing the pinching. Simultaneous so it does not swallow the
+            // two taps above.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0).updating($isPressed) { _, state, _ in state = true }
+            )
+            // `@GestureState` restores itself when the gesture ends or is
+            // cancelled, which is what turns "lift the finger" into "no layer
+            // is held" without any cleanup of our own.
+            .onChange(of: isPressed) { _, pressed in onPressChanged(pressed) }
             .accessibilityElement()
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(accessibilityValue)
@@ -197,59 +202,4 @@ struct EditorLayerView: View {
             }
             .offset(x: 8 * inverseScale, y: -8 * inverseScale)
     }
-
-    private var transformGesture: some Gesture {
-        DragGesture(minimumDistance: 6)
-            .simultaneously(with: MagnifyGesture().simultaneously(with: RotateGesture()))
-            .updating($gesture) { value, state, _ in
-                state.translation = value.first?.translation ?? .zero
-                state.magnification = value.second?.first?.magnification ?? 1
-                state.rotationDegrees = value.second?.second?.rotation.degrees ?? 0
-            }
-            .onChanged { value in
-                onSnapChanged(proposedSnap(for: value))
-            }
-            .onEnded { value in
-                onTransformEnded(settled(proposedSnap(for: value).transform))
-            }
-    }
-
-    private typealias TransformValue = SimultaneousGesture<
-        DragGesture, SimultaneousGesture<MagnifyGesture, RotateGesture>
-    >.Value
-
-    /// Read from the gesture value rather than from `@GestureState`, whose
-    /// update is not ordered against these callbacks — but composed by the same
-    /// function as the drawn one, so the two cannot drift apart.
-    private func proposedSnap(for value: TransformValue) -> CanvasSnap {
-        CanvasSnapping.snap(
-            committed: layer.transform,
-            translation: value.first?.translation ?? .zero,
-            magnification: value.second?.first?.magnification ?? 1,
-            rotationDelta: value.second?.second?.rotation.degrees ?? 0,
-            canvasSize: canvasSize
-        )
-    }
-
-    /// Boundary clamping happens here, once, at the end — during the drag the
-    /// layer follows the finger anywhere and then settles back.
-    private func settled(_ transform: ElementTransform) -> ElementTransform {
-        var settled = transform
-        settled.position = CanvasGeometry.constrainedPosition(
-            transform.position,
-            canvasSize: canvasSize,
-            layerSize: contentSize,
-            scale: transform.scale,
-            rotationDegrees: transform.rotationDegrees
-        )
-        return settled
-    }
-}
-
-/// Resets itself when the gesture ends, so a released layer never keeps a
-/// stale offset — the same shape `CropView` uses.
-private struct TransientTransform: Equatable {
-    var translation: CGSize = .zero
-    var magnification: CGFloat = 1
-    var rotationDegrees: Double = 0
 }
