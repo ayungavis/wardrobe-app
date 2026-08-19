@@ -20,6 +20,9 @@ struct CanvasTransformGestureModifier: ViewModifier {
     }
 
     let hitTest: (CGPoint) -> UUID?
+    /// Fires the moment the touch sequence stops being a plain tap, so the
+    /// canvas can close the doors a tap would otherwise open.
+    let onEngagementChanged: (Bool, UUID?) -> Void
     let onChanged: (Update) -> Void
     let onEnded: (Update) -> Void
     let onCancelled: () -> Void
@@ -28,6 +31,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
         #if os(iOS)
             content.gesture(CanvasTransformGesture(
                 hitTest: hitTest,
+                onEngagementChanged: onEngagementChanged,
                 onChanged: { report($0).map(onChanged) },
                 onEnded: { report($0).map(onEnded) },
                 onCancelled: onCancelled
@@ -61,7 +65,17 @@ struct CanvasTransformGestureModifier: ViewModifier {
         /// Takes a point in **window** coordinates; the representable converts
         /// it into the canvas's space before the hit test sees it.
         var hitTest: (CGPoint) -> UUID? = { _ in nil }
+        var onEngagementChanged: (Bool, UUID?) -> Void = { _, _ in }
         private(set) var heldLayerID: UUID?
+
+        /// From the moment this sequence stops being a plain tap — a second
+        /// finger lands, or the transform begins — until every finger lifts.
+        private var isEngaged = false {
+            didSet {
+                guard isEngaged != oldValue else { return }
+                onEngagementChanged(isEngaged, heldLayerID)
+            }
+        }
 
         private var tracker = CanvasTouchTracker()
         /// Ordered, not a `Set`: reordering would flip the measured angle by 180°.
@@ -89,6 +103,9 @@ struct CanvasTransformGestureModifier: ViewModifier {
                 heldLayerID = touches.first.map { hitTest($0.location(in: nil)) } ?? nil
                 tracker.begin(points())
             } else {
+                // A second finger means this is no longer a tap, whether or not
+                // it ever moves far enough to become a transform.
+                isEngaged = true
                 tracker.update(points())
                 advance()
             }
@@ -114,6 +131,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
             super.reset()
             tracker = CanvasTouchTracker()
             tracked = []
+            isEngaged = false
             heldLayerID = nil
         }
 
@@ -130,6 +148,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
         private func advance() {
             guard state != .possible else {
                 if hasMovedEnough {
+                    isEngaged = true
                     state = .began
                 }
                 return
@@ -150,6 +169,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
 
     struct CanvasTransformGesture: UIGestureRecognizerRepresentable {
         let hitTest: (CGPoint) -> UUID?
+        let onEngagementChanged: (Bool, UUID?) -> Void
         let onChanged: (CanvasTransformRecognizer) -> Void
         let onEnded: (CanvasTransformRecognizer) -> Void
         let onCancelled: () -> Void
@@ -159,6 +179,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
             recognizer.cancelsTouchesInView = false
             recognizer.delaysTouchesBegan = false
             recognizer.delegate = context.coordinator
+            recognizer.onEngagementChanged = onEngagementChanged
             install(hitTest, on: recognizer, converter: context.converter)
             return recognizer
         }
@@ -166,6 +187,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
         /// Refreshed every update so the hit test sees the current document,
         /// canvas size, and open tool.
         func updateUIGestureRecognizer(_ recognizer: CanvasTransformRecognizer, context: Context) {
+            recognizer.onEngagementChanged = onEngagementChanged
             install(hitTest, on: recognizer, converter: context.converter)
         }
 

@@ -10,6 +10,9 @@ struct EditorCanvasView: View {
     @Binding var canvasSize: CGSize
     @State private var heldLayerID: UUID?
     @State private var isOverDeleteTarget = false
+    /// True while a finger is doing something other than tapping. What closes
+    /// the doors a stray double tap would otherwise open mid-gesture.
+    @State private var isGestureEngaged = false
     @State private var snap: CanvasSnap?
     @State private var layerSizes: [UUID: CGSize] = [:]
     @State private var gesture = TransientTransform()
@@ -22,7 +25,7 @@ struct EditorCanvasView: View {
         )
         // Registered before the single tap that starts a new text, the same
         // ordering `EditorLayerView` already relies on.
-        .onTapGesture(count: 2) { viewModel.beginCrop(.background) }
+        .onTapGesture(count: 2) { beginBackgroundCrop() }
         .gesture(backgroundTap)
         .overlay { layers }
         .overlay { guides }
@@ -36,6 +39,7 @@ struct EditorCanvasView: View {
         .coordinateSpace(.named(CanvasTransformGestureModifier.coordinateSpace))
         .modifier(CanvasTransformGestureModifier(
             hitTest: hitTest(at:),
+            onEngagementChanged: engagementChanged,
             onChanged: transformChanged,
             onEnded: transformFinished,
             onCancelled: endTransform
@@ -62,7 +66,6 @@ struct EditorCanvasView: View {
     }
 
     private func transformChanged(_ update: CanvasTransformGestureModifier.Update) {
-        heldLayerID = update.layerID
         gesture = TransientTransform(
             translation: update.translation,
             magnification: update.magnification,
@@ -91,7 +94,6 @@ struct EditorCanvasView: View {
 
     private func endTransform() {
         gesture = TransientTransform()
-        heldLayerID = nil
     }
 
     private var backgroundTap: some Gesture {
@@ -199,7 +201,23 @@ struct EditorCanvasView: View {
         EditorHaptics.selection.play()
     }
 
+    /// The one place `heldLayerID` is written. A hold that never becomes a
+    /// transform sends no action at all — the recogniser simply fails — so
+    /// clearing it from the transform's end would leave it dangling.
+    private func engagementChanged(_ isEngaged: Bool, _ layerID: UUID?) {
+        isGestureEngaged = isEngaged
+        heldLayerID = isEngaged ? layerID : nil
+    }
+
+    private func beginBackgroundCrop() {
+        guard !isGestureEngaged else { return }
+        viewModel.beginCrop(.background)
+    }
+
+    /// Refused mid-gesture: a second finger tapping twice while the first holds
+    /// a layer must not yank the user into the composer or the crop screen.
     private func beginEditing(_ layer: EditorLayer) {
+        guard !isGestureEngaged else { return }
         if let draft = layer.textDraft {
             viewModel.beginEditingText(draft)
         } else if case .photo = layer.content {
