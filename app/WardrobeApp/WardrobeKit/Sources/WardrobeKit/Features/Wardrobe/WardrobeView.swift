@@ -106,12 +106,21 @@ public struct WardrobeView: View {
         }
         .padding(.horizontal, Spacing.md)
         .padding(.top, Spacing.md)
-        .sheet(isPresented: $isBulkScanPresented) {
-            BulkScanView(review: container.makeGarmentReviewModel())
-        }
-        .sheet(isPresented: $isCameraScanPresented) {
-            BulkScanCameraView(camera: container.makeCameraService(), review: container.makeGarmentReviewModel())
-        }
+        .sheet(
+            isPresented: $isBulkScanPresented,
+            onDismiss: { viewModel.load() },
+            content: { AddByPhotosView(review: container.makeGarmentReviewModel()) }
+        )
+        .sheet(
+            isPresented: $isCameraScanPresented,
+            onDismiss: { viewModel.load() },
+            content: {
+                AddByCameraView(
+                    camera: container.makeCameraService(),
+                    review: container.makeGarmentReviewModel()
+                )
+            }
+        )
     }
 
     private func close() {

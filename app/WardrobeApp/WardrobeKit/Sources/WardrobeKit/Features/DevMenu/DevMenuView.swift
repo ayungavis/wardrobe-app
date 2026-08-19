@@ -131,7 +131,7 @@ struct DevMenuView: View {
                 }
         }
         .sheet(isPresented: $isBulkScanPresented, onDismiss: onStateChanged) {
-            BulkScanView(review: makeReview())
+            AddByPhotosView(review: makeReview())
         }
         .sheet(isPresented: $isBenchmarkPresented) {
             MatchBenchmarkView(viewModel: makeBenchmark())

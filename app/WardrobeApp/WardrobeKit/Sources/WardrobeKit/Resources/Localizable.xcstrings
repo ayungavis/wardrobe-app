@@ -49,6 +49,22 @@
         }
       }
     },
+    "camera.permission.denied.wardrobe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable camera access in Settings to scan your clothes."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktifkan akses kamera di Pengaturan untuk memindai bajumu."
+          }
+        }
+      }
+    },
     "capture.camera.capture" : {
       "localizations" : {
         "en" : {
@@ -4297,8 +4313,40 @@
         }
       }
     },
+    "wardrobe.add.camera.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add by Camera"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tambah dari Kamera"
+          }
+        }
+      }
+    },
     "wardrobe.add.photos" : {
       "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add from Photos"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tambah dari Foto"
+          }
+        }
+      }
+    },
+    "wardrobe.add.photos.title" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4852,7 +4900,6 @@
       }
     },
     "wardrobe.review.title" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4884,6 +4931,22 @@
         }
       }
     },
+    "wardrobe.scan.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No clothes detected"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak ada pakaian terdeteksi"
+          }
+        }
+      }
+    },
     "wardrobe.scan.processing" : {
       "localizations" : {
         "en" : {
@@ -4896,6 +4959,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Memproses…"
+          }
+        }
+      }
+    },
+    "wardrobe.scan.retake" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take another photo"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ambil foto lagi"
+          }
+        }
+      }
+    },
+    "wardrobe.scan.review" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tinjau"
           }
         }
       }
