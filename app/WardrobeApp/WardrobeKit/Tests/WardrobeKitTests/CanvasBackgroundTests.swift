@@ -102,6 +102,19 @@ struct CanvasBackgroundTests {
         #expect(document.photoLayerID(showing: "bg-1") == nil)
     }
 
+    /// Undo refreshes previews by comparing this, so a background crop missing
+    /// from it means undoing one leaves the canvas drawing the old pixels.
+    @Test func photoCropsIncludesTheBackground() {
+        let crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))
+        let document = EditorDocument(
+            layers: [EditorLayer(content: .photo(PhotoContent(photoID: "layer-1")))],
+            background: .photo(id: "bg-1", crop: crop)
+        )
+
+        #expect(document.photoCrops["bg-1"] == crop)
+        #expect(document.photoCrops["layer-1"] == CropSpec?.none)
+    }
+
     @Test func aDocumentWithNoBackgroundUsesTheDefault() throws {
         let json = """
         { "id": "\(UUID().uuidString)", "schemaVersion": 1, "layers": [] }

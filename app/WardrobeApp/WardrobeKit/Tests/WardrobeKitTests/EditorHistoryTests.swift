@@ -92,6 +92,29 @@ struct EditorHistoryTests {
 
     /// Selection is view-model state, deliberately outside the document, so
     /// undo does not walk it backwards.
+    /// The background is a photo the document draws, so undoing its crop has to
+    /// rebuild its preview exactly as undoing a layer's does.
+    @Test func undoAcrossABackgroundCropRebuildsThePreview() async throws {
+        let sut = try makeEditorSUT()
+        sut.load()
+        await sut.loadTask?.value
+        try sut.setBackgroundPhoto(SampleCameraService.makeSampleJPEG(width: 90, height: 160))
+        let backgroundID = try #require(sut.document.background.photoID)
+        let full = try #require(sut.preview(forPhoto: backgroundID)?.width)
+
+        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)), for: .background)
+        #expect(sut.preview(forPhoto: backgroundID)?.width == full / 2)
+
+        sut.undo()
+
+        #expect(sut.document.background.crop == nil)
+        #expect(sut.preview(forPhoto: backgroundID)?.width == full)
+
+        sut.redo()
+
+        #expect(sut.preview(forPhoto: backgroundID)?.width == full / 2)
+    }
+
     @Test func undoDoesNotBringBackAnOldSelection() throws {
         let first = TextItem(content: "one")
         let second = TextItem(content: "two")

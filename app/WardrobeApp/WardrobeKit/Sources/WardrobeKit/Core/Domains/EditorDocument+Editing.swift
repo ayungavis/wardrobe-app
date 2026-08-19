@@ -25,24 +25,29 @@ public extension EditorDocument {
         }?.id
     }
 
+    /// Every photo the document draws, layer **or** background. `photoIDs` and
+    /// `photoCrops` both derive from this, so neither can forget that a photo
+    /// can live outside the layer list — which is exactly how undo stopped
+    /// refreshing the background.
+    var photos: [(id: String, crop: CropSpec?)] {
+        var photos = layers.compactMap { layer -> (id: String, crop: CropSpec?)? in
+            guard case let .photo(photo) = layer.content else { return nil }
+            return (photo.photoID, photo.crop)
+        }
+        if case let .photo(id, crop) = background {
+            photos.append((id, crop))
+        }
+        return photos
+    }
+
     var photoCrops: [String: CropSpec?] {
-        layers.reduce(into: [:]) { result, layer in
-            if case let .photo(photo) = layer.content {
-                result[photo.photoID] = photo.crop
-            }
+        photos.reduce(into: [:]) { result, photo in
+            result[photo.id] = photo.crop
         }
     }
 
-    /// Includes the background's photo: it is a file on disk with the same
-    /// lifetime as any layer's, and every loader and cleanup path reads this.
     var photoIDs: [String] {
-        let layerIDs = layers.compactMap { layer -> String? in
-            if case let .photo(photo) = layer.content {
-                return photo.photoID
-            }
-            return nil
-        }
-        return layerIDs + [background.photoID].compactMap(\.self)
+        photos.map(\.id)
     }
 
     func layer(id: UUID) -> EditorLayer? {
