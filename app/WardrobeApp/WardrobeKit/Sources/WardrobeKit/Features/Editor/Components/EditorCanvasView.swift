@@ -59,6 +59,7 @@ struct EditorCanvasView: View {
                         photo: viewModel.preview(forPhoto:),
                         isSelected: viewModel.selectedLayerID == layer.id,
                         isOverDeleteTarget: isOverDeleteTarget && interactingLayerID == layer.id,
+                        isChallengePhoto: viewModel.challengePhotoLayerID == layer.id,
                         onSelect: { select(layer.id) },
                         onDoubleTap: { beginEditing(layer) },
                         onSnapChanged: { snapChanged(layer.id, to: $0) },
@@ -122,7 +123,9 @@ struct EditorCanvasView: View {
 
     @ViewBuilder
     private var deleteTarget: some View {
-        if interactingLayerID != nil {
+        // Never shown for a layer it could not take: dragging into a bin that
+        // then does nothing is worse than no bin at all.
+        if let interactingLayerID, viewModel.canRemove(layerID: interactingLayerID) {
             DeleteDropTargetView(isActive: isOverDeleteTarget)
                 .transition(.opacity)
         }
@@ -171,6 +174,8 @@ struct EditorCanvasView: View {
         if landedOnSomething {
             EditorHaptics.latch.play()
         }
+
+        guard viewModel.canRemove(layerID: id) else { return }
 
         let isOver = CanvasGeometry.isOverDeleteTarget(snap.transform.position)
         guard isOver != isOverDeleteTarget else { return }

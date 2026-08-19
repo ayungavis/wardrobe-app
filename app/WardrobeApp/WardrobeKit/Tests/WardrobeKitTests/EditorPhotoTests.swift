@@ -62,6 +62,51 @@ struct EditorPhotoTests {
         #expect((try? photoRepository.loadOriginal(id: added)) != nil, "the file outlived the layer")
     }
 
+    /// Deleting the challenge's own photo would leave a challenge that
+    /// completes legitimately and shares a picture with no photo in it —
+    /// `CompletedChallenge` names that photo, and the export renders the
+    /// document.
+    @Test func theChallengePhotoCannotBeDeletedButOtherPhotosCan() async throws {
+        let sut = try makeEditorSUT()
+        sut.load()
+        await sut.loadTask?.value
+        try sut.addPhoto(makePhoto())
+        let challengeLayer = try #require(sut.challengePhotoLayerID)
+        let addedLayer = try #require(sut.document.layers.last?.id)
+
+        sut.removeLayer(id: challengeLayer)
+        #expect(sut.document.layers.contains { $0.id == challengeLayer })
+        #expect(!sut.canRemove(layerID: challengeLayer))
+
+        sut.removeLayer(id: addedLayer)
+        #expect(!sut.document.layers.contains { $0.id == addedLayer })
+    }
+
+    /// A refused delete is not an edit: it must not eat an undo step that then
+    /// does nothing when pressed.
+    @Test func aRefusedDeleteLeavesNoUndoStep() async throws {
+        let sut = try makeEditorSUT()
+        sut.load()
+        await sut.loadTask?.value
+        let challengeLayer = try #require(sut.challengePhotoLayerID)
+
+        sut.removeLayer(id: challengeLayer)
+
+        #expect(!sut.canUndo)
+    }
+
+    /// The rule belongs to the challenge, not to the document — a document
+    /// reopened from History protects a different photo. This is what stops it
+    /// being moved into `EditorDocument` later by mistake.
+    @Test func theDocumentItselfHasNoOpinionAboutTheChallengePhoto() {
+        var document = EditorDocument(photoID: "photo-1")
+        let layerID = document.layers[0].id
+
+        document.removeLayer(id: layerID)
+
+        #expect(document.layers.isEmpty)
+    }
+
     /// Abandoning takes every photo with it, not just the capture.
     @Test func abandoningRemovesEveryPhotoTheCanvasHeld() async throws {
         let photoRepository = SpyPhotoRepository()

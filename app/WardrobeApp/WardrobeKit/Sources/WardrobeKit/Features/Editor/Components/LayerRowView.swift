@@ -18,6 +18,9 @@ struct LayerRowView: View {
     /// While the list owns the row for dragging, the row's own controls cannot
     /// be tapped — so they are hidden rather than left looking live.
     let isReordering: Bool
+    /// The challenge's own photo cannot be deleted, and saying so is what
+    /// keeps the disabled Delete from being a mystery.
+    let isChallengePhoto: Bool
     let onSelect: () -> Void
     let onToggleLock: () -> Void
     let onMove: (EditorDocument.LayerMove) -> Void
@@ -33,6 +36,7 @@ struct LayerRowView: View {
                 lockButton
                 LayerMenuView(
                     isLocked: layer.isLocked,
+                    canDelete: !isChallengePhoto,
                     canMoveUp: depth < layerCount - 1,
                     canMoveDown: depth > 0,
                     onMove: onMove,
@@ -54,12 +58,12 @@ struct LayerRowView: View {
                 LayerThumbnailView(content: layer.content, photo: photo)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(verbatim: LayerLabel.title(for: layer.content))
+                    Text(verbatim: LayerLabel.title(for: layer.content, isChallengePhoto: isChallengePhoto))
                         .font(AppFont.body.weight(.semibold))
                         .foregroundStyle(AppColor.onMedia)
                         .lineLimit(1)
 
-                    Text(verbatim: LayerLabel.kind(for: layer.content))
+                    Text(verbatim: LayerLabel.kind(for: layer.content, isChallengePhoto: isChallengePhoto))
                         .font(AppFont.caption)
                         .foregroundStyle(AppColor.onMedia.opacity(0.64))
                 }
@@ -75,7 +79,7 @@ struct LayerRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: LayerLabel.title(for: layer.content)))
+        .accessibilityLabel(Text(verbatim: LayerLabel.title(for: layer.content, isChallengePhoto: isChallengePhoto)))
         .accessibilityValue(Text(verbatim: accessibilityValue))
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier("editor.layer.row")

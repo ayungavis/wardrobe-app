@@ -112,6 +112,7 @@ struct LayerPanelView: View {
             depth: depth(of: layer),
             layerCount: viewModel.document.layers.count,
             isReordering: isReordering,
+            isChallengePhoto: !viewModel.canRemove(layerID: layer.id),
             onSelect: { viewModel.select(layer.id) },
             onToggleLock: { viewModel.setLock(!layer.isLocked, ofLayer: layer.id) },
             onMove: { viewModel.moveLayer(id: layer.id, $0) },

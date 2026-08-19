@@ -276,6 +276,8 @@ public final class EditorViewModel {
     }
 
     public func removeLayer(id: UUID) {
+        guard canRemove(layerID: id) else { return }
+
         document.removeLayer(id: id)
         if selectedLayerID == id {
             selectedLayerID = nil

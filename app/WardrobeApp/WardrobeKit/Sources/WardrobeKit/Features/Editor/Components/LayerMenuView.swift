@@ -9,6 +9,7 @@ import SwiftUI
 /// readable.
 struct LayerMenuView: View {
     let isLocked: Bool
+    let canDelete: Bool
     let canMoveUp: Bool
     let canMoveDown: Bool
     let onMove: (EditorDocument.LayerMove) -> Void
@@ -56,8 +57,9 @@ struct LayerMenuView: View {
                     }
                 }
                 // FR-087: deleting a locked layer takes an explicit unlock
-                // first. A live button that did nothing would be worse.
-                .disabled(isLocked)
+                // first — and the challenge's own photo cannot go at all. A
+                // live button that did nothing would be worse than either.
+                .disabled(isLocked || !canDelete)
             }
         } label: {
             Image(systemName: "ellipsis")

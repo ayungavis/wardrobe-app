@@ -78,6 +78,22 @@ public extension EditorViewModel {
         }
     }
 
+    /// The layer showing the challenge's own photo, if the document still has
+    /// it. Derived from `ActiveChallenge.photoID` rather than flagged in the
+    /// document: a document reopened from History will protect a different
+    /// photo, and two copies of that fact could disagree.
+    var challengePhotoLayerID: UUID? {
+        challenge.photoID.flatMap { document.photoLayerID(showing: $0) }
+    }
+
+    /// Everything but the challenge's own photo can go. Deleting that one would
+    /// leave a challenge that completes legitimately and shares a picture with
+    /// no photo in it — `CompletedChallenge` names it, and the export renders
+    /// the document.
+    func canRemove(layerID: UUID) -> Bool {
+        layerID != challengePhotoLayerID
+    }
+
     /// The pixels a photo layer should draw, already cropped.
     func preview(forPhoto photoID: String) -> CGImage? {
         croppedPreviews[photoID]

@@ -1643,6 +1643,23 @@
         }
       }
     },
+    "editor.layer.challengePhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Challenge photo"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto tantangan"
+          }
+        }
+      }
+    },
     "editor.layer.crop": {
       "localizations": {
         "en": {

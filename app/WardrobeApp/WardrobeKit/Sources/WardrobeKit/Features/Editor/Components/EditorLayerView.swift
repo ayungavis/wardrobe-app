@@ -18,6 +18,7 @@ struct EditorLayerView: View {
     let photo: (String) -> CGImage?
     let isSelected: Bool
     let isOverDeleteTarget: Bool
+    let isChallengePhoto: Bool
     let onSelect: () -> Void
     let onDoubleTap: () -> Void
     /// Reports the live snap so the canvas can light up the delete target and
@@ -72,7 +73,7 @@ struct EditorLayerView: View {
                 }
                 // Offering Delete on a locked layer would advertise an action
                 // the document refuses (FR-087).
-                if !layer.isLocked {
+                if !layer.isLocked, !isChallengePhoto {
                     Button(action: onDelete) { Text("editor.layer.delete", bundle: .module) }
                 }
             }
@@ -99,7 +100,7 @@ struct EditorLayerView: View {
     }
 
     private var accessibilityLabel: Text {
-        Text(verbatim: LayerLabel.title(for: layer.content))
+        Text(verbatim: LayerLabel.title(for: layer.content, isChallengePhoto: isChallengePhoto))
     }
 
     /// Everything §19 asks a canvas layer to announce: position, scale,
