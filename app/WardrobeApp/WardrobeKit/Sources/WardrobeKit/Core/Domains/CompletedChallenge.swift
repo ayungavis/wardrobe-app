@@ -26,7 +26,6 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, card, photoID, document, completedAt, previewFile
-        /// The flat pre-canvas shape. Read forever, written never.
         case draft
     }
 

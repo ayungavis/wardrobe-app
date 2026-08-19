@@ -10,48 +10,80 @@ struct EditorCanvasView: View {
     @Binding var canvasSize: CGSize
     @State private var heldLayerID: UUID?
     @State private var isOverDeleteTarget = false
+    @State private var isGestureEngaged = false
     @State private var snap: CanvasSnap?
     @State private var layerSizes: [UUID: CGSize] = [:]
     @State private var gesture = TransientTransform()
 
     var body: some View {
-        CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
-            .gesture(backgroundTap)
-            .overlay { layers }
-            .overlay { guides }
-            .overlay(alignment: .top) { snapBadges }
-            .overlay { drawingSurface }
-            .overlay(alignment: .bottom) { deleteTarget }
-            .modifier(CanvasTransformGestureModifier(
-                onChanged: { transformChanged($0, $1, $2) },
-                onEnded: { transformFinished($0, $1, $2) },
-                onCancelled: { gesture = TransientTransform() }
-            ))
-    }
-
-    private func transformChanged(
-        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
-    ) {
-        gesture = TransientTransform(
-            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        CanvasFrameView(
+            background: viewModel.document.background,
+            photo: viewModel.preview(forPhoto:),
+            canvasSize: $canvasSize
         )
-        guard let layer = heldLayer else { return }
-        snapChanged(layer.id, to: snapping(
-            for: layer,
-            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+        .onTapGesture(count: 2) { beginBackgroundCrop() }
+        .gesture(backgroundTap)
+        .overlay { layers.clipShape(.rect(cornerRadius: 12)) }
+        .overlay { guides }
+        .overlay(alignment: .top) { snapBadges }
+        .overlay { drawingSurface }
+        .overlay(alignment: .bottom) { deleteTarget }
+        .coordinateSpace(.named(CanvasTransformGestureModifier.coordinateSpace))
+        .modifier(CanvasTransformGestureModifier(
+            hitTest: hitTest(at:),
+            onEngagementChanged: engagementChanged,
+            onChanged: transformChanged,
+            onEnded: transformFinished,
+            onCancelled: endTransform
         ))
     }
 
-    private func transformFinished(
-        _ translation: CGSize, _ magnification: CGFloat, _ rotationDegrees: Double
-    ) {
-        defer { gesture = TransientTransform() }
-        guard let layer = heldLayer else { return }
+    private func hitTest(at point: CGPoint) -> UUID? {
+        guard let id = CanvasHitTest.layerID(
+            at: point,
+            in: viewModel.document,
+            canvasSize: canvasSize,
+            layerSizes: layerSizes
+        ) else {
+            return nil
+        }
+        guard let layer = viewModel.document.layer(id: id),
+              EditorGesture.canHold(layer, activeTool: viewModel.activeTool)
+        else {
+            return nil
+        }
+        return id
+    }
+
+    private func transformChanged(_ update: CanvasTransformGestureModifier.Update) {
+        gesture = TransientTransform(
+            translation: update.translation,
+            magnification: update.magnification,
+            rotationDegrees: update.rotationDegrees
+        )
+        guard let layer = viewModel.document.layer(id: update.layerID) else { return }
+        snapChanged(layer.id, to: snapping(
+            for: layer,
+            translation: update.translation,
+            magnification: update.magnification,
+            rotationDegrees: update.rotationDegrees
+        ))
+    }
+
+    private func transformFinished(_ update: CanvasTransformGestureModifier.Update) {
+        defer { endTransform() }
+        guard let layer = viewModel.document.layer(id: update.layerID) else { return }
         let proposed = snapping(
             for: layer,
-            translation: translation, magnification: magnification, rotationDegrees: rotationDegrees
+            translation: update.translation,
+            magnification: update.magnification,
+            rotationDegrees: update.rotationDegrees
         ).transform
         transformEnded(layer.id, to: settled(proposed, layer: layer))
+    }
+
+    private func endTransform() {
+        gesture = TransientTransform()
     }
 
     private var backgroundTap: some Gesture {
@@ -83,7 +115,6 @@ struct EditorCanvasView: View {
                         isChallengePhoto: viewModel.challengePhotoLayerID == layer.id,
                         onSelect: { select(layer.id) },
                         onDoubleTap: { beginEditing(layer) },
-                        onPressChanged: { pressChanged(layer, isPressed: $0) },
                         onSizeChanged: { layerSizes[layer.id] = $0 },
                         onDelete: { viewModel.removeLayer(id: layer.id) }
                     )
@@ -160,11 +191,22 @@ struct EditorCanvasView: View {
         EditorHaptics.selection.play()
     }
 
+    private func engagementChanged(_ isEngaged: Bool, _ layerID: UUID?) {
+        isGestureEngaged = isEngaged
+        heldLayerID = isEngaged ? layerID : nil
+    }
+
+    private func beginBackgroundCrop() {
+        guard !isGestureEngaged else { return }
+        viewModel.beginCrop(.background)
+    }
+
     private func beginEditing(_ layer: EditorLayer) {
+        guard !isGestureEngaged else { return }
         if let draft = layer.textDraft {
             viewModel.beginEditingText(draft)
         } else if case .photo = layer.content {
-            viewModel.beginCrop(layerID: layer.id)
+            viewModel.beginCrop(.layer(layer.id))
         }
     }
 
@@ -190,18 +232,6 @@ struct EditorCanvasView: View {
         }
     }
 
-    private func pressChanged(_ layer: EditorLayer, isPressed: Bool) {
-        guard isPressed else {
-            if heldLayerID == layer.id {
-                heldLayerID = nil
-            }
-            return
-        }
-        heldLayerID = EditorGesture.hold(
-            current: heldLayerID, pressing: layer, activeTool: viewModel.activeTool
-        )
-    }
-
     private func liveTransform(for layer: EditorLayer) -> ElementTransform {
         guard layer.id == heldLayerID else { return layer.transform }
         return snapping(
@@ -225,10 +255,6 @@ struct EditorCanvasView: View {
             rotationDelta: rotationDegrees,
             canvasSize: canvasSize
         )
-    }
-
-    private var heldLayer: EditorLayer? {
-        heldLayerID.flatMap { id in viewModel.document.layers.first { $0.id == id } }
     }
 
     private func settled(_ transform: ElementTransform, layer: EditorLayer) -> ElementTransform {
@@ -259,12 +285,13 @@ struct EditorCanvasView: View {
 
 private struct CanvasFrameView: View {
     let background: CanvasBackground
+    let photo: (String) -> CGImage?
     @Binding var canvasSize: CGSize
 
     var body: some View {
         Color.clear
             .aspectRatio(StoryCanvas.aspectRatio, contentMode: .fit)
-            .background(CanvasBackgroundView(background: background))
+            .background(CanvasBackgroundView(background: background, photo: photo))
             .clipShape(.rect(cornerRadius: 12))
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size

@@ -9,6 +9,7 @@ public final class AppContainer {
     private let photoRepository: PhotoRepository
     let preferencesRepository: AccountPreferencesRepository
     private let completionPreviewRepository: CompletionPreviewRepository
+    let onboarding: OnboardingModel
     private let cameraService: CameraService
 
     public init(
@@ -18,6 +19,7 @@ public final class AppContainer {
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
+        appleAccountRepository: AppleAccountRepository = KeychainAppleAccountRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
@@ -26,6 +28,9 @@ public final class AppContainer {
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
+        onboarding = OnboardingModel(
+            preferences: preferencesRepository, accounts: appleAccountRepository
+        )
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -39,6 +44,10 @@ public final class AppContainer {
 
     public func flushDrafts() async {
         await activeChallengeRepository.flush()
+    }
+
+    public func makeOnboardingViewModel() -> OnboardingViewModel {
+        OnboardingViewModel(onboarding: onboarding)
     }
 
     public func makeChallengeViewModel() -> ChallengeViewModel {
@@ -137,10 +146,8 @@ public final class AppContainer {
             return try ModelContainer(for: SwiftDataWardrobeItemRepository.schema)
         } catch {
             Log.report(error)
-            // Last resort after the on-disk container failed: an in-memory one
-            // keeps the app usable for this session. `ModelContainer` has no
-            // non-throwing initialiser, and failing here means SwiftData itself
-            // is unusable — there is nothing left to fall back to.
+            // `ModelContainer` has no non-throwing init, and a SwiftData that
+            // cannot even build one in memory leaves nothing to fall back to.
             // swiftlint:disable:next force_try
             return try! ModelContainer(
                 for: SwiftDataWardrobeItemRepository.schema,
@@ -164,7 +171,8 @@ public final class AppContainer {
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
-            previews: completionPreviewRepository
+            previews: completionPreviewRepository,
+            onboarding: onboarding
         )
     }
 

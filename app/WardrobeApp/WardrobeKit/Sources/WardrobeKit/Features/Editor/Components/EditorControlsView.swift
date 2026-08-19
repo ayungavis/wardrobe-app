@@ -115,8 +115,6 @@ struct EditorControlsView: View {
         }
         .disabled(isSaving || didSave)
         .accessibilityLabel(Text("editor.save", bundle: .module))
-        // §19: a state may not be carried by a glyph alone, and swapping the
-        // icon for a checkmark is exactly that.
         .accessibilityValue(didSave ? Text("editor.saved", bundle: .module) : Text(verbatim: ""))
         .accessibilityIdentifier("editor.save")
     }
@@ -138,7 +136,6 @@ struct EditorControlsView: View {
             .frame(minHeight: 44)
             .background(.ultraThinMaterial, in: Capsule())
         }
-        // PRD §17: prevent duplicate export actions.
         .disabled(isExporting)
         .accessibilityLabel(Text("editor.share", bundle: .module))
         .accessibilityIdentifier("editor.share")

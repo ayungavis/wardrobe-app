@@ -2,12 +2,6 @@
     import UIKit
 #endif
 
-/// What just happened, not how it should feel.
-///
-/// Call sites name the event; this file decides the sensation. Left to each of
-/// the twenty-odd places that want feedback, "something was deleted" would feel
-/// different depending on which button you pressed.
-///
 /// ponytail: called straight through, no protocol and no injection. CLAUDE.md
 /// classes a seam outside the process as a service, and the Taptic Engine is
 /// one — but there is nothing here to assert, nothing to fake, and no failure

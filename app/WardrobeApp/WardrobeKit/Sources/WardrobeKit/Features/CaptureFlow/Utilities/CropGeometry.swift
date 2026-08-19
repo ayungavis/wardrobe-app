@@ -1,11 +1,15 @@
 import CoreGraphics
 
 enum CropGeometry {
-    static let aspectRatio: CGFloat = 3.0 / 4.0
+    static let photoAspectRatio: CGFloat = 3.0 / 4.0
 
     static let scaleRange: ClosedRange<CGFloat> = 1 ... 6
 
-    static func cropSize(fitting available: CGSize, insets: CGSize) -> CGSize {
+    static func cropSize(
+        fitting available: CGSize,
+        insets: CGSize,
+        aspectRatio: CGFloat = photoAspectRatio
+    ) -> CGSize {
         let maxWidth = max(0, available.width - insets.width)
         let maxHeight = max(0, available.height - insets.height)
 
@@ -51,6 +55,12 @@ enum CropGeometry {
         )
     }
 
+    static func offset(_ offset: CGSize, rescaledFrom old: CGFloat, to new: CGFloat) -> CGSize {
+        guard old > 0, new > 0 else { return offset }
+        let ratio = new / old
+        return CGSize(width: offset.width * ratio, height: offset.height * ratio)
+    }
+
     static func normalizedRect(
         scale: CGFloat,
         offset: CGSize,
@@ -74,6 +84,30 @@ enum CropGeometry {
             width: cropSize.width / displayed.width,
             height: cropSize.height / displayed.height
         ).standardized
+    }
+
+    struct Framing: Equatable {
+        let scale: CGFloat
+        let offset: CGSize
+    }
+
+    static func framing(for rect: CGRect, imageSize: CGSize, cropSize: CGSize) -> Framing {
+        let fill = aspectFillSize(imageSize: imageSize, cropSize: cropSize)
+        guard rect.width > 0, rect.height > 0, fill.width > 0, fill.height > 0 else {
+            return Framing(scale: 1, offset: .zero)
+        }
+
+        let scale = clampedScale(cropSize.width / rect.width / fill.width)
+        let displayed = CGSize(width: fill.width * scale, height: fill.height * scale)
+        let offset = CGSize(
+            width: (displayed.width - cropSize.width) / 2 - rect.minX * displayed.width,
+            height: (displayed.height - cropSize.height) / 2 - rect.minY * displayed.height
+        )
+
+        return Framing(
+            scale: scale,
+            offset: clampedOffset(offset, scale: scale, imageSize: imageSize, cropSize: cropSize)
+        )
     }
 
     private static func displayedSize(imageSize: CGSize, cropSize: CGSize, scale: CGFloat) -> CGSize {

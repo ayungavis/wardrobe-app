@@ -91,11 +91,6 @@ enum CanvasSnapping {
         }
     }
 
-    /// The nearest step, **unnormalised**.
-    ///
-    /// Normalising here is the prototype's bug: at 358° the nearest step is
-    /// 360, which normalised to 0 and unwound the layer a whole turn on commit.
-    /// Only the badge normalises, and only to read it out.
     static func rotationSnap(for degrees: Double) -> Double? {
         let nearest = (degrees / rotationStep).rounded() * rotationStep
         guard abs(degrees - nearest) <= rotationThresholdDegrees else { return nil }

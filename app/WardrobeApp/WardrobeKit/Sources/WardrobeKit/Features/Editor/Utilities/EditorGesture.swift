@@ -6,15 +6,6 @@ enum EditorGesture {
         return !layer.isLocked
     }
 
-    static func hold(
-        current: UUID?,
-        pressing layer: EditorLayer,
-        activeTool: EditorViewModel.Tool?
-    ) -> UUID? {
-        guard current == nil else { return current }
-        return canHold(layer, activeTool: activeTool) ? layer.id : nil
-    }
-
     static func canSelect(_ id: UUID, whileHolding held: UUID?) -> Bool {
         held == nil || held == id
     }

@@ -10,30 +10,10 @@ public struct WardrobeItemDetailView: View {
     @State private var editableName: String = ""
     @State private var editableDescription: String = ""
 
-    private let onDeleted: () -> Void
-
-    public init(viewModel: WardrobeItemDetailViewModel, onDeleted: @escaping () -> Void) {
+    public init(viewModel: WardrobeItemDetailViewModel) {
         _viewModel = State(wrappedValue: viewModel)
-        self.onDeleted = onDeleted
     }
 
-//    public var body: some View {
-//                        name: item.name,
-//                        category: item.category,
-//                        status: item.status,
-//                        wearCount: viewModel.wearCount,
-//                        firstWornAt: viewModel.firstWornAt,
-//                        lastWornAt: viewModel.lastWornAt
-//                    timeline
-//                    similar
-//                    deleteButton
-//        #if os(iOS)
-//        #endif
-//                isPresented: $isDeleteConfirmationPresented,
-//                titleVisibility: .visible
-//                    viewModel.delete()
-//                // FR-018.14: the consequence is stated before the red button,
-//                // not discovered after it.
     public var body: some View {
         ZStack {
             Image("appBG", bundle: .module)
@@ -50,7 +30,7 @@ public struct WardrobeItemDetailView: View {
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.xl)
 
-                        Text("wardrobe.wearCount \(viewModel.wearCount)", bundle: .module)
+                        Text("wardrobe.wearCount.used \(viewModel.wearCount)", bundle: .module)
                             .font(AppFont.title)
                             .fontWeight(.black)
                             .stroke(color: .white, width: 3)
@@ -123,7 +103,6 @@ public struct WardrobeItemDetailView: View {
         }
         .onChange(of: viewModel.isDeleted) { _, deleted in
             if deleted {
-                onDeleted()
                 dismiss()
             }
         }
@@ -279,8 +258,6 @@ private struct SimilarItemCellView: View {
             .background(AppColor.surface)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            // The confidence word, not the raw score: PRD §16 keeps the model's
-            // number internal.
             Text(entry.match.confidence.title, bundle: .module)
                 .font(AppFont.caption)
                 .foregroundStyle(AppColor.textSecondary)

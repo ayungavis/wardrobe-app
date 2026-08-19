@@ -1,18 +1,6 @@
 import CoreGraphics
 import Foundation
 
-// The flat, pre-canvas edit shape. **Read forever, written never.**
-//
-// Nothing in the app produces these any more — `EditorDocument` replaced them
-// in S2. They survive because challenges and completions written before that
-// are still sitting on people's phones, and `ActiveChallenge.init(from:)` and
-// `CompletedChallenge.init(from:)` decode the old `draft` key into them so
-// that work keeps opening. Deleting them would delete that work.
-//
-// They live in their own file so the split is visible: everything here is a
-// read path, and everything that used to sit alongside them — `CropSpec` and
-// the text style palette — is live and moved out.
-
 public struct EditDraft: Codable, Equatable, Sendable {
     public var crop: CropSpec?
     public var texts: [TextItem]

@@ -29,8 +29,6 @@ struct HistoryPolaroidCardView: View {
                 Color(red: 1, green: 1, blue: 1),
                 in: .rect(cornerRadius: inset * 1.5)
             )
-            // One shadow for the whole card rather than one per element —
-            // without this the preview and the date each grow their own.
             .compositingGroup()
             .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 4)
         }

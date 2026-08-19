@@ -109,4 +109,25 @@ struct WardrobeItemRepositoryTests {
         #expect(try sut.fingerprints().isEmpty)
         #expect(try sut.wears(for: item.id).count == 1)
     }
+
+    /// Screens reach storage through their own repository handle. A write made
+    /// on one must be visible to the next read on another, or a rename made in
+    /// the detail screen never reaches the wardrobe list.
+    @Test func aWriteOnOneHandleIsVisibleToAnother() throws {
+        let container = try ModelContainer(
+            for: SwiftDataWardrobeItemRepository.schema,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let writer = SwiftDataWardrobeItemRepository(container: container)
+        let reader = SwiftDataWardrobeItemRepository(container: container)
+        let item = makeItem()
+        try writer.insert(item, fingerprint: nil, wear: WearRecord(itemID: item.id, wornAt: Date()))
+        _ = try reader.items()
+
+        var renamed = item
+        renamed.name = "sleeve"
+        try writer.update(renamed)
+
+        #expect(try reader.items().first?.name == "sleeve")
+    }
 }

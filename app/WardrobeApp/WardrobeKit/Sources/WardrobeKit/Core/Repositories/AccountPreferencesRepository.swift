@@ -9,7 +9,6 @@ public protocol AccountPreferencesRepository: Sendable {
 // clause waits for the account-preferences table, which `docs/backend-schema.md`
 // has decided the shape of but not built.
 public final class UserDefaultsAccountPreferencesRepository: AccountPreferencesRepository, @unchecked Sendable {
-    // @unchecked: UserDefaults is documented thread-safe.
     private let defaults: UserDefaults
     private static let key = "accountPreferences"
     private static let legacyOnboardingKey = "hasCompletedOnboarding"

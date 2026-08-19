@@ -90,6 +90,7 @@ public struct CaptureFlowView: View {
         if let photoID = viewModel.challenge.photoID {
             CropView(
                 viewModel: makeCropViewModel(photoID),
+                aspectRatio: CropGeometry.photoAspectRatio,
                 onExit: { viewModel.discardPhoto() },
                 onUseCrop: { viewModel.useCrop($0) }
             )

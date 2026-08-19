@@ -36,7 +36,6 @@ struct PolaroidPhotoView: View {
                 photoWell(size: photoSize)
                     .padding(.top, border)
             }
-            // One shadow for the whole card rather than one per element.
             .compositingGroup()
             .shadow(color: .black.opacity(0.28), radius: width * 0.015, x: 0, y: width * 0.02)
     }
@@ -50,8 +49,6 @@ struct PolaroidPhotoView: View {
                 .frame(width: size.width, height: size.height)
                 .clipped()
         } else {
-            // FR-092: a photo that cannot be read leaves the layer in place
-            // rather than blocking export or completion.
             Rectangle()
                 .fill(Color(red: 0.92, green: 0.92, blue: 0.92))
                 .frame(width: size.width, height: size.height)

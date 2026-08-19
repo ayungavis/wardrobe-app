@@ -31,8 +31,6 @@ public final class CropViewModel {
                     return ImageDecoding.downsampledImage(from: data, maxPixel: Self.maxPreviewPixel)
                 }.value
                 try Task.checkCancellation()
-                // A photo that will not decode cannot be framed. FR-083 wants
-                // that said plainly, with retake still on offer.
                 image = decoded.map(Loadable.loaded) ?? .failed(.photoImportFailed)
             } catch is CancellationError {
             } catch {

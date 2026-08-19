@@ -2,21 +2,46 @@ import CoreGraphics
 import SwiftUI
 
 struct CanvasTransformGestureModifier: ViewModifier {
-    let onChanged: (CGSize, CGFloat, Double) -> Void
-    let onEnded: (CGSize, CGFloat, Double) -> Void
+    static let coordinateSpace = "editorCanvas"
+
+    struct Update {
+        let layerID: UUID
+        let translation: CGSize
+        let magnification: CGFloat
+        let rotationDegrees: Double
+    }
+
+    let hitTest: (CGPoint) -> UUID?
+    let onEngagementChanged: (Bool, UUID?) -> Void
+    let onChanged: (Update) -> Void
+    let onEnded: (Update) -> Void
     let onCancelled: () -> Void
 
     func body(content: Content) -> some View {
         #if os(iOS)
             content.gesture(CanvasTransformGesture(
-                onChanged: { onChanged($0.translation, $0.magnification, $0.rotationDegrees) },
-                onEnded: { onEnded($0.translation, $0.magnification, $0.rotationDegrees) },
+                hitTest: hitTest,
+                onEngagementChanged: onEngagementChanged,
+                onChanged: { report($0).map(onChanged) },
+                onEnded: { report($0).map(onEnded) },
                 onCancelled: onCancelled
             ))
         #else
             content
         #endif
     }
+
+    #if os(iOS)
+        private func report(_ recognizer: CanvasTransformRecognizer) -> Update? {
+            guard let layerID = recognizer.heldLayerID else { return nil }
+            return Update(
+                layerID: layerID,
+                translation: recognizer.translation,
+                magnification: recognizer.magnification,
+                rotationDegrees: recognizer.rotationDegrees
+            )
+        }
+    #endif
 }
 
 #if os(iOS)
@@ -25,8 +50,18 @@ struct CanvasTransformGestureModifier: ViewModifier {
     final class CanvasTransformRecognizer: UIGestureRecognizer {
         private static let minimumTranslation: CGFloat = 6
 
+        var hitTest: (CGPoint) -> UUID? = { _ in nil }
+        var onEngagementChanged: (Bool, UUID?) -> Void = { _, _ in }
+        private(set) var heldLayerID: UUID?
+
+        private var isEngaged = false {
+            didSet {
+                guard isEngaged != oldValue else { return }
+                onEngagementChanged(isEngaged, heldLayerID)
+            }
+        }
+
         private var tracker = CanvasTouchTracker()
-        /// Ordered, not a `Set`: reordering would flip the measured angle by 180°.
         private var tracked: [UITouch] = []
 
         var translation: CGSize {
@@ -48,8 +83,10 @@ struct CanvasTransformGestureModifier: ViewModifier {
                 tracked.append(touch)
             }
             if isFirst {
+                heldLayerID = touches.first.map { hitTest($0.location(in: nil)) } ?? nil
                 tracker.begin(points())
             } else {
+                isEngaged = true
                 tracker.update(points())
                 advance()
             }
@@ -75,6 +112,8 @@ struct CanvasTransformGestureModifier: ViewModifier {
             super.reset()
             tracker = CanvasTouchTracker()
             tracked = []
+            isEngaged = false
+            heldLayerID = nil
         }
 
         private func finish(_ touches: Set<UITouch>, endState: UIGestureRecognizer.State) {
@@ -90,6 +129,7 @@ struct CanvasTransformGestureModifier: ViewModifier {
         private func advance() {
             guard state != .possible else {
                 if hasMovedEnough {
+                    isEngaged = true
                     state = .began
                 }
                 return
@@ -109,6 +149,8 @@ struct CanvasTransformGestureModifier: ViewModifier {
     }
 
     struct CanvasTransformGesture: UIGestureRecognizerRepresentable {
+        let hitTest: (CGPoint) -> UUID?
+        let onEngagementChanged: (Bool, UUID?) -> Void
         let onChanged: (CanvasTransformRecognizer) -> Void
         let onEnded: (CanvasTransformRecognizer) -> Void
         let onCancelled: () -> Void
@@ -118,10 +160,28 @@ struct CanvasTransformGestureModifier: ViewModifier {
             recognizer.cancelsTouchesInView = false
             recognizer.delaysTouchesBegan = false
             recognizer.delegate = context.coordinator
+            recognizer.onEngagementChanged = onEngagementChanged
+            install(hitTest, on: recognizer, converter: context.converter)
             return recognizer
         }
 
-        func updateUIGestureRecognizer(_: CanvasTransformRecognizer, context _: Context) {}
+        func updateUIGestureRecognizer(_ recognizer: CanvasTransformRecognizer, context: Context) {
+            recognizer.onEngagementChanged = onEngagementChanged
+            install(hitTest, on: recognizer, converter: context.converter)
+        }
+
+        private func install(
+            _ hitTest: @escaping (CGPoint) -> UUID?,
+            on recognizer: CanvasTransformRecognizer,
+            converter: CoordinateSpaceConverter
+        ) {
+            recognizer.hitTest = { windowPoint in
+                hitTest(converter.convert(
+                    globalPoint: windowPoint,
+                    to: .named(CanvasTransformGestureModifier.coordinateSpace)
+                ))
+            }
+        }
 
         func handleUIGestureRecognizerAction(_ recognizer: CanvasTransformRecognizer, context _: Context) {
             switch recognizer.state {

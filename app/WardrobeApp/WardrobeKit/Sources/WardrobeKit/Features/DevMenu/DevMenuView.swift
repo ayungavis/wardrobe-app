@@ -9,6 +9,7 @@ struct DevMenuView: View {
     @State private var isResetConfirmationPresented = false
     @State private var isHistoryResetConfirmationPresented = false
     @State private var isWardrobeResetConfirmationPresented = false
+    @State private var isOnboardingResetConfirmationPresented = false
     @State private var isBulkScanPresented = false
     @State private var isBenchmarkPresented = false
     private let onStateChanged: () -> Void
@@ -36,6 +37,9 @@ struct DevMenuView: View {
                 }
                 DevHistorySection {
                     isHistoryResetConfirmationPresented = true
+                }
+                DevOnboardingSection {
+                    isOnboardingResetConfirmationPresented = true
                 }
                 DevWardrobeSection(
                     onScan: { isBulkScanPresented = true },
@@ -107,9 +111,27 @@ struct DevMenuView: View {
                 } message: {
                     Text(verbatim: "Deletes every wardrobe item, its wear history, and its cut-out image.")
                 }
+                .confirmationDialog(
+                    Text(verbatim: "Reset onboarding?"),
+                    isPresented: $isOnboardingResetConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button(role: .destructive) {
+                        dismiss()
+                        viewModel.resetOnboarding()
+                    } label: {
+                        Text(verbatim: "Reset")
+                    }
+                    Button(role: .cancel) {} label: {
+                        Text("common.cancel", bundle: .module)
+                    }
+                } message: {
+                    Text(verbatim: "Signs out of Apple and reopens onboarding right away. "
+                        + "Challenges and the wardrobe are left alone.")
+                }
         }
         .sheet(isPresented: $isBulkScanPresented, onDismiss: onStateChanged) {
-            BulkScanView(review: makeReview())
+            AddByPhotosView(review: makeReview())
         }
         .sheet(isPresented: $isBenchmarkPresented) {
             MatchBenchmarkView(viewModel: makeBenchmark())
@@ -148,6 +170,16 @@ private struct DevStateSection: View {
                 Text(verbatim: "\(summary.fingerprintCount)")
             } label: {
                 Text(verbatim: "Fingerprints")
+            }
+            LabeledContent {
+                Text(verbatim: summary.hasCompletedOnboarding ? "done" : "pending")
+            } label: {
+                Text(verbatim: "Onboarding")
+            }
+            LabeledContent {
+                Text(verbatim: summary.isSignedIn ? "yes" : "no")
+            } label: {
+                Text(verbatim: "Signed in with Apple")
             }
         } header: {
             Text(verbatim: "State")
@@ -190,6 +222,23 @@ private struct DevHistorySection: View {
         } footer: {
             Text(verbatim: "Clears every completed challenge, not just today's. "
                 + "Wear counts survive; use Reset wardrobe.")
+        }
+    }
+}
+
+private struct DevOnboardingSection: View {
+    let onReset: () -> Void
+
+    var body: some View {
+        Section {
+            Button(role: .destructive, action: onReset) {
+                Text(verbatim: "Reset onboarding")
+            }
+        } header: {
+            Text(verbatim: "Onboarding")
+        } footer: {
+            Text(verbatim: "Clears the Apple account from the keychain and sends you "
+                + "back to step 1 without a restart.")
         }
     }
 }

@@ -2,7 +2,7 @@ import DesignSystem
 import PhotosUI
 import SwiftUI
 
-struct BulkScanView: View {
+struct AddByPhotosView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var review: GarmentReviewModel
     @State private var selectedPhotos: [PhotosPickerItem] = []
@@ -16,20 +16,11 @@ struct BulkScanView: View {
             List {
                 Section {
                     picker
-                } footer: {
-                    Text(verbatim: "Scans photos into the wardrobe without completing a challenge.")
                 }
 
-                ForEach(review.garments) { garment in
-                    ScannedGarmentRowView(
-                        garment: garment,
-                        scannedImage: review.thumbnailData(forFile: garment.cutoutFile),
-                        candidateImage: { review.thumbnailData(forItemID: $0) },
-                        onChoose: { review.choose($0, for: garment.id) }
-                    )
-                }
+                GarmentReviewListView(review: review)
             }
-            .navigationTitle(Text(verbatim: "Bulk scan"))
+            .navigationTitle(Text("wardrobe.add.photos.title", bundle: .module))
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
             #endif

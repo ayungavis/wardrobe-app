@@ -66,27 +66,19 @@ public final class CaptureFlowViewModel {
             thumbnails: thumbnails
         )
         stage = Self.initialStage(challenge: challenge, permission: camera.permission)
-        // Landing straight in the editor can only mean the challenge came off disk
-        // with the crop committed, which is exactly what §17 wants stated — so no
-        // extra flag is persisted to repeat what the stage already says.
         didResumeDraft = stage == .editor
         syncCameraState()
     }
 
     static func initialStage(challenge: ActiveChallenge, permission: CameraPermission) -> CaptureStage {
-        // Resume where the photo actually is (FR-017): the crop in the draft is
-        // what says the step is done, so no extra flag is persisted.
         if let photoID = challenge.photoID {
-            // The *challenge* photo's crop, not any photo's: a second photo
-            // added in the editor must not send the flow back to the crop step
-            // (FR-093).
             let layerID = challenge.document.photoLayerID(showing: photoID)
             let crop = layerID.flatMap { challenge.document.crop(ofLayer: $0) }
             return crop == nil ? .crop : .editor
         }
         switch permission {
         case .granted: return .camera
-        case .notDetermined: return .consent // FR-013: explain before the system prompt
+        case .notDetermined: return .consent
         case .denied, .restricted: return .denied
         }
     }
@@ -134,9 +126,9 @@ public final class CaptureFlowViewModel {
             do {
                 try await camera.toggleCamera()
             } catch {
-                Log.report(error, logger: Log.ui) // non-fatal: stay on the current camera
+                Log.report(error, logger: Log.ui)
             }
-            syncCameraState() // lens list and zoom differ per camera
+            syncCameraState()
         }
     }
 
@@ -168,7 +160,7 @@ public final class CaptureFlowViewModel {
             } catch is CancellationError {
             } catch {
                 Log.report(error, logger: Log.ui)
-                alertError = .captureFailed // stay in .camera; no photo record
+                alertError = .captureFailed
             }
         }
     }
@@ -221,7 +213,6 @@ public final class CaptureFlowViewModel {
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
 
     public func discardPhoto() {
-        // Every photo the canvas holds, not just the capture (FR-093).
         photoRepository.deleteOriginals(of: challenge.document, and: challenge.photoID)
         challenge.photoID = nil
         challenge.document = EditorDocument(layers: [])

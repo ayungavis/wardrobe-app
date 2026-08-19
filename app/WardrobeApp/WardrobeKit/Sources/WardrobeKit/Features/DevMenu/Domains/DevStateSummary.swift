@@ -7,4 +7,6 @@ public struct DevStateSummary: Equatable, Sendable {
     public var activeHasPhoto = false
     public var wardrobeItemCount = 0
     public var fingerprintCount = 0
+    public var hasCompletedOnboarding = false
+    public var isSignedIn = false
 }

@@ -105,4 +105,23 @@ struct ExportServiceTests {
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)
         #expect(props[kCGImagePropertyGPSDictionary] == nil)
     }
+
+    /// The background is not a layer, so the export has to reach for it
+    /// separately — otherwise the shared file loses what the canvas showed.
+    @Test func exportRendersAPhotoBackground() async throws {
+        let background = try SampleCameraService.makeSampleJPEG(width: 200, height: 400)
+        let original = try SampleCameraService.makeSampleJPEG(width: 200, height: 200)
+        var document = EditorDocument.fixture()
+        document.background = .photo(
+            id: "bg-1", crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.5))
+        )
+
+        let exported = try await ExportService.render(
+            originals: ["photo-1": original, "bg-1": background], document: document
+        )
+        let props = try properties(of: exported)
+
+        #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)
+        #expect(props[kCGImagePropertyGPSDictionary] == nil)
+    }
 }

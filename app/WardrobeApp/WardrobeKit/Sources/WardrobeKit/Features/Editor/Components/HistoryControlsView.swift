@@ -52,8 +52,6 @@ struct HistoryControlsView: View {
                 .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
-        // FR-088: with no step left the control is disabled rather than a
-        // press that quietly does nothing.
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.36)
         .accessibilityLabel(Text(label, bundle: .module))

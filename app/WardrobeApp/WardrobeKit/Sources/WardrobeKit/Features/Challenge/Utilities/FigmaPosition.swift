@@ -1,11 +1,11 @@
 import Foundation
 
 struct FigmaPosition {
-    let x: CGFloat // fraction 0-1, relative to its container
+    let x: CGFloat
     let y: CGFloat
     let widthFraction: CGFloat
     let heightFraction: CGFloat
-    let rotation: Double // degrees, 0 if none
+    let rotation: Double
 
     init(
         figmaX: CGFloat,

@@ -2,15 +2,10 @@ import DesignSystem
 import SwiftUI
 
 public struct RootView: View {
-    @State private var hasCompletedOnboarding: Bool
-
     private let container: AppContainer
 
     public init(container: AppContainer) {
         self.container = container
-        _hasCompletedOnboarding = State(
-            initialValue: container.preferencesRepository.load().hasCompletedOnboarding
-        )
     }
 
     public var body: some View {
@@ -19,14 +14,13 @@ public struct RootView: View {
                 .resizable()
                 .ignoresSafeArea()
 
-            if hasCompletedOnboarding {
+            if container.onboarding.isCompleted {
                 tabs
             } else {
-                WelcomeView {
-                    completeOnboarding()
-                }
+                OnboardingView(viewModel: container.makeOnboardingViewModel())
             }
         }
+        .preferredColorScheme(.light)
     }
 
     private var tabs: some View {
@@ -65,15 +59,6 @@ public struct RootView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         #endif
         .background(.clear)
-    }
-}
-
-private extension RootView {
-    func completeOnboarding() {
-        var preferences = container.preferencesRepository.load()
-        preferences.hasCompletedOnboarding = true
-        container.preferencesRepository.save(preferences)
-        hasCompletedOnboarding = true
     }
 }
 

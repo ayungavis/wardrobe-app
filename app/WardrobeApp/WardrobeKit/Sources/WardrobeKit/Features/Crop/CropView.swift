@@ -9,23 +9,30 @@ public struct CropView: View {
 
     @State private var viewModel: CropViewModel
     private let exit: Exit
+    private let initialCrop: CropSpec?
+    private let aspectRatio: CGFloat
     private let onExit: () -> Void
     private let onUseCrop: (CropSpec) -> Void
 
     public init(
         viewModel: CropViewModel,
         exit: Exit = .retake,
+        initialCrop: CropSpec? = nil,
+        aspectRatio: CGFloat,
         onExit: @escaping () -> Void,
         onUseCrop: @escaping (CropSpec) -> Void
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.exit = exit
+        self.initialCrop = initialCrop
+        self.aspectRatio = aspectRatio
         self.onExit = onExit
         self.onUseCrop = onUseCrop
     }
 
     @State private var scale: CGFloat = 1
     @State private var offset: CGSize = .zero
+    @State private var hasRestoredCrop = false
     @GestureState private var gesture = TransientGesture()
 
     private static let zoomStep: CGFloat = 0.5
@@ -52,17 +59,52 @@ public struct CropView: View {
         let imageSize = CGSize(width: image.width, height: image.height)
 
         return GeometryReader { proxy in
-            let cropSize = CropGeometry.cropSize(fitting: proxy.size, insets: Self.canvasInsets)
+            let cropSize = CropGeometry.cropSize(
+                fitting: proxy.size, insets: Self.canvasInsets, aspectRatio: aspectRatio
+            )
 
             VStack(spacing: 0) {
                 topBar
                 Spacer(minLength: Spacing.lg)
                 canvas(image: image, imageSize: imageSize, cropSize: cropSize)
-                hint
+                hint(imageSize: imageSize, cropSize: cropSize)
                 Spacer(minLength: Spacing.xl)
                 useCropButton(imageSize: imageSize, cropSize: cropSize)
             }
+            .task(id: cropSize) {
+                restoreCrop(imageSize: imageSize, cropSize: cropSize)
+            }
         }
+    }
+
+    private func rescale(
+        to newScale: CGFloat,
+        by translation: CGSize = .zero,
+        imageSize: CGSize,
+        cropSize: CGSize
+    ) {
+        let anchored = CropGeometry.offset(offset, rescaledFrom: scale, to: newScale)
+        offset = CropGeometry.clampedOffset(
+            CGSize(
+                width: anchored.width + translation.width,
+                height: anchored.height + translation.height
+            ),
+            scale: newScale,
+            imageSize: imageSize,
+            cropSize: cropSize
+        )
+        scale = newScale
+    }
+
+    private func restoreCrop(imageSize: CGSize, cropSize: CGSize) {
+        guard !hasRestoredCrop, let initialCrop, cropSize.width > 0 else { return }
+        hasRestoredCrop = true
+
+        let framing = CropGeometry.framing(
+            for: initialCrop.rect, imageSize: imageSize, cropSize: cropSize
+        )
+        scale = framing.scale
+        offset = framing.offset
     }
 
     private func failed(_ error: AppError) -> some View {
@@ -113,38 +155,38 @@ public struct CropView: View {
         .padding(.horizontal, Spacing.lg)
     }
 
-    private var hint: some View {
+    private func hint(imageSize: CGSize, cropSize: CGSize) -> some View {
         HStack(spacing: Spacing.lg) {
-            zoomButton(
-                systemImage: "minus.magnifyingglass",
-                by: -Self.zoomStep,
-                label: "crop.zoomOut",
-                identifier: "crop.zoomOut"
-            )
+            zoomButton(systemImage: "minus.magnifyingglass", label: "crop.zoomOut", identifier: "crop.zoomOut") {
+                zoom(by: -Self.zoomStep, imageSize: imageSize, cropSize: cropSize)
+            }
             Text("crop.hint", bundle: .module)
                 .font(AppFont.caption)
                 .foregroundStyle(AppColor.onMedia.opacity(0.7))
-            zoomButton(
-                systemImage: "plus.magnifyingglass",
-                by: Self.zoomStep,
-                label: "crop.zoomIn",
-                identifier: "crop.zoomIn"
-            )
+            zoomButton(systemImage: "plus.magnifyingglass", label: "crop.zoomIn", identifier: "crop.zoomIn") {
+                zoom(by: Self.zoomStep, imageSize: imageSize, cropSize: cropSize)
+            }
         }
         .padding(.top, Spacing.lg)
     }
 
+    private func zoom(by delta: CGFloat, imageSize: CGSize, cropSize: CGSize) {
+        withAnimation(.snappy) {
+            rescale(
+                to: CropGeometry.clampedScale(scale + delta),
+                imageSize: imageSize,
+                cropSize: cropSize
+            )
+        }
+    }
+
     private func zoomButton(
         systemImage: String,
-        by delta: CGFloat,
         label: LocalizedStringKey,
-        identifier: String
+        identifier: String,
+        action: @escaping () -> Void
     ) -> some View {
-        Button {
-            withAnimation(.snappy) {
-                scale = CropGeometry.clampedScale(scale + delta)
-            }
-        } label: {
+        Button(action: action) {
             Image(systemName: systemImage)
                 .frame(minWidth: 44, minHeight: 44)
         }
@@ -183,10 +225,11 @@ public struct CropView: View {
 
     private func canvas(image: CGImage, imageSize: CGSize, cropSize: CGSize) -> some View {
         let liveScale = CropGeometry.clampedScale(scale * gesture.magnification)
+        let anchored = CropGeometry.offset(offset, rescaledFrom: scale, to: liveScale)
         let liveOffset = CropGeometry.clampedOffset(
             CGSize(
-                width: offset.width + gesture.translation.width,
-                height: offset.height + gesture.translation.height
+                width: anchored.width + gesture.translation.width,
+                height: anchored.height + gesture.translation.height
             ),
             scale: liveScale,
             imageSize: imageSize,
@@ -225,16 +268,7 @@ public struct CropView: View {
             .onEnded { value in
                 let newScale = CropGeometry.clampedScale(scale * (value.first?.magnification ?? 1))
                 let translation = value.second?.translation ?? .zero
-                scale = newScale
-                offset = CropGeometry.clampedOffset(
-                    CGSize(
-                        width: offset.width + translation.width,
-                        height: offset.height + translation.height
-                    ),
-                    scale: newScale,
-                    imageSize: imageSize,
-                    cropSize: cropSize
-                )
+                rescale(to: newScale, by: translation, imageSize: imageSize, cropSize: cropSize)
             }
     }
 }

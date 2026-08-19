@@ -289,7 +289,7 @@ extension EditorDocument {
         crop: CropSpec? = nil,
         texts: [TextItem] = [],
         stickers: [StickerItem] = [],
-        background: CanvasBackground = .white
+        background: CanvasBackground = .default
     ) -> EditorDocument {
         var document = EditorDocument(
             migrating: EditDraft(crop: crop, texts: texts, stickers: stickers),
@@ -364,5 +364,26 @@ final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, 
 
     func save(_ preferences: AccountPreferences) {
         stored = preferences
+    }
+}
+
+final class InMemoryAppleAccountRepository: AppleAccountRepository, @unchecked Sendable {
+    // @unchecked: tests drive it from one actor at a time.
+    var stored: AppleAccount?
+    var saveError: AppError?
+
+    func load() -> AppleAccount? {
+        stored
+    }
+
+    func save(_ account: AppleAccount) throws {
+        if let saveError {
+            throw saveError
+        }
+        stored = stored.map { $0.merged(with: account) } ?? account
+    }
+
+    func clear() throws {
+        stored = nil
     }
 }

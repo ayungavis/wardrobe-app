@@ -45,7 +45,7 @@ public final class GarmentReviewModel {
         isScanning = true
 
         scanTask = Task {
-            await previous?.value // keep a batch's results in order
+            await previous?.value
             defer { isScanning = false }
             do {
                 let photo = try load()
@@ -56,7 +56,7 @@ public final class GarmentReviewModel {
                     "Garment scan finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
                 )
             } catch {
-                Log.report(error) // a failed scan must never block the caller
+                Log.report(error)
             }
         }
     }
@@ -134,8 +134,6 @@ public final class GarmentReviewModel {
         completionID: UUID?,
         at date: Date
     ) throws {
-        // Re-filed under the item it belongs to: one fingerprint per confirmed
-        // wear is what makes the next match stronger (§4).
         try wardrobeRepository.recordWear(
             WearRecord(itemID: itemID, completionID: completionID, wornAt: date),
             fingerprint: ItemFingerprint(

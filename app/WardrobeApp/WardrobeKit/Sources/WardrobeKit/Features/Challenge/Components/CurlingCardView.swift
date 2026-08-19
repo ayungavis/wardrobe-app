@@ -4,10 +4,10 @@ struct CurlingCardView<Content: View>: View {
     let content: Content
     var onCurledAway: (() -> Void)?
 
-    @State private var dragProgress: CGFloat = 0 // 0 = flat, 1 = fully curled away
+    @State private var dragProgress: CGFloat = 0
     @State private var isAnimatingAway = false
 
-    private let sliceCount = 24 // more slices = smoother curl, more render cost
+    private let sliceCount = 24
 
     init(onCurledAway: (() -> Void)? = nil, @ViewBuilder content: () -> Content) {
         self.onCurledAway = onCurledAway
@@ -69,7 +69,7 @@ struct CurlingCardView<Content: View>: View {
     }
 
     private func localProgress(forSlice slice: Int) -> CGFloat {
-        let sliceFraction = CGFloat(slice) / CGFloat(sliceCount) // 0 (top) to 1 (bottom)
+        let sliceFraction = CGFloat(slice) / CGFloat(sliceCount)
         let adjusted = (dragProgress - sliceFraction * 0.6) / 0.4
         return min(max(adjusted, 0), 1)
     }
@@ -80,7 +80,7 @@ struct CurlingCardView<Content: View>: View {
 
     private func curlOffset(forSlice slice: Int, sliceHeight: CGFloat) -> CGFloat {
         let progress = localProgress(forSlice: slice)
-        return -progress * sliceHeight * 0.5 // slight lift as it curls
+        return -progress * sliceHeight * 0.5
     }
 
     private func curlOpacity(forSlice slice: Int) -> Double {

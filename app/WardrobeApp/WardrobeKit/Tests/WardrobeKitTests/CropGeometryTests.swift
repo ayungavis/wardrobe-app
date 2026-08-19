@@ -116,7 +116,7 @@ struct CropGeometryTests {
         )
 
         let pixels = CGSize(width: rect.width * wide.width, height: rect.height * wide.height)
-        #expect(abs(pixels.width / pixels.height - CropGeometry.aspectRatio) < 0.01)
+        #expect(abs(pixels.width / pixels.height - CropGeometry.photoAspectRatio) < 0.01)
     }
 
     @Test func zoomingInSelectsLessOfThePhoto() {
@@ -138,7 +138,7 @@ struct CropGeometryTests {
             fitting: CGSize(width: 390, height: 844), insets: CGSize(width: 32, height: 220)
         )
 
-        #expect(abs(size.width / size.height - CropGeometry.aspectRatio) < 0.001)
+        #expect(abs(size.width / size.height - CropGeometry.photoAspectRatio) < 0.001)
         #expect(size.width <= 390 - 32 + 0.001)
         #expect(size.height <= 844 - 220 + 0.001)
     }
@@ -151,5 +151,160 @@ struct CropGeometryTests {
 
         #expect(abs(size.height - 180) < 0.001)
         #expect(abs(size.width - 135) < 0.001)
+    }
+
+    // MARK: Reopening a stored crop
+
+    private let image = CGSize(width: 1200, height: 1600)
+    private let crop = CGSize(width: 300, height: 400)
+
+    private func roundTrip(_ rect: CGRect) -> CGRect {
+        let framing = CropGeometry.framing(for: rect, imageSize: image, cropSize: crop)
+        return CropGeometry.normalizedRect(
+            scale: framing.scale, offset: framing.offset, imageSize: image, cropSize: crop
+        )
+    }
+
+    /// The real test: it ties the two directions to each other, so neither can
+    /// drift without the other noticing.
+    @Test(arguments: [
+        CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5),
+        CGRect(x: 0, y: 0, width: 0.4, height: 0.4),
+        CGRect(x: 0.6, y: 0.55, width: 0.4, height: 0.4),
+        CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2),
+    ])
+    func aStoredCropSurvivesARoundTrip(rect: CGRect) {
+        let restored = roundTrip(rect)
+
+        #expect(abs(restored.minX - rect.minX) < 0.0001)
+        #expect(abs(restored.minY - rect.minY) < 0.0001)
+        #expect(abs(restored.width - rect.width) < 0.0001)
+        #expect(abs(restored.height - rect.height) < 0.0001)
+    }
+
+    /// The whole image is exactly the state the screen opens in today.
+    @Test func theWholeImageIsScaleOneAndNoOffset() {
+        let framing = CropGeometry.framing(
+            for: CGRect(x: 0, y: 0, width: 1, height: 1), imageSize: image, cropSize: crop
+        )
+
+        #expect(framing.scale == 1)
+        #expect(framing.offset == .zero)
+    }
+
+    /// A crop tighter than the zoom ceiling comes back clamped rather than
+    /// reopening at a zoom the user could never have reached.
+    @Test func aCropBeyondTheZoomCeilingIsClamped() {
+        let framing = CropGeometry.framing(
+            for: CGRect(x: 0.45, y: 0.45, width: 0.02, height: 0.02),
+            imageSize: image, cropSize: crop
+        )
+
+        #expect(framing.scale == CropGeometry.scaleRange.upperBound)
+    }
+
+    @Test func adegenerateRectDoesNotProduceInfinities() {
+        let empty = CropGeometry.framing(for: .zero, imageSize: image, cropSize: crop)
+        #expect(empty.scale == 1)
+        #expect(empty.offset == .zero)
+
+        let noImage = CropGeometry.framing(
+            for: CGRect(x: 0, y: 0, width: 1, height: 1), imageSize: .zero, cropSize: crop
+        )
+        #expect(noImage.scale.isFinite)
+        #expect(noImage.offset.width.isFinite)
+    }
+
+    /// The background fills the story canvas, so its frame has to be the story
+    /// canvas's shape — the same code path, a different argument.
+    @Test func theCropBoxFollowsTheAspectItIsGiven() {
+        let size = CropGeometry.cropSize(
+            fitting: CGSize(width: 390, height: 844),
+            insets: CGSize(width: 32, height: 220),
+            aspectRatio: StoryCanvas.aspectRatio
+        )
+
+        #expect(abs(size.width / size.height - StoryCanvas.aspectRatio) < 0.001)
+        #expect(size.width <= 390 - 32 + 0.001)
+        #expect(size.height <= 844 - 220 + 0.001)
+    }
+
+    /// Restoring a stored crop goes through the same formulas, so no assumption
+    /// about 3:4 may be left in them.
+    @Test(arguments: [
+        CGRect(x: 0.25, y: 0.2, width: 0.5, height: 0.6),
+        CGRect(x: 0, y: 0, width: 0.35, height: 0.45),
+        CGRect(x: 0.55, y: 0.4, width: 0.45, height: 0.55),
+    ])
+    func aStoredBackgroundCropSurvivesARoundTrip(rect: CGRect) {
+        let storyCrop = CropGeometry.cropSize(
+            fitting: CGSize(width: 390, height: 844),
+            insets: CGSize(width: 32, height: 220),
+            aspectRatio: StoryCanvas.aspectRatio
+        )
+        let framing = CropGeometry.framing(for: rect, imageSize: image, cropSize: storyCrop)
+        let restored = CropGeometry.normalizedRect(
+            scale: framing.scale, offset: framing.offset, imageSize: image, cropSize: storyCrop
+        )
+
+        #expect(abs(restored.minX - rect.minX) < 0.0001)
+        #expect(abs(restored.minY - rect.minY) < 0.0001)
+        #expect(abs(restored.width - rect.width) < 0.0001)
+    }
+
+    // MARK: Zooming about the centre
+
+    private func centre(scale: CGFloat, offset: CGSize) -> CGPoint {
+        let rect = CropGeometry.normalizedRect(
+            scale: scale, offset: offset, imageSize: image, cropSize: crop
+        )
+        return CGPoint(x: rect.midX, y: rect.midY)
+    }
+
+    /// What "zoom about the centre" means, said through the function that
+    /// actually stores the crop: whatever sits in the middle of the box stays
+    /// in the middle, whichever way the scale moves.
+    @Test(arguments: [CGFloat(1.5), 2, 4.5, 6])
+    func zoomKeepsTheCentredPointCentred(target: CGFloat) {
+        let from: CGFloat = 3
+        let offset = CGSize(width: 24, height: -18)
+
+        let after = centre(
+            scale: target,
+            offset: CropGeometry.offset(offset, rescaledFrom: from, to: target)
+        )
+        let before = centre(scale: from, offset: offset)
+
+        #expect(abs(after.x - before.x) < 0.0001)
+        #expect(abs(after.y - before.y) < 0.0001)
+    }
+
+    /// The glitch itself: leave the offset alone while the scale changes and the
+    /// picture slides out from under the middle of the box.
+    @Test func keepingTheOffsetWhileZoomingMovesTheCentre() {
+        let offset = CGSize(width: 24, height: -18)
+
+        let before = centre(scale: 2, offset: offset)
+        let after = centre(scale: 4, offset: offset)
+
+        #expect(abs(after.x - before.x) > 0.001)
+    }
+
+    @Test func zoomingInAndBackOutRestoresTheOffset() {
+        let offset = CGSize(width: 24, height: -18)
+
+        let out = CropGeometry.offset(
+            CropGeometry.offset(offset, rescaledFrom: 2, to: 5), rescaledFrom: 5, to: 2
+        )
+
+        #expect(abs(out.width - offset.width) < 0.0001)
+        #expect(abs(out.height - offset.height) < 0.0001)
+    }
+
+    @Test func aDegenerateScaleLeavesTheOffsetAlone() {
+        let offset = CGSize(width: 10, height: 10)
+
+        #expect(CropGeometry.offset(offset, rescaledFrom: 0, to: 2) == offset)
+        #expect(CropGeometry.offset(offset, rescaledFrom: 2, to: 0) == offset)
     }
 }

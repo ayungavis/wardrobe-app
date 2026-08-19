@@ -32,15 +32,12 @@ public extension CaptureFlowViewModel {
         completion.previewFile = await renderPreview(of: completion)
 
         completedRepository.append(completion)
-        activeRepository.clear() // the photo file stays — History still reads it
+        activeRepository.clear()
         isCompleted = true
         let cardID = challenge.card.id.uuidString
         Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
     }
 
-    /// Best-effort: a failed render must never cost the user their completion
-    /// (FR-028). History falls back to rendering on demand when this returns nil.
-    ///
     /// ponytail: stored at full export size, roughly 300 KB a completion.
     /// Downscale, or keep a second smaller rendition, when storage complains.
     func renderPreview(of completion: CompletedChallenge) async -> String? {

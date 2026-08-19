@@ -3,10 +3,10 @@ import Foundation
 struct StickerPlacement: Identifiable {
     let id = UUID()
     let imageName: String
-    let x: CGFloat // fraction 0-1, relative to its container
+    let x: CGFloat
     let y: CGFloat
     let widthFraction: CGFloat
-    let rotation: Double // degrees, 0 if none
+    let rotation: Double
 
     init(_ imageName: String, x: CGFloat, y: CGFloat, width: CGFloat, rotation: Double = 0) {
         self.imageName = imageName

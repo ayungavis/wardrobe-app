@@ -22,29 +22,6 @@ struct EditorGestureTests {
         #expect(!EditorGesture.canHold(makeLayer(isLocked: true), activeTool: nil))
     }
 
-    /// The drawing surface is mounted above the layers so a stroke drawn across
-    /// a sticker draws instead of dragging it. The canvas gesture sits further
-    /// out still, so it has to stand down while any tool is open.
-    /// The reported bug: a second finger landing on another layer used to take
-    /// the gesture with it, mid-hold.
-    @Test func theFirstFingerDownKeepsTheLayer() {
-        let held = makeLayer()
-        let other = makeLayer()
-
-        #expect(EditorGesture.hold(current: held.id, pressing: other, activeTool: nil) == held.id)
-    }
-
-    @Test func aPressWithNothingHeldTakesTheLayer() {
-        let layer = makeLayer()
-
-        #expect(EditorGesture.hold(current: nil, pressing: layer, activeTool: nil) == layer.id)
-    }
-
-    /// The rules compose: nothing is held, but the layer still refuses.
-    @Test func aLockedLayerIsNotTakenEvenWhenNothingIsHeld() {
-        #expect(EditorGesture.hold(current: nil, pressing: makeLayer(isLocked: true), activeTool: nil) == nil)
-    }
-
     /// Same bug, other half: the tap that comes with that second finger must
     /// not move the selection either.
     @Test func aTapCannotSelectAnotherLayerWhileOneIsHeld() {
@@ -58,7 +35,7 @@ struct EditorGestureTests {
     @Test func noLayerCanBeHeldWhileAToolIsOpen() {
         let layer = makeLayer()
         #expect(!EditorGesture.canHold(layer, activeTool: .drawing(.empty)))
-        #expect(!EditorGesture.canHold(layer, activeTool: .crop(UUID())))
+        #expect(!EditorGesture.canHold(layer, activeTool: .crop(.layer(UUID()))))
         #expect(!EditorGesture.canHold(layer, activeTool: .text(TextDraft(content: TextContent(content: "hi")), isNew: true)))
     }
 }

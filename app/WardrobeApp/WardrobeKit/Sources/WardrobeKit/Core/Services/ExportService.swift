@@ -20,18 +20,17 @@ public enum ExportService {
             else {
                 continue
             }
-            // Each layer's own crop: FR-093 lets a document hold several photos,
-            // and framing belongs to the layer that shows it.
             photos[content.photoID] = try await prepare(original: original, crop: content.crop)
+        }
+
+        if case let .photo(id, crop) = document.background, let original = originals[id] {
+            photos[id] = try await prepare(original: original, crop: crop)
         }
 
         let rendered = try await rasterize(document: document, photos: photos)
         return try await encode(rendered)
     }
 
-    /// `@concurrent` rather than bare `nonisolated`: a nonisolated async
-    /// function stays on the caller's actor (SE-0461), and every caller here is
-    /// `@MainActor`, so without it this would not move at all.
     @concurrent
     static func prepare(original: Data, crop: CropSpec?) async throws -> CGImage {
         guard let image = ImageDecoding.downsampledImage(from: original, maxPixel: maxOutputPixel) else {

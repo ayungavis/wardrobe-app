@@ -11,10 +11,6 @@ public protocol PhotoLibrarySaveService: Sendable {
         public init() {}
 
         public func save(_ data: Data) async throws {
-            // Asked for rather than inferred from a failure: `performChanges`
-            // does raise the system prompt on its own, but then a refusal comes
-            // back as the same opaque error as a full disk, and the two need
-            // different things from the user (PRD §17).
             guard await isAuthorized else { throw AppError.photoAccessDenied }
 
             do {

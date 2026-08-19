@@ -10,7 +10,11 @@ struct DevMenuViewModelTests {
         photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
         wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
         thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository(),
-        previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository()
+        previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository(),
+        onboarding: OnboardingModel = OnboardingModel(
+            preferences: InMemoryAccountPreferencesRepository(),
+            accounts: InMemoryAppleAccountRepository()
+        )
     ) -> DevMenuViewModel {
         DevMenuViewModel(
             activeRepository: activeRepository,
@@ -18,7 +22,8 @@ struct DevMenuViewModelTests {
             photoRepository: photoRepository,
             wardrobeRepository: wardrobeRepository,
             thumbnails: thumbnails,
-            previews: previews
+            previews: previews,
+            onboarding: onboarding
         )
     }
 
@@ -43,6 +48,37 @@ struct DevMenuViewModelTests {
         #expect(thumbnails.deleteAllCount == 1)
         #expect(sut.summary.wardrobeItemCount == 0)
         #expect(sut.lastAction != nil)
+    }
+
+    @Test func resetOnboardingSignsOutAndReopensOnboarding() throws {
+        let preferences = InMemoryAccountPreferencesRepository()
+        let accounts = InMemoryAppleAccountRepository()
+        let onboarding = OnboardingModel(preferences: preferences, accounts: accounts)
+        try onboarding.signIn(AppleAccount(userID: "u1"))
+        let sut = makeSUT(onboarding: onboarding)
+
+        sut.resetOnboarding()
+
+        #expect(onboarding.isCompleted == false)
+        #expect(preferences.stored.hasCompletedOnboarding == false)
+        #expect(accounts.stored == nil)
+        #expect(sut.summary.hasCompletedOnboarding == false)
+        #expect(sut.summary.isSignedIn == false)
+        #expect(sut.lastAction != nil)
+    }
+
+    @Test func summaryReportsOnboardingAndSignIn() throws {
+        let onboarding = OnboardingModel(
+            preferences: InMemoryAccountPreferencesRepository(),
+            accounts: InMemoryAppleAccountRepository()
+        )
+        try onboarding.signIn(AppleAccount(userID: "u1"))
+        let sut = makeSUT(onboarding: onboarding)
+
+        sut.refresh()
+
+        #expect(sut.summary.hasCompletedOnboarding)
+        #expect(sut.summary.isSignedIn)
     }
 
     @Test func summaryCountsWardrobeItems() throws {

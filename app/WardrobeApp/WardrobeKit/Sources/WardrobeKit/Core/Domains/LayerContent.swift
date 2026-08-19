@@ -28,9 +28,6 @@ extension LayerContent: Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        // An unrecognised kind means the document knows something this build
-        // does not; say that, rather than surfacing a raw decoding error
-        // (FR-098).
         guard let kind = try? container.decode(Kind.self, forKey: .kind) else {
             throw AppError.documentFromNewerApp
         }
@@ -115,7 +112,6 @@ public struct TextContent: Equatable, Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case content, colorName, backgroundStyleName, fontName, alignmentName
-        /// The two-state predecessor. Read forever, written never.
         case hasBackground
     }
 
@@ -161,7 +157,6 @@ public struct StickerContent: Equatable, Sendable {
 extension StickerContent: Codable {
     enum CodingKeys: String, CodingKey {
         case art
-        /// The glyph-only predecessor. Read forever, written never.
         case emoji
     }
 

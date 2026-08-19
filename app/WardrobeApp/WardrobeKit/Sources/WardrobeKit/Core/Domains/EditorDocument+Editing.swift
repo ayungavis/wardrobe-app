@@ -25,21 +25,25 @@ public extension EditorDocument {
         }?.id
     }
 
+    var photos: [(id: String, crop: CropSpec?)] {
+        var photos = layers.compactMap { layer -> (id: String, crop: CropSpec?)? in
+            guard case let .photo(photo) = layer.content else { return nil }
+            return (photo.photoID, photo.crop)
+        }
+        if case let .photo(id, crop) = background {
+            photos.append((id, crop))
+        }
+        return photos
+    }
+
     var photoCrops: [String: CropSpec?] {
-        layers.reduce(into: [:]) { result, layer in
-            if case let .photo(photo) = layer.content {
-                result[photo.photoID] = photo.crop
-            }
+        photos.reduce(into: [:]) { result, photo in
+            result[photo.id] = photo.crop
         }
     }
 
     var photoIDs: [String] {
-        layers.compactMap {
-            if case let .photo(photo) = $0.content {
-                return photo.photoID
-            }
-            return nil
-        }
+        photos.map(\.id)
     }
 
     func layer(id: UUID) -> EditorLayer? {

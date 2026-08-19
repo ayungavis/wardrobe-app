@@ -12,12 +12,10 @@ struct EditorLayerView: View {
     let isChallengePhoto: Bool
     let onSelect: () -> Void
     let onDoubleTap: () -> Void
-    let onPressChanged: (Bool) -> Void
     let onSizeChanged: (CGSize) -> Void
     let onDelete: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var isPressed = false
 
     var body: some View {
         LayerContentView(content: layer.content, canvasSize: canvasSize, photo: photo)
@@ -35,27 +33,15 @@ struct EditorLayerView: View {
             .animation(settleAnimation, value: layer.transform)
             .onTapGesture(count: 2, perform: onDoubleTap)
             .onTapGesture(perform: onSelect)
-            // Zero distance so a finger that never moves still latches the layer;
-            // simultaneous so it does not swallow the two taps above.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0).updating($isPressed) { _, state, _ in state = true }
-            )
-            // `@GestureState` restores itself on end or cancel, which is what
-            // turns "lift the finger" into "no layer is held".
-            .onChange(of: isPressed) { _, pressed in onPressChanged(pressed) }
             .accessibilityElement()
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(accessibilityValue)
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             .accessibilityActions {
                 Button(action: onSelect) { Text("editor.layer.select", bundle: .module) }
-                // The double tap has to have a non-gesture twin (§19), and it
-                // means something different per kind.
                 if let reopen = reopenLabel {
                     Button(action: onDoubleTap) { Text(reopen, bundle: .module) }
                 }
-                // Offering Delete on a locked layer would advertise an action
-                // the document refuses (FR-087).
                 if !layer.isLocked, !isChallengePhoto {
                     Button(action: onDelete) { Text("editor.layer.delete", bundle: .module) }
                 }

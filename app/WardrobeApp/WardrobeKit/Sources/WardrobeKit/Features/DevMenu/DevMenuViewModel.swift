@@ -13,6 +13,7 @@ public final class DevMenuViewModel {
     private let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
     private let previews: CompletionPreviewRepository
+    private let onboarding: OnboardingModel
     private let calendar: Calendar
 
     public init(
@@ -22,6 +23,7 @@ public final class DevMenuViewModel {
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
         previews: CompletionPreviewRepository,
+        onboarding: OnboardingModel,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -30,6 +32,7 @@ public final class DevMenuViewModel {
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
         self.previews = previews
+        self.onboarding = onboarding
         self.calendar = calendar
     }
 
@@ -41,8 +44,21 @@ public final class DevMenuViewModel {
             hasActiveChallenge: active != nil,
             activeHasPhoto: active?.photoID != nil,
             wardrobeItemCount: (try? wardrobeRepository.items().count) ?? 0,
-            fingerprintCount: (try? wardrobeRepository.fingerprints().count) ?? 0
+            fingerprintCount: (try? wardrobeRepository.fingerprints().count) ?? 0,
+            hasCompletedOnboarding: onboarding.isCompleted,
+            isSignedIn: onboarding.isSignedIn
         )
+    }
+
+    public func resetOnboarding() {
+        do {
+            try onboarding.reset()
+            Log.ui.info("Dev: onboarding reset")
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Onboarding reset"
     }
 
     public func resetWardrobe() {

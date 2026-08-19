@@ -28,7 +28,6 @@ public extension PhotoRepository {
 }
 
 public final class FilePhotoRepository: PhotoRepository, @unchecked Sendable {
-    // @unchecked: FileManager is thread-safe for these operations.
     private let directory: URL
 
     public init(directory: URL? = nil) {
@@ -41,7 +40,7 @@ public final class FilePhotoRepository: PhotoRepository, @unchecked Sendable {
         let id = UUID().uuidString
         var options: Data.WritingOptions = [.atomic]
         #if os(iOS)
-            options.insert(.completeFileProtection) // §18.4; full encryption story arrives with the backend
+            options.insert(.completeFileProtection)
         #endif
         try data.write(to: fileURL(id), options: options)
         return id

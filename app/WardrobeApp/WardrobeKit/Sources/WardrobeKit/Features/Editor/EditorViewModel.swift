@@ -7,22 +7,17 @@ import Observation
 public final class EditorViewModel {
     public static let maximumTextLength = 280
 
+    public enum CropTarget: Equatable {
+        case layer(UUID)
+        case background
+    }
+
     public enum Tool: Equatable {
-        case crop(UUID)
+        case crop(CropTarget)
         case text(TextDraft, isNew: Bool)
         case drawing(DrawingContent)
     }
 
-    /// Whether the document's photos are on hand. One `Loadable` for all of
-    /// them: a canvas with a photo it cannot decode is not half-loaded, it is
-    /// broken, and FR-093 wants that said at the layer rather than as a state
-    /// of the whole editor.
-    /// Every photo's bytes, keyed by id. The exporter re-crops the original
-    /// rather than the preview, so the bytes have to stay reachable.
-    ///
-    /// One `Loadable` for all of them: a canvas with a photo it cannot decode
-    /// is not half-loaded, it is broken.
-    ///
     /// ponytail: every photo's bytes live here at once. Two or three is fine;
     /// if a document ever holds many, read them back from the repository at
     /// export time instead.
@@ -127,22 +122,47 @@ public final class EditorViewModel {
         persistDocument()
     }
 
-    public func beginCrop(layerID: UUID) {
-        guard case .photo = document.layer(id: layerID)?.content else { return }
-        activeTool = .crop(layerID)
+    public func beginCrop(_ target: CropTarget) {
+        guard photoID(for: target) != nil else { return }
+        activeTool = .crop(target)
     }
 
     public var croppingPhotoID: String? {
-        guard case let .crop(layerID) = activeTool,
-              case let .photo(content) = document.layer(id: layerID)?.content
-        else {
-            return nil
-        }
-        return content.photoID
+        guard case let .crop(target) = activeTool else { return nil }
+        return photoID(for: target)
     }
 
-    public func commitCrop(_ crop: CropSpec, ofLayer layerID: UUID) {
-        document.setCrop(crop, ofLayer: layerID)
+    public var croppingCrop: CropSpec? {
+        guard case let .crop(target) = activeTool else { return nil }
+        switch target {
+        case let .layer(id): return document.crop(ofLayer: id)
+        case .background: return document.background.crop
+        }
+    }
+
+    public var croppingAspectRatio: CGFloat {
+        guard case .crop(.background) = activeTool else { return CropGeometry.photoAspectRatio }
+        return StoryCanvas.aspectRatio
+    }
+
+    private func photoID(for target: CropTarget) -> String? {
+        switch target {
+        case let .layer(id):
+            guard case let .photo(content) = document.layer(id: id)?.content else { return nil }
+            return content.photoID
+        case .background:
+            return document.background.photoID
+        }
+    }
+
+    public func commitCrop(_ crop: CropSpec, for target: CropTarget) {
+        switch target {
+        case let .layer(id):
+            document.setCrop(crop, ofLayer: id)
+        case .background:
+            guard let id = document.background.photoID else { return }
+            document.background = .photo(id: id, crop: crop)
+        }
         updateCroppedPreviews()
         activeTool = nil
         persistDocument()
@@ -236,6 +256,26 @@ public final class EditorViewModel {
         guard document.background != background else { return }
         document.background = background
         persistDocument()
+    }
+
+    public func setBackgroundPhoto(_ data: Data) {
+        do {
+            let photoID = try photoRepository.saveOriginal(data)
+            challenge.importedPhotoIDs.append(photoID)
+
+            if case var .loaded(originals) = originals {
+                originals[photoID] = data
+                self.originals = .loaded(originals)
+            }
+            previewImages[photoID] = ImageDecoding.downsampledImage(from: data, maxPixel: 1600)
+
+            document.background = .photo(id: photoID, crop: nil)
+            updateCroppedPreviews()
+            persistDocument()
+        } catch {
+            Log.report(error)
+            alertError = .photoImportFailed
+        }
     }
 
     // MARK: Stickers (PRD FR-019)

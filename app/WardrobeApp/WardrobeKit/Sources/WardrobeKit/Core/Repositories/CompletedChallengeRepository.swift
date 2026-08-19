@@ -16,7 +16,6 @@ public extension CompletedChallengeRepository {
 // ponytail: UserDefaults JSON array; move to SwiftData when History needs
 // querying and paging.
 public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeRepository, @unchecked Sendable {
-    // @unchecked: UserDefaults is documented thread-safe.
     private let defaults: UserDefaults
     private let calendar: Calendar
     private static let key = "completedChallenges"
@@ -26,11 +25,6 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         self.calendar = calendar
     }
 
-    /// Decoded one entry at a time on purpose. Decoding the array in one go
-    /// means a single unreadable completion takes the **whole history** with
-    /// it — and `append` then writes the truncated array straight back over
-    /// the original, permanently. Per entry, one bad record costs one record.
-    ///
     /// ponytail: a skipped entry is dropped rather than preserved verbatim.
     /// Keeping its raw JSON needs a passthrough type; it comes back from the
     /// server once sync exists, and the server is the system of record for

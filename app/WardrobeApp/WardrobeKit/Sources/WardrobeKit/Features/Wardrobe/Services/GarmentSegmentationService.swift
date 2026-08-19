@@ -35,9 +35,6 @@ public extension GarmentSegmentationService {
     public struct FASHNGarmentSegmentationService: GarmentSegmentationService {
         private static let inputSize = (width: 384, height: 576)
 
-        /// Loaded once for the whole process: the weights are ~128 MB, and the
-        /// previous code re-loaded them for every single photo.
-        ///
         /// nonisolated(unsafe): the generated wrapper is not `Sendable`, but it
         /// is immutable once loaded and `MLModel` predictions are thread-safe.
         private nonisolated(unsafe) static let model: FASHNSegFormer? = {
