@@ -27,10 +27,10 @@ public final class CaptureFlowViewModel {
     public let library: PhotoLibraryService
 
     /// Set once the checkmark commits — the flow's cover closes on it.
-    public private(set) var isCompleted = false
+    public internal(set) var isCompleted = false
     /// Read by the editor so the ✓ can show the wait for the garment scan
     /// rather than looking inert.
-    public private(set) var isCompleting = false
+    public internal(set) var isCompleting = false
     /// True when this session opened onto work that was already there, rather
     /// than work it created. Read by the editor to state that a device-only
     /// draft was restored (§17).
@@ -40,16 +40,17 @@ public final class CaptureFlowViewModel {
     public let review: GarmentReviewModel
 
     private let camera: CameraService
-    private let activeRepository: ActiveChallengeRepository
-    private let completedRepository: CompletedChallengeRepository
-    private let photoRepository: PhotoRepository
+    let activeRepository: ActiveChallengeRepository
+    let completedRepository: CompletedChallengeRepository
+    let photoRepository: PhotoRepository
+    let previews: CompletionPreviewRepository
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
     private(set) var sessionTask: Task<Void, Never>?
     private(set) var flipTask: Task<Void, Never>?
     private(set) var importTask: Task<Void, Never>?
     private(set) var thumbnailTask: Task<Void, Never>?
-    private(set) var completionTask: Task<Void, Never>?
+    var completionTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
@@ -57,6 +58,7 @@ public final class CaptureFlowViewModel {
         activeRepository: ActiveChallengeRepository,
         completedRepository: CompletedChallengeRepository,
         photoRepository: PhotoRepository,
+        previews: CompletionPreviewRepository,
         library: PhotoLibraryService,
         scanner: GarmentScanService,
         wardrobeRepository: WardrobeItemRepository,
@@ -67,6 +69,7 @@ public final class CaptureFlowViewModel {
         self.activeRepository = activeRepository
         self.completedRepository = completedRepository
         self.photoRepository = photoRepository
+        self.previews = previews
         self.library = library
         review = GarmentReviewModel(
             scanner: scanner,
@@ -251,51 +254,6 @@ public final class CaptureFlowViewModel {
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
-
-    /// The checkmark — the only action that completes the challenge (FR-028).
-    /// Guarded twice over: an in-flight flag here, and a same-day check in the
-    /// store, so repeated taps can never write two records (FR-029).
-    public func completeChallenge() {
-        guard !isCompleting, !isCompleted, challenge.photoID != nil else { return }
-        isCompleting = true
-
-        completionTask = Task {
-            defer { isCompleting = false }
-            await review.finishScanning()
-            commit()
-        }
-    }
-
-    private func commit() {
-        guard let photoID = challenge.photoID else { return }
-        let now = Date()
-        let completion = CompletedChallenge(
-            card: challenge.card,
-            photoID: photoID,
-            // Read back rather than trusted: the editor owns a separate copy of
-            // the challenge and saves its edits to the repository, so this
-            // value copy has been stale ever since the editor opened. Taking
-            // the local one here silently dropped every text and sticker at ✓.
-            document: activeRepository.load()?.document ?? challenge.document,
-            completedAt: now
-        )
-
-        // Wardrobe first, completion last. The two live in different stores, so
-        // one transaction is impossible; if the bookkeeping fails the challenge
-        // still completes rather than being held hostage by it.
-        review.commit(completionID: completion.id, at: now)
-        // Photos added and then deleted have nothing left in the document to
-        // name them, so this is the last chance to clean them up.
-        photoRepository.deleteUnusedOriginals(
-            of: completion.document, imported: challenge.importedPhotoIDs
-        )
-
-        completedRepository.append(completion)
-        activeRepository.clear() // the photo file stays — History will render it
-        isCompleted = true
-        let cardID = challenge.card.id.uuidString
-        Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
-    }
 
     /// Editor X: throw the photo and its edits away, back to the camera.
     public func discardPhoto() {

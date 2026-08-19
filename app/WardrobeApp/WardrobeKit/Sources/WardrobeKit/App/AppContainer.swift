@@ -10,6 +10,7 @@ public final class AppContainer {
     private let completedChallengeRepository: CompletedChallengeRepository
     private let photoRepository: PhotoRepository
     let preferencesRepository: AccountPreferencesRepository
+    private let completionPreviewRepository: CompletionPreviewRepository
     private let cameraService: CameraService
 
     public init(
@@ -18,6 +19,7 @@ public final class AppContainer {
         completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
+        completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
@@ -25,6 +27,7 @@ public final class AppContainer {
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
+        self.completionPreviewRepository = completionPreviewRepository
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -58,6 +61,7 @@ public final class AppContainer {
             activeRepository: activeChallengeRepository,
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
+            previews: completionPreviewRepository,
             library: Self.defaultPhotoLibrary(),
             scanner: makeGarmentScanService(),
             wardrobeRepository: makeWardrobeItemRepository(),
@@ -165,7 +169,8 @@ public final class AppContainer {
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository
         )
     }
 
@@ -186,7 +191,8 @@ public final class AppContainer {
             completedRepository: completedChallengeRepository,
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository
         )
     }
 }

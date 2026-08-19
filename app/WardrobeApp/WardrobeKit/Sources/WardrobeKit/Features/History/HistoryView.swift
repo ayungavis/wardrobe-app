@@ -34,8 +34,9 @@ public struct HistoryView: View {
                                 } label: {
                                     HistoryPolaroidCardView(
                                         completion: completion,
-                                        photoData: viewModel.photoData(for: completion)
+                                        previewData: viewModel.previewData(for: completion)
                                     )
+                                    .task { await viewModel.renderMissingPreview(for: completion) }
                                 }
                                 .rotationEffect(.degrees(-3))
                                 .buttonStyle(.plain)
@@ -50,7 +51,7 @@ public struct HistoryView: View {
                 if let completion = viewModel.completions.first(where: { $0.id == completionID }) {
                     HistoryDetailView(
                         completion: completion,
-                        photoData: viewModel.photoData(for: completion),
+                        previewData: viewModel.previewData(for: completion),
                         viewModel: viewModel
                     )
                 }

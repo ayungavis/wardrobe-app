@@ -9,14 +9,16 @@ struct DevMenuViewModelTests {
         completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
         photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
         wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
-        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository()
+        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository(),
+        previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository()
     ) -> DevMenuViewModel {
         DevMenuViewModel(
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository,
             wardrobeRepository: wardrobeRepository,
-            thumbnails: thumbnails
+            thumbnails: thumbnails,
+            previews: previews
         )
     }
 
@@ -147,6 +149,41 @@ struct DevMenuViewModelTests {
 
     /// The whole point of the separate button: unlike `resetToday`, an
     /// in-progress challenge survives.
+    /// A preview outlives its completion unless the reset takes it too, and an
+    /// orphaned render is a file nothing can ever name again.
+    @Test func resetHistoryDeletesTheStoredPreviews() throws {
+        let previews = InMemoryCompletionPreviewRepository()
+        let file = try previews.save(Data([0x01]), id: UUID())
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        var completion = makeCompletion(at: Date(), photoID: "done")
+        completion.previewFile = file
+        completedRepository.stored = [completion]
+        let sut = makeSUT(completedRepository: completedRepository, previews: previews)
+
+        sut.resetHistory()
+
+        #expect(previews.files.isEmpty)
+        #expect(previews.deleteAllCount == 1)
+    }
+
+    @Test func resetTodayDeletesTodaysPreviewAndKeepsTheRest() throws {
+        let previews = InMemoryCompletionPreviewRepository()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        let todayFile = try previews.save(Data([0x01]), id: UUID())
+        let oldFile = try previews.save(Data([0x02]), id: UUID())
+        var today = makeCompletion(at: Date(), photoID: "today")
+        today.previewFile = todayFile
+        var old = makeCompletion(at: yesterday, photoID: "old")
+        old.previewFile = oldFile
+        let completedRepository = InMemoryCompletedChallengeRepository()
+        completedRepository.stored = [old, today]
+        let sut = makeSUT(completedRepository: completedRepository, previews: previews)
+
+        sut.resetToday()
+
+        #expect(previews.files.keys.sorted() == [oldFile])
+    }
+
     @Test func resetHistoryLeavesTheActiveChallengeAlone() {
         let activeRepository = InMemoryActiveChallengeRepository()
         activeRepository.stored = makeActive(photoID: "active-photo")

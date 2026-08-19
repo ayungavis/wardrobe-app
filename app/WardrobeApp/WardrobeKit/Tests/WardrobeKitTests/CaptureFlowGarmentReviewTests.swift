@@ -21,6 +21,7 @@ struct CaptureFlowGarmentReviewTests {
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository,
+            previews: InMemoryCompletionPreviewRepository(),
             library: library,
             scanner: scanner,
             wardrobeRepository: wardrobeRepository,

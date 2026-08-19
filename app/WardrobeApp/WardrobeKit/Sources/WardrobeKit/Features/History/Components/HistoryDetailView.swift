@@ -3,14 +3,14 @@ import SwiftUI
 
 public struct HistoryDetailView: View {
     public let completion: CompletedChallenge
-    public let photoData: Data?
+    public let previewData: Data?
     let viewModel: HistoryViewModel
 
     @State private var garments: [(item: WardrobeItem, wearCount: Int)] = []
 
-    public init(completion: CompletedChallenge, photoData: Data?, viewModel: HistoryViewModel) {
+    public init(completion: CompletedChallenge, previewData: Data?, viewModel: HistoryViewModel) {
         self.completion = completion
-        self.photoData = photoData
+        self.previewData = previewData
         self.viewModel = viewModel
     }
 
@@ -24,11 +24,11 @@ public struct HistoryDetailView: View {
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .top) {
                     // Main Content Stack
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.lg) {
                         // 1. Top Canvas / Polaroid
                         HistoryPolaroidCardView(
                             completion: completion,
-                            photoData: photoData
+                            previewData: previewData
                         )
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.lg)

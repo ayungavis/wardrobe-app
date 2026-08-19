@@ -11,6 +11,7 @@ func makeCaptureFlowSUT(
     activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
     completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
     photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
+    previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository(),
     library: FakePhotoLibrary = FakePhotoLibrary(),
     scanner: FakeGarmentScanService = FakeGarmentScanService(),
     wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
@@ -22,6 +23,7 @@ func makeCaptureFlowSUT(
         activeRepository: activeRepository,
         completedRepository: completedRepository,
         photoRepository: photoRepository,
+        previews: previews,
         library: library,
         scanner: scanner,
         wardrobeRepository: wardrobeRepository,
@@ -34,7 +36,9 @@ func makeCaptureFlowSUT(
 @MainActor
 func makeEditorStageCaptureFlowSUT(
     activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
-    completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository()
+    completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
+    photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
+    previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository()
 ) -> CaptureFlowViewModel {
     var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
     challenge.photoID = UUID().uuidString
@@ -45,6 +49,8 @@ func makeEditorStageCaptureFlowSUT(
         challenge: challenge,
         camera: camera,
         activeRepository: activeRepository,
-        completedRepository: completedRepository
+        completedRepository: completedRepository,
+        photoRepository: photoRepository,
+        previews: previews
     )
 }

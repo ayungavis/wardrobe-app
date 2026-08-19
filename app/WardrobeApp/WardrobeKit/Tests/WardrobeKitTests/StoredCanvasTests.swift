@@ -62,6 +62,32 @@ struct StoredCanvasTests {
         #expect(completion.document.stickerItems.first?.scale == 2)
     }
 
+    /// History renders the composition, so the file holding it has to survive a
+    /// round trip — and a completion written before previews existed has to
+    /// keep decoding, because history is never migrated in place.
+    @Test func previewFileRoundTripsAndIsOptionalOnOlderRecords() throws {
+        var completion = CompletedChallenge(
+            card: ChallengeCard(prompt: "x"), photoID: "photo-1",
+            document: .fixture(), completedAt: Date(timeIntervalSince1970: 1000)
+        )
+        completion.previewFile = "preview-1.jpg"
+
+        let encoded = try JSONEncoder().encode(completion)
+        #expect(try JSONDecoder().decode(CompletedChallenge.self, from: encoded).previewFile == "preview-1.jpg")
+
+        let withoutKey = Data("""
+        {
+          "id": "\(UUID().uuidString)",
+          "card": { "id": "\(UUID().uuidString)", "prompt": "Wear red." },
+          "photoID": "photo-1",
+          "completedAt": 2000,
+          "draft": { "texts": [], "stickers": [] }
+        }
+        """.utf8)
+
+        #expect(try JSONDecoder().decode(CompletedChallenge.self, from: withoutKey).previewFile == nil)
+    }
+
     /// Once read, it is written back in the new shape — the old key is a read
     /// path, not a format we keep producing.
     @Test func aMigratedChallengeIsRewrittenAsADocument() throws {

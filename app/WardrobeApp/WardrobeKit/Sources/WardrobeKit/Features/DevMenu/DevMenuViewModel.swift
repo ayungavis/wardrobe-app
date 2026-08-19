@@ -16,6 +16,7 @@ public final class DevMenuViewModel {
     private let photoRepository: PhotoRepository
     private let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
+    private let previews: CompletionPreviewRepository
     private let calendar: Calendar
 
     public init(
@@ -24,6 +25,7 @@ public final class DevMenuViewModel {
         photoRepository: PhotoRepository,
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
+        previews: CompletionPreviewRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -31,6 +33,7 @@ public final class DevMenuViewModel {
         self.photoRepository = photoRepository
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
+        self.previews = previews
         self.calendar = calendar
     }
 
@@ -70,6 +73,7 @@ public final class DevMenuViewModel {
             .filter { calendar.isDate($0.completedAt, inSameDayAs: today) }
         for completion in todaysCompletions {
             photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
+            deletePreview(of: completion)
         }
         completedRepository.removeCompletions(on: today)
 
@@ -95,10 +99,28 @@ public final class DevMenuViewModel {
         for completion in completedRepository.load() {
             photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
         }
+        // Everything goes, so the directory goes — no per-file walk needed, and
+        // it collects any preview whose completion was already lost.
+        do {
+            try previews.deleteAll()
+        } catch {
+            Log.report(error)
+        }
         completedRepository.removeAll()
 
         refresh()
         lastAction = "History cleared"
         Log.ui.info("Dev: history cleared")
+    }
+
+    /// Reported rather than thrown, like the photos above: an orphaned file is
+    /// not worth blocking a reset over.
+    private func deletePreview(of completion: CompletedChallenge) {
+        guard let file = completion.previewFile else { return }
+        do {
+            try previews.delete(file: file)
+        } catch {
+            Log.report(error)
+        }
     }
 }
