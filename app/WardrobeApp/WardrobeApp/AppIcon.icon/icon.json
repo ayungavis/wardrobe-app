@@ -7,7 +7,14 @@
       "layers" : [
         {
           "image-name" : "logo.png",
-          "name" : "logo"
+          "name" : "logo",
+          "position" : {
+            "scale" : 0.8,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "shadow" : {
