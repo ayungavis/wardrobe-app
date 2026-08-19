@@ -27,6 +27,41 @@ struct EditorTextToolTests {
         #expect(sut.document.textItems.count == 1)
     }
 
+    /// Done is the only way out of the composer now, so on an untouched draft it
+    /// has to behave as a cancel — not as an edit that happens to change
+    /// nothing. The undo stack is what tells the two apart.
+    @Test func doneOnABlankNewDraftRecordsNothing() throws {
+        let sut = try makeEditorSUT()
+        let before = sut.document
+
+        sut.beginNewText()
+        sut.commitTool()
+
+        #expect(sut.document == before)
+        #expect(!sut.canUndo)
+        #expect(sut.activeTool == nil)
+    }
+
+    /// Emptying a text that already exists is a deletion, and a deletion is an
+    /// edit — so this one *does* take a step, and undo brings the text back.
+    @Test func emptyingAnExistingTextDeletesItAndCanBeUndone() throws {
+        let item = TextItem(content: "old")
+        let sut = try makeEditorSUT(document: .fixture(texts: [item]))
+        let draft = try #require(sut.document.layers.compactMap(\.textDraft).first)
+
+        sut.beginEditingText(draft)
+        var emptied = draft
+        emptied.content.content = ""
+        sut.updateWorking(text: emptied)
+        sut.commitTool()
+
+        #expect(sut.document.textItems.isEmpty)
+
+        sut.undo()
+
+        #expect(sut.document.textContents == ["old"])
+    }
+
     @Test func editingExistingTextUpdatesInPlace() throws {
         let item = TextItem(content: "old")
         let sut = try makeEditorSUT(document: .fixture(texts: [item]))

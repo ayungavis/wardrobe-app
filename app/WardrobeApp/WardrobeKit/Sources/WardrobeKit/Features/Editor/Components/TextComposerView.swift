@@ -72,6 +72,9 @@ struct TextComposerView: View {
             }
         }
         .task { isFocused = true }
+        // The X was the only way out, and §19 requires a modal to stay
+        // dismissable. An escape must not commit, so it is the cancel path.
+        .accessibilityAction(.escape, onCancel)
     }
 
     // MARK: The live text
@@ -122,11 +125,7 @@ struct TextComposerView: View {
             .focused($isFocused)
             .sentenceCapitalized()
             .submitLabel(.done)
-            .onSubmit {
-                if !working.isBlank {
-                    onDone()
-                }
-            }
+            .onSubmit(onDone)
             .accessibilityLabel(Text("editor.text.placeholder", bundle: .module))
             .accessibilityIdentifier("editor.text.field")
     }
@@ -135,16 +134,6 @@ struct TextComposerView: View {
 
     private var topBar: some View {
         HStack(spacing: Spacing.sm) {
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .frame(width: 42, height: 42)
-                    .background(AppColor.mediaBackground.opacity(0.66), in: .circle)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("common.cancel", bundle: .module))
-            .accessibilityIdentifier("editor.text.cancel")
-
             Spacer()
 
             if isExisting {
@@ -173,8 +162,6 @@ struct TextComposerView: View {
                     .background(AppColor.mediaBackground.opacity(0.66), in: .capsule)
             }
             .buttonStyle(.plain)
-            .disabled(working.isBlank)
-            .opacity(working.isBlank ? 0.45 : 1)
             .accessibilityIdentifier("editor.text.done")
         }
         .foregroundStyle(AppColor.onMedia)
