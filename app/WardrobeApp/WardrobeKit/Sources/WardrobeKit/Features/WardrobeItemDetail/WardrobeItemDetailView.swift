@@ -30,7 +30,7 @@ public struct WardrobeItemDetailView: View {
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.xl)
 
-                        Text("wardrobe.wearCount \(viewModel.wearCount)", bundle: .module)
+                        Text("wardrobe.wearCount.used \(viewModel.wearCount)", bundle: .module)
                             .font(AppFont.title)
                             .fontWeight(.black)
                             .stroke(color: .white, width: 3)

@@ -5124,6 +5124,22 @@
           }
         }
       }
+    },
+    "wardrobe.wearCount.used %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldx used"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldx dipakai"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

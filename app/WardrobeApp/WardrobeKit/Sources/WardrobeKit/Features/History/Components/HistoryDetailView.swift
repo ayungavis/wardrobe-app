@@ -105,7 +105,7 @@ public struct HistoryDetailView: View {
                     .fill(AppColor.surface)
                     .frame(width: 80, height: 80)
             }
-            Text("wardrobe.wearCount \(wearCount)", bundle: .module)
+            Text("wardrobe.wearCount.used \(wearCount)", bundle: .module)
                 .font(.subheadline)
                 .bold()
                 .foregroundColor(.black)
