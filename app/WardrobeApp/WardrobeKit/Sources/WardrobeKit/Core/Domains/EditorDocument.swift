@@ -2,21 +2,26 @@ import CoreGraphics
 import Foundation
 
 public struct EditorDocument: Equatable, Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let id: UUID
-    public private(set) var schemaVersion: Int
     public var layers: [EditorLayer]
     public var background: CanvasBackground
 
+    /// Derived, not stored: a document is only v2 when it holds something a v1
+    /// reader cannot render. Stamping every document v2 would make builds that
+    /// predate photo backgrounds refuse documents they could read perfectly
+    /// well — and a stored stamp would disagree with its own round trip.
+    public var schemaVersion: Int {
+        background.photoID == nil ? 1 : 2
+    }
+
     public init(
         id: UUID = UUID(),
-        schemaVersion: Int = EditorDocument.currentSchemaVersion,
         layers: [EditorLayer],
-        background: CanvasBackground = .white
+        background: CanvasBackground = .default
     ) {
         self.id = id
-        self.schemaVersion = schemaVersion
         self.layers = layers
         self.background = background
     }
@@ -71,6 +76,14 @@ extension EditorDocument: Codable {
         case id, schemaVersion, layers, background
     }
 
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(layers, forKey: .layers)
+        try container.encode(background, forKey: .background)
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let version = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
@@ -79,9 +92,8 @@ extension EditorDocument: Codable {
         }
 
         id = try container.decode(UUID.self, forKey: .id)
-        schemaVersion = version
         layers = try container.decodeIfPresent([EditorLayer].self, forKey: .layers) ?? []
-        background = try container.decodeIfPresent(CanvasBackground.self, forKey: .background) ?? .white
+        background = try container.decodeIfPresent(CanvasBackground.self, forKey: .background) ?? .default
     }
 }
 

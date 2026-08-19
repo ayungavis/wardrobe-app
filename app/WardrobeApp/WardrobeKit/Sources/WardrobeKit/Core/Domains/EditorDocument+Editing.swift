@@ -33,13 +33,16 @@ public extension EditorDocument {
         }
     }
 
+    /// Includes the background's photo: it is a file on disk with the same
+    /// lifetime as any layer's, and every loader and cleanup path reads this.
     var photoIDs: [String] {
-        layers.compactMap {
-            if case let .photo(photo) = $0.content {
+        let layerIDs = layers.compactMap { layer -> String? in
+            if case let .photo(photo) = layer.content {
                 return photo.photoID
             }
             return nil
         }
+        return layerIDs + [background.photoID].compactMap(\.self)
     }
 
     func layer(id: UUID) -> EditorLayer? {

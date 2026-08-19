@@ -36,7 +36,7 @@ struct EditorPhotoTests {
         let challengeLayer = try #require(sut.document.layers.first?.id)
         let addedLayer = try #require(sut.document.layers.last?.id)
 
-        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)), ofLayer: addedLayer)
+        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)), for: .layer(addedLayer))
 
         #expect(sut.document.crop(ofLayer: addedLayer) != nil)
         #expect(sut.document.crop(ofLayer: challengeLayer) == nil)
@@ -120,5 +120,63 @@ struct EditorPhotoTests {
         photoRepository.deleteOriginals(of: stored.document, and: stored.photoID)
 
         #expect(photoRepository.saved.isEmpty)
+    }
+
+    // MARK: Photo background
+
+    @Test func settingAPhotoBackgroundStoresTheBytesAndKeepsOnlyTheID() throws {
+        let photoRepository = SpyPhotoRepository()
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = try makeEditorSUT(activeRepository: activeRepository, photoRepository: photoRepository)
+        sut.load()
+
+        sut.setBackgroundPhoto(Data([0x02]))
+
+        let id = try #require(sut.document.background.photoID)
+        #expect(photoRepository.saved[id] == Data([0x02]))
+        #expect(sut.document.photoIDs.contains(id))
+        // Recorded so a background that is later replaced still has an owner
+        // when `deleteUnusedOriginals` runs at ✓.
+        #expect(activeRepository.stored?.importedPhotoIDs.contains(id) == true)
+    }
+
+    /// Going back to a palette drops the photo out of `photoIDs` while leaving
+    /// it in `importedPhotoIDs` — exactly the set the commit path collects.
+    @Test func returningToAPaletteLeavesTheOldPhotoForCleanup() throws {
+        let activeRepository = InMemoryActiveChallengeRepository()
+        let sut = try makeEditorSUT(activeRepository: activeRepository)
+        sut.load()
+        sut.setBackgroundPhoto(Data([0x02]))
+        let id = try #require(sut.document.background.photoID)
+
+        sut.setBackground(.palette(.mint))
+
+        #expect(!sut.document.photoIDs.contains(id))
+        #expect(activeRepository.stored?.importedPhotoIDs.contains(id) == true)
+    }
+
+    @Test func croppingTheBackgroundStoresTheCropAndRefreshesItsPreview() async throws {
+        let sut = try makeEditorSUT()
+        sut.load()
+        await sut.loadTask?.value
+        sut.setBackgroundPhoto(Data([0x02]))
+        let id = try #require(sut.document.background.photoID)
+
+        sut.beginCrop(.background)
+        #expect(sut.croppingPhotoID == id)
+
+        sut.commitCrop(CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)), for: .background)
+
+        #expect(sut.document.background.crop != nil)
+        #expect(sut.activeTool == nil)
+    }
+
+    /// Nothing to reframe means no crop screen — the palette has no pixels.
+    @Test func aPaletteBackgroundCannotBeCropped() throws {
+        let sut = try makeEditorSUT()
+
+        sut.beginCrop(.background)
+
+        #expect(sut.activeTool == nil)
     }
 }

@@ -289,7 +289,7 @@ extension EditorDocument {
         crop: CropSpec? = nil,
         texts: [TextItem] = [],
         stickers: [StickerItem] = [],
-        background: CanvasBackground = .white
+        background: CanvasBackground = .default
     ) -> EditorDocument {
         var document = EditorDocument(
             migrating: EditDraft(crop: crop, texts: texts, stickers: stickers),

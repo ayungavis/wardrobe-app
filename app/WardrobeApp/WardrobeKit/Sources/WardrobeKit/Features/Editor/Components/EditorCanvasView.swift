@@ -15,18 +15,25 @@ struct EditorCanvasView: View {
     @State private var gesture = TransientTransform()
 
     var body: some View {
-        CanvasFrameView(background: viewModel.document.background, canvasSize: $canvasSize)
-            .gesture(backgroundTap)
-            .overlay { layers }
-            .overlay { guides }
-            .overlay(alignment: .top) { snapBadges }
-            .overlay { drawingSurface }
-            .overlay(alignment: .bottom) { deleteTarget }
-            .modifier(CanvasTransformGestureModifier(
-                onChanged: { transformChanged($0, $1, $2) },
-                onEnded: { transformFinished($0, $1, $2) },
-                onCancelled: { gesture = TransientTransform() }
-            ))
+        CanvasFrameView(
+            background: viewModel.document.background,
+            photo: viewModel.preview(forPhoto:),
+            canvasSize: $canvasSize
+        )
+        // Registered before the single tap that starts a new text, the same
+        // ordering `EditorLayerView` already relies on.
+        .onTapGesture(count: 2) { viewModel.beginCrop(.background) }
+        .gesture(backgroundTap)
+        .overlay { layers }
+        .overlay { guides }
+        .overlay(alignment: .top) { snapBadges }
+        .overlay { drawingSurface }
+        .overlay(alignment: .bottom) { deleteTarget }
+        .modifier(CanvasTransformGestureModifier(
+            onChanged: { transformChanged($0, $1, $2) },
+            onEnded: { transformFinished($0, $1, $2) },
+            onCancelled: { gesture = TransientTransform() }
+        ))
     }
 
     private func transformChanged(
@@ -164,7 +171,7 @@ struct EditorCanvasView: View {
         if let draft = layer.textDraft {
             viewModel.beginEditingText(draft)
         } else if case .photo = layer.content {
-            viewModel.beginCrop(layerID: layer.id)
+            viewModel.beginCrop(.layer(layer.id))
         }
     }
 
@@ -259,12 +266,13 @@ struct EditorCanvasView: View {
 
 private struct CanvasFrameView: View {
     let background: CanvasBackground
+    let photo: (String) -> CGImage?
     @Binding var canvasSize: CGSize
 
     var body: some View {
         Color.clear
             .aspectRatio(StoryCanvas.aspectRatio, contentMode: .fit)
-            .background(CanvasBackgroundView(background: background))
+            .background(CanvasBackgroundView(background: background, photo: photo))
             .clipShape(.rect(cornerRadius: 12))
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size

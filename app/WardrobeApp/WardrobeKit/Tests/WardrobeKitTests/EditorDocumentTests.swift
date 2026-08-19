@@ -16,7 +16,7 @@ struct EditorDocumentTests {
     }
 
     private func makeDocument(layers: [EditorLayer]) -> EditorDocument {
-        EditorDocument(layers: layers, background: .mint)
+        EditorDocument(layers: layers, background: .palette(.mint))
     }
 
     // MARK: Round trip
@@ -72,7 +72,7 @@ struct EditorDocumentTests {
 
         let document = try decode(Data(json.utf8))
 
-        #expect(document.background == .white)
+        #expect(document.background == .palette(.white))
         #expect(document.layers.first?.transform == .identity)
         #expect(document.layers.first?.isLocked == false)
         guard case let .text(text) = document.layers.first?.content else {
@@ -112,10 +112,16 @@ struct EditorDocumentTests {
         }
     }
 
-    @Test func theCurrentVersionDecodes() throws {
-        let document = try decode(encode(makeDocument(layers: [])))
+    /// Stamped from what the document holds: a palette background needs nothing
+    /// a v1 reader lacks, so it stays v1 and older builds keep reading it.
+    @Test func theVersionIsStampedFromTheContent() throws {
+        #expect(try decode(encode(makeDocument(layers: []))).schemaVersion == 1)
 
-        #expect(document.schemaVersion == EditorDocument.currentSchemaVersion)
+        let withPhotoBackground = EditorDocument(
+            layers: [], background: .photo(id: "bg-1", crop: nil)
+        )
+        #expect(try decode(encode(withPhotoBackground)).schemaVersion == 2)
+        #expect(withPhotoBackground.schemaVersion == EditorDocument.currentSchemaVersion)
     }
 
     /// A document with no version at all predates versioning, so it is read as

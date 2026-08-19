@@ -65,7 +65,9 @@ public struct EditorView<ReviewDrawer: View>: View {
         .sheet(isPresented: $viewModel.isBackgroundPickerPresented) {
             BackgroundPickerView(
                 selected: viewModel.document.background,
-                onPick: viewModel.setBackground
+                photo: viewModel.preview(forPhoto:),
+                onPick: viewModel.setBackground,
+                onPickPhoto: viewModel.setBackgroundPhoto
             )
             .presentationDetents([.height(230)])
             .presentationDragIndicator(.hidden)
@@ -117,12 +119,12 @@ public struct EditorView<ReviewDrawer: View>: View {
         case let .failed(error):
             EditorLoadFailedView(error: error, onRetry: viewModel.load)
         case .loaded:
-            if case let .crop(layerID) = viewModel.activeTool, let photoID = viewModel.croppingPhotoID {
+            if case let .crop(target) = viewModel.activeTool, let photoID = viewModel.croppingPhotoID {
                 CropView(
                     viewModel: makeCropViewModel(photoID),
                     exit: .cancel,
                     onExit: viewModel.cancelTool,
-                    onUseCrop: { viewModel.commitCrop($0, ofLayer: layerID) }
+                    onUseCrop: { viewModel.commitCrop($0, for: target) }
                 )
             } else {
                 canvasStage

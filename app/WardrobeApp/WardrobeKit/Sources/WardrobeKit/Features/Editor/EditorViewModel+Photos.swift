@@ -79,6 +79,9 @@ public extension EditorViewModel {
             }
             cropped[photo.photoID] = Self.cropped(preview, to: photo.crop)
         }
+        if case let .photo(id, crop) = document.background, let preview = previewImages[id] {
+            cropped[id] = Self.cropped(preview, to: crop)
+        }
         croppedPreviews = cropped
     }
 

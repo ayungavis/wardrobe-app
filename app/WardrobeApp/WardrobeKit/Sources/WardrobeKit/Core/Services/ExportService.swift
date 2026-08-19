@@ -25,6 +25,10 @@ public enum ExportService {
             photos[content.photoID] = try await prepare(original: original, crop: content.crop)
         }
 
+        if case let .photo(id, crop) = document.background, let original = originals[id] {
+            photos[id] = try await prepare(original: original, crop: crop)
+        }
+
         let rendered = try await rasterize(document: document, photos: photos)
         return try await encode(rendered)
     }

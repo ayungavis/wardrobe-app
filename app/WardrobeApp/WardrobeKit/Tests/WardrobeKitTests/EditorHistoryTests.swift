@@ -43,7 +43,7 @@ struct EditorHistoryTests {
         sut.commitTransform(layerID: item.id, to: ElementTransform(scale: 2))
         sut.undo()
 
-        sut.setBackground(.mint)
+        sut.setBackground(.palette(.mint))
 
         #expect(!sut.canRedo)
     }
@@ -77,10 +77,10 @@ struct EditorHistoryTests {
         sut.load()
         await sut.loadTask?.value
         let photoID = try #require(sut.document.photoIDs.first)
-        try sut.beginCrop(layerID: #require(sut.document.firstPhotoLayerID))
+        try sut.beginCrop(.layer(#require(sut.document.firstPhotoLayerID)))
         try sut.commitCrop(
             CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)),
-            ofLayer: #require(sut.document.firstPhotoLayerID)
+            for: .layer(#require(sut.document.firstPhotoLayerID))
         )
         #expect(sut.preview(forPhoto: photoID)?.width == 50)
 

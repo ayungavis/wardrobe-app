@@ -58,7 +58,7 @@ struct EditorGestureTests {
     @Test func noLayerCanBeHeldWhileAToolIsOpen() {
         let layer = makeLayer()
         #expect(!EditorGesture.canHold(layer, activeTool: .drawing(.empty)))
-        #expect(!EditorGesture.canHold(layer, activeTool: .crop(UUID())))
+        #expect(!EditorGesture.canHold(layer, activeTool: .crop(.layer(UUID()))))
         #expect(!EditorGesture.canHold(layer, activeTool: .text(TextDraft(content: TextContent(content: "hi")), isNew: true)))
     }
 }

@@ -7,8 +7,15 @@ import Observation
 public final class EditorViewModel {
     public static let maximumTextLength = 280
 
+    /// What a crop is reframing. The background is not a layer, so an id alone
+    /// cannot say which of the two is meant.
+    public enum CropTarget: Equatable {
+        case layer(UUID)
+        case background
+    }
+
     public enum Tool: Equatable {
-        case crop(UUID)
+        case crop(CropTarget)
         case text(TextDraft, isNew: Bool)
         case drawing(DrawingContent)
     }
@@ -127,22 +134,34 @@ public final class EditorViewModel {
         persistDocument()
     }
 
-    public func beginCrop(layerID: UUID) {
-        guard case .photo = document.layer(id: layerID)?.content else { return }
-        activeTool = .crop(layerID)
+    public func beginCrop(_ target: CropTarget) {
+        guard photoID(for: target) != nil else { return }
+        activeTool = .crop(target)
     }
 
     public var croppingPhotoID: String? {
-        guard case let .crop(layerID) = activeTool,
-              case let .photo(content) = document.layer(id: layerID)?.content
-        else {
-            return nil
-        }
-        return content.photoID
+        guard case let .crop(target) = activeTool else { return nil }
+        return photoID(for: target)
     }
 
-    public func commitCrop(_ crop: CropSpec, ofLayer layerID: UUID) {
-        document.setCrop(crop, ofLayer: layerID)
+    private func photoID(for target: CropTarget) -> String? {
+        switch target {
+        case let .layer(id):
+            guard case let .photo(content) = document.layer(id: id)?.content else { return nil }
+            return content.photoID
+        case .background:
+            return document.background.photoID
+        }
+    }
+
+    public func commitCrop(_ crop: CropSpec, for target: CropTarget) {
+        switch target {
+        case let .layer(id):
+            document.setCrop(crop, ofLayer: id)
+        case .background:
+            guard let id = document.background.photoID else { return }
+            document.background = .photo(id: id, crop: crop)
+        }
         updateCroppedPreviews()
         activeTool = nil
         persistDocument()
@@ -236,6 +255,31 @@ public final class EditorViewModel {
         guard document.background != background else { return }
         document.background = background
         persistDocument()
+    }
+
+    /// The bytes go to the photo repository and the document keeps only the id.
+    ///
+    /// A background this replaces needs no cleanup of its own: it leaves
+    /// `photoIDs` but stays in `importedPhotoIDs`, which is exactly the set
+    /// `deleteUnusedOriginals` collects at ✓.
+    public func setBackgroundPhoto(_ data: Data) {
+        do {
+            let photoID = try photoRepository.saveOriginal(data)
+            challenge.importedPhotoIDs.append(photoID)
+
+            if case var .loaded(originals) = originals {
+                originals[photoID] = data
+                self.originals = .loaded(originals)
+            }
+            previewImages[photoID] = ImageDecoding.downsampledImage(from: data, maxPixel: 1600)
+
+            document.background = .photo(id: photoID, crop: nil)
+            updateCroppedPreviews()
+            persistDocument()
+        } catch {
+            Log.report(error)
+            alertError = .photoImportFailed
+        }
     }
 
     // MARK: Stickers (PRD FR-019)
