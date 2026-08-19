@@ -2,15 +2,10 @@ import DesignSystem
 import SwiftUI
 
 public struct RootView: View {
-    @State private var hasCompletedOnboarding: Bool
-
     private let container: AppContainer
 
     public init(container: AppContainer) {
         self.container = container
-        _hasCompletedOnboarding = State(
-            initialValue: container.preferencesRepository.load().hasCompletedOnboarding
-        )
     }
 
     public var body: some View {
@@ -19,12 +14,10 @@ public struct RootView: View {
                 .resizable()
                 .ignoresSafeArea()
 
-            if hasCompletedOnboarding {
+            if container.onboarding.isCompleted {
                 tabs
             } else {
-                OnboardingView(viewModel: container.makeOnboardingViewModel()) {
-                    hasCompletedOnboarding = true
-                }
+                OnboardingView(viewModel: container.makeOnboardingViewModel())
             }
         }
     }

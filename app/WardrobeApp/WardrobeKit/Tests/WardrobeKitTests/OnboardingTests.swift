@@ -32,18 +32,103 @@ struct AppleAccountTests {
 }
 
 @MainActor
-struct OnboardingViewModelTests {
+struct OnboardingModelTests {
     @MainActor private struct Setup {
-        let model: OnboardingViewModel
+        let model: OnboardingModel
         let accounts: InMemoryAppleAccountRepository
         let preferences: InMemoryAccountPreferencesRepository
 
         init() {
             accounts = InMemoryAppleAccountRepository()
             preferences = InMemoryAccountPreferencesRepository()
-            model = OnboardingViewModel(
-                accountRepository: accounts, preferencesRepository: preferences
-            )
+            model = OnboardingModel(preferences: preferences, accounts: accounts)
+        }
+    }
+
+    @Test func itReadsWhatWasStoredBefore() {
+        let preferences = InMemoryAccountPreferencesRepository()
+        preferences.stored = AccountPreferences(hasCompletedOnboarding: true)
+
+        let model = OnboardingModel(
+            preferences: preferences, accounts: InMemoryAppleAccountRepository()
+        )
+
+        #expect(model.isCompleted)
+    }
+
+    @Test func skippingFinishesWithoutAnAccount() {
+        let setup = Setup()
+
+        setup.model.skip()
+
+        #expect(setup.model.isCompleted)
+        #expect(setup.preferences.stored.hasCompletedOnboarding)
+        #expect(setup.model.isSignedIn == false)
+    }
+
+    @Test func signingInStoresTheAccountAndFinishes() throws {
+        let setup = Setup()
+        let account = AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
+
+        try setup.model.signIn(account)
+
+        #expect(setup.accounts.stored == account)
+        #expect(setup.model.isSignedIn)
+        #expect(setup.model.isCompleted)
+        #expect(setup.preferences.stored.hasCompletedOnboarding)
+    }
+
+    /// The merge rule has to survive the trip through the model, not just the
+    /// domain: Apple sends the name and email exactly once.
+    @Test func aSecondSignInDoesNotEraseTheStoredNameAndEmail() throws {
+        let setup = Setup()
+        try setup.model.signIn(
+            AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
+        )
+
+        try setup.model.signIn(AppleAccount(userID: "u1"))
+
+        #expect(setup.accounts.stored?.fullName == "Ada")
+        #expect(setup.accounts.stored?.email == "ada@example.com")
+    }
+
+    @Test func resettingSignsOutAndReopensOnboarding() throws {
+        let setup = Setup()
+        try setup.model.signIn(AppleAccount(userID: "u1"))
+
+        try setup.model.reset()
+
+        #expect(setup.model.isCompleted == false)
+        #expect(setup.preferences.stored.hasCompletedOnboarding == false)
+        #expect(setup.accounts.stored == nil)
+        #expect(setup.model.isSignedIn == false)
+    }
+
+    @Test func aFailedSaveFinishesNothing() {
+        let setup = Setup()
+        setup.accounts.saveError = .unexpected
+
+        #expect(throws: AppError.unexpected) {
+            try setup.model.signIn(AppleAccount(userID: "u1"))
+        }
+        #expect(setup.model.isCompleted == false)
+        #expect(setup.preferences.stored.hasCompletedOnboarding == false)
+    }
+}
+
+@MainActor
+struct OnboardingViewModelTests {
+    @MainActor private struct Setup {
+        let model: OnboardingViewModel
+        let onboarding: OnboardingModel
+        let accounts: InMemoryAppleAccountRepository
+        let preferences: InMemoryAccountPreferencesRepository
+
+        init() {
+            accounts = InMemoryAppleAccountRepository()
+            preferences = InMemoryAccountPreferencesRepository()
+            onboarding = OnboardingModel(preferences: preferences, accounts: accounts)
+            model = OnboardingViewModel(onboarding: onboarding)
         }
     }
 
@@ -75,89 +160,70 @@ struct OnboardingViewModelTests {
 
     @Test func skipAsksBeforeItFinishes() {
         let setup = Setup()
-        let model = setup.model
-        let preferences = setup.preferences
-        model.next()
-        model.next()
+        setup.model.next()
+        setup.model.next()
 
-        model.skip()
+        setup.model.skip()
 
-        #expect(model.isSkipConfirmationPresented)
-        #expect(model.isCompleted == false)
-        #expect(preferences.stored.hasCompletedOnboarding == false)
+        #expect(setup.model.isSkipConfirmationPresented)
+        #expect(setup.onboarding.isCompleted == false)
+        #expect(setup.preferences.stored.hasCompletedOnboarding == false)
     }
 
     @Test func cancellingTheDialogLeavesTheUserOnTheLastStep() {
         let setup = Setup()
-        let model = setup.model
-        let preferences = setup.preferences
-        model.next()
-        model.next()
-        model.skip()
+        setup.model.next()
+        setup.model.next()
+        setup.model.skip()
 
-        model.isSkipConfirmationPresented = false
+        setup.model.isSkipConfirmationPresented = false
 
-        #expect(model.step == .firstChallenge)
-        #expect(model.isCompleted == false)
-        #expect(preferences.stored.hasCompletedOnboarding == false)
+        #expect(setup.model.step == .firstChallenge)
+        #expect(setup.onboarding.isCompleted == false)
     }
 
     @Test func confirmingTheDialogFinishesWithoutAnAccount() {
         let setup = Setup()
-        let model = setup.model
-        let accounts = setup.accounts
-        let preferences = setup.preferences
-        model.skip()
+        setup.model.skip()
 
-        model.confirmSkip()
+        setup.model.confirmSkip()
 
-        #expect(model.isSkipConfirmationPresented == false)
-        #expect(model.isCompleted)
-        #expect(preferences.stored.hasCompletedOnboarding)
-        #expect(accounts.stored == nil)
+        #expect(setup.model.isSkipConfirmationPresented == false)
+        #expect(setup.onboarding.isCompleted)
+        #expect(setup.accounts.stored == nil)
     }
 
     @Test func signingInStoresTheAccountAndFinishes() {
         let setup = Setup()
-        let model = setup.model
-        let accounts = setup.accounts
-        let preferences = setup.preferences
         let account = AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
 
-        model.signedIn(account)
+        setup.model.signedIn(account)
 
-        #expect(accounts.stored == account)
-        #expect(model.isCompleted)
-        #expect(preferences.stored.hasCompletedOnboarding)
+        #expect(setup.accounts.stored == account)
+        #expect(setup.onboarding.isCompleted)
     }
 
     /// Onboarding is the only gate in front of the app: finishing it on a failed
     /// save would leave the user inside with no identity and no way back.
     @Test func aFailedSaveFinishesNothingAndSurfacesTheError() {
         let setup = Setup()
-        let model = setup.model
-        let accounts = setup.accounts
-        let preferences = setup.preferences
-        accounts.saveError = .unexpected
+        setup.accounts.saveError = .unexpected
 
-        model.signedIn(AppleAccount(userID: "u1"))
+        setup.model.signedIn(AppleAccount(userID: "u1"))
 
-        #expect(model.isCompleted == false)
-        #expect(preferences.stored.hasCompletedOnboarding == false)
-        #expect(model.alertError == .unexpected)
+        #expect(setup.onboarding.isCompleted == false)
+        #expect(setup.preferences.stored.hasCompletedOnboarding == false)
+        #expect(setup.model.alertError == .unexpected)
     }
 
     @Test func aFailedSignInLeavesTheUserWhereTheyWere() {
         let setup = Setup()
-        let model = setup.model
-        let preferences = setup.preferences
-        model.next()
-        model.next()
+        setup.model.next()
+        setup.model.next()
 
-        model.signInFailed(AppError.unexpected)
+        setup.model.signInFailed(AppError.unexpected)
 
-        #expect(model.step == .firstChallenge)
-        #expect(model.isCompleted == false)
-        #expect(preferences.stored.hasCompletedOnboarding == false)
+        #expect(setup.model.step == .firstChallenge)
+        #expect(setup.onboarding.isCompleted == false)
     }
 }

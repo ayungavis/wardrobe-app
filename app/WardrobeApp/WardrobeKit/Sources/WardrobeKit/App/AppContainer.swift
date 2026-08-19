@@ -9,7 +9,7 @@ public final class AppContainer {
     private let photoRepository: PhotoRepository
     let preferencesRepository: AccountPreferencesRepository
     private let completionPreviewRepository: CompletionPreviewRepository
-    private let appleAccountRepository: AppleAccountRepository
+    let onboarding: OnboardingModel
     private let cameraService: CameraService
 
     public init(
@@ -28,7 +28,9 @@ public final class AppContainer {
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
-        self.appleAccountRepository = appleAccountRepository
+        onboarding = OnboardingModel(
+            preferences: preferencesRepository, accounts: appleAccountRepository
+        )
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
@@ -45,10 +47,7 @@ public final class AppContainer {
     }
 
     public func makeOnboardingViewModel() -> OnboardingViewModel {
-        OnboardingViewModel(
-            accountRepository: appleAccountRepository,
-            preferencesRepository: preferencesRepository
-        )
+        OnboardingViewModel(onboarding: onboarding)
     }
 
     public func makeChallengeViewModel() -> ChallengeViewModel {
@@ -172,7 +171,8 @@ public final class AppContainer {
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
-            previews: completionPreviewRepository
+            previews: completionPreviewRepository,
+            onboarding: onboarding
         )
     }
 

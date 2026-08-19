@@ -4,11 +4,9 @@ import SwiftUI
 
 public struct OnboardingView: View {
     @State private var viewModel: OnboardingViewModel
-    private let onFinished: () -> Void
 
-    public init(viewModel: OnboardingViewModel, onFinished: @escaping () -> Void) {
+    public init(viewModel: OnboardingViewModel) {
         _viewModel = State(wrappedValue: viewModel)
-        self.onFinished = onFinished
     }
 
     public var body: some View {
@@ -29,11 +27,6 @@ public struct OnboardingView: View {
         }
         .padding(Spacing.xl)
         .animation(.snappy, value: viewModel.step)
-        .onChange(of: viewModel.isCompleted) { _, completed in
-            if completed {
-                onFinished()
-            }
-        }
         .confirmationDialog(
             Text("onboarding.skip.title", bundle: .module),
             isPresented: $viewModel.isSkipConfirmationPresented,

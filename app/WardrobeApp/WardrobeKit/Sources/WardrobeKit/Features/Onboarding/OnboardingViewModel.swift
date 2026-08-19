@@ -5,19 +5,13 @@ import Observation
 @Observable
 public final class OnboardingViewModel {
     var step: OnboardingStep = .wardrobe
-    public private(set) var isCompleted = false
     var isSkipConfirmationPresented = false
     public var alertError: AppError?
 
-    private let accountRepository: AppleAccountRepository
-    private let preferencesRepository: AccountPreferencesRepository
+    private let onboarding: OnboardingModel
 
-    public init(
-        accountRepository: AppleAccountRepository,
-        preferencesRepository: AccountPreferencesRepository
-    ) {
-        self.accountRepository = accountRepository
-        self.preferencesRepository = preferencesRepository
+    public init(onboarding: OnboardingModel) {
+        self.onboarding = onboarding
     }
 
     var canGoBack: Bool {
@@ -44,13 +38,12 @@ public final class OnboardingViewModel {
 
     func confirmSkip() {
         isSkipConfirmationPresented = false
-        complete()
+        onboarding.skip()
     }
 
     func signedIn(_ account: AppleAccount) {
         do {
-            try accountRepository.save(account)
-            complete()
+            try onboarding.signIn(account)
         } catch {
             Log.report(error)
             alertError = .unexpected
@@ -59,12 +52,5 @@ public final class OnboardingViewModel {
 
     func signInFailed(_ error: Error) {
         Log.report(error)
-    }
-
-    private func complete() {
-        var preferences = preferencesRepository.load()
-        preferences.hasCompletedOnboarding = true
-        preferencesRepository.save(preferences)
-        isCompleted = true
     }
 }
