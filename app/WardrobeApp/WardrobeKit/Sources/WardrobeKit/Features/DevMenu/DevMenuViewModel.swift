@@ -61,19 +61,25 @@ public final class DevMenuViewModel {
     }
 
     /// Puts today back to a clean slate: today's completion, the active
-    /// challenge, and both of their photos are gone, so the deck reopens.
+    /// challenge, and every photo either of them holds are gone, so the deck
+    /// reopens.
     public func resetToday() {
         let today = Date()
 
         let todaysCompletions = completedRepository.load()
             .filter { calendar.isDate($0.completedAt, inSameDayAs: today) }
         for completion in todaysCompletions {
-            deletePhoto(completion.photoID)
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
         }
         completedRepository.removeCompletions(on: today)
 
-        if let photoID = activeRepository.load()?.photoID {
-            deletePhoto(photoID)
+        if let active = activeRepository.load() {
+            photoRepository.deleteOriginals(of: active.document, and: active.photoID)
+            // Photos added and then deleted have nothing left in the document
+            // to name them, so this is the last chance to clean them up.
+            photoRepository.deleteUnusedOriginals(
+                of: active.document, imported: active.importedPhotoIDs
+            )
         }
         activeRepository.clear()
 
@@ -82,11 +88,17 @@ public final class DevMenuViewModel {
         Log.ui.info("Dev: today's challenge reset")
     }
 
-    private func deletePhoto(_ id: String) {
-        do {
-            try photoRepository.deleteOriginal(id: id)
-        } catch {
-            Log.report(error) // an orphaned file must not block the reset
+    /// Empties the whole history, photos included. The wardrobe is deliberately
+    /// untouched: the wear records those completions created stay, and "Reset
+    /// wardrobe" is the button that clears them.
+    public func resetHistory() {
+        for completion in completedRepository.load() {
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
         }
+        completedRepository.removeAll()
+
+        refresh()
+        lastAction = "History cleared"
+        Log.ui.info("Dev: history cleared")
     }
 }

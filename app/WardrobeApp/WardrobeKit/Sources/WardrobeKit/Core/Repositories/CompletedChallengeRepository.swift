@@ -8,6 +8,9 @@ public protocol CompletedChallengeRepository: Sendable {
     /// Drops every completion recorded on `date`. Used by the dev menu today;
     /// the same call is what an "undo completion" feature would need.
     func removeCompletions(on date: Date)
+    /// Empties the whole history. Dev-menu only — FR-096 makes a completion
+    /// permanent for the user, so nothing in the product may call this.
+    func removeAll()
 }
 
 public extension CompletedChallengeRepository {
@@ -67,6 +70,12 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
     public func removeCompletions(on date: Date) {
         let kept = load().filter { !calendar.isDate($0.completedAt, inSameDayAs: date) }
         save(kept)
+    }
+
+    /// Removes the key rather than storing an empty array, so `load` takes its
+    /// early exit instead of decoding nothing on every call.
+    public func removeAll() {
+        defaults.removeObject(forKey: Self.key)
     }
 
     private func save(_ completions: [CompletedChallenge]) {

@@ -8,6 +8,7 @@ struct DevMenuView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DevMenuViewModel
     @State private var isResetConfirmationPresented = false
+    @State private var isHistoryResetConfirmationPresented = false
     @State private var isWardrobeResetConfirmationPresented = false
     @State private var isBulkScanPresented = false
     @State private var isBenchmarkPresented = false
@@ -37,6 +38,9 @@ struct DevMenuView: View {
                 DevStateSection(summary: viewModel.summary)
                 DevTodaySection(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
+                }
+                DevHistorySection {
+                    isHistoryResetConfirmationPresented = true
                 }
                 DevWardrobeSection(
                     onScan: { isBulkScanPresented = true },
@@ -73,6 +77,23 @@ struct DevMenuView: View {
                     }
                 } message: {
                     Text(verbatim: "Deletes today's completion, the active challenge, and their photos.")
+                }
+                .confirmationDialog(
+                    Text(verbatim: "Reset all history?"),
+                    isPresented: $isHistoryResetConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button(role: .destructive) {
+                        viewModel.resetHistory()
+                        onStateChanged()
+                    } label: {
+                        Text(verbatim: "Reset")
+                    }
+                    Button(role: .cancel) {} label: {
+                        Text("common.cancel", bundle: .module)
+                    }
+                } message: {
+                    Text(verbatim: "Deletes every completed challenge and its photos. The wardrobe is left alone.")
                 }
                 .confirmationDialog(
                     Text(verbatim: "Reset wardrobe?"),
@@ -159,6 +180,23 @@ private struct DevTodaySection: View {
             // New dev actions go here as extra rows — one method on the view
             // model, one Button.
             Text(verbatim: lastAction ?? "Reopens the deck as if today had not started.")
+        }
+    }
+}
+
+private struct DevHistorySection: View {
+    let onReset: () -> Void
+
+    var body: some View {
+        Section {
+            Button(role: .destructive, action: onReset) {
+                Text(verbatim: "Reset all history")
+            }
+        } header: {
+            Text(verbatim: "History")
+        } footer: {
+            Text(verbatim: "Clears every completed challenge, not just today's. "
+                + "Wear counts survive; use Reset wardrobe.")
         }
     }
 }

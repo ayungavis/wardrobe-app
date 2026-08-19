@@ -45,6 +45,10 @@ final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, 
     func removeCompletions(on date: Date) {
         stored.removeAll { Calendar.current.isDate($0.completedAt, inSameDayAs: date) }
     }
+
+    func removeAll() {
+        stored = []
+    }
 }
 
 @MainActor

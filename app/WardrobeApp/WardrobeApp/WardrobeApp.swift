@@ -16,19 +16,7 @@ struct WardrobeAppApp: App {
 
     var body: some Scene {
         WindowGroup {
-//           ZStack{
-//                Image("appBG")
-//                    .resizable()
-//                    .ignoresSafeArea()
-//                RootView(container: container)
-//            }
             RootView(container: container)
-            // .background(Color.red.ignoresSafeArea())
-//                .background(
-//                                Image("appBG")
-//                                    .resizable()
-//                                    .ignoresSafeArea()
-//                            )
         }
         // Draft writes are coalesced, so this is where the last one is made to
         // land — without it, backgrounding mid-edit could lose the burst that
