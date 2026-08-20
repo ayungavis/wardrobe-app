@@ -113,6 +113,7 @@ public final class GarmentReviewModel {
     }
 
     private func insert(_ garment: ScannedGarment, completionID: UUID?, at date: Date) throws {
+        let wear = completionID.map { WearRecord(itemID: garment.id, completionID: $0, wornAt: date) }
         try wardrobeRepository.insert(
             WardrobeItem(
                 id: garment.id,
@@ -124,7 +125,7 @@ public final class GarmentReviewModel {
                 updatedAt: date
             ),
             fingerprint: garment.fingerprint,
-            wear: WearRecord(itemID: garment.id, completionID: completionID, wornAt: date)
+            wear: wear
         )
     }
 
@@ -134,8 +135,9 @@ public final class GarmentReviewModel {
         completionID: UUID?,
         at date: Date
     ) throws {
+        let wear = completionID.map { WearRecord(itemID: itemID, completionID: $0, wornAt: date) }
         try wardrobeRepository.recordWear(
-            WearRecord(itemID: itemID, completionID: completionID, wornAt: date),
+            wear,
             fingerprint: ItemFingerprint(
                 itemID: itemID,
                 version: garment.fingerprint.version,

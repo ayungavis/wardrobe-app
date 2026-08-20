@@ -6,8 +6,8 @@ public protocol WardrobeItemRepository: AnyObject {
     func items() throws -> [WardrobeItem]
     func fingerprints() throws -> [ItemFingerprint]
     func wears(for itemID: UUID) throws -> [WearRecord]
-    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws
-    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws
+    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
+    func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
     func update(_ item: WardrobeItem) throws
     func delete(itemID: UUID) throws
     func deleteAll() throws
@@ -18,26 +18,26 @@ public protocol WardrobeItemRepository: AnyObject {
 @MainActor
 public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     private let context: ModelContext
-
+    
     public init(container: ModelContainer) {
         context = ModelContext(container)
     }
-
+    
     public static var schema: Schema {
         Schema([WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self])
     }
-
+    
     public func items() throws -> [WardrobeItem] {
         let descriptor = FetchDescriptor<WardrobeItemEntity>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         return try context.fetch(descriptor).map(\.domain)
     }
-
+    
     public func fingerprints() throws -> [ItemFingerprint] {
         try context.fetch(FetchDescriptor<ItemFingerprintEntity>()).map(\.domain)
     }
-
+    
     public func wears(for itemID: UUID) throws -> [WearRecord] {
         let descriptor = FetchDescriptor<WearRecordEntity>(
             predicate: #Predicate { $0.itemID == itemID },
@@ -45,22 +45,26 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         )
         return try context.fetch(descriptor).map(\.domain)
     }
-
-    public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
+    
+    public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {
         context.insert(WardrobeItemEntity(item))
         if let fingerprint {
             context.insert(ItemFingerprintEntity(fingerprint))
         }
-        context.insert(WearRecordEntity(wear))
+        if let wear {
+            context.insert(WearRecordEntity(wear))
+        }
         try context.save()
     }
-
-    public func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
-        context.insert(WearRecordEntity(wear))
+    
+    public func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws {
+        if let wear {
+            context.insert(WearRecordEntity(wear))
+        }
         context.insert(ItemFingerprintEntity(fingerprint))
         try context.save()
     }
-
+    
     public func update(_ item: WardrobeItem) throws {
         let itemID = item.id
         let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
@@ -72,14 +76,14 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         entity.updatedAt = item.updatedAt
         try context.save()
     }
-
+    
     public func delete(itemID: UUID) throws {
         try context.delete(model: WardrobeItemEntity.self, where: #Predicate { $0.id == itemID })
         try context.delete(model: ItemFingerprintEntity.self, where: #Predicate { $0.itemID == itemID })
         try context.delete(model: WearRecordEntity.self, where: #Predicate { $0.itemID == itemID })
         try context.save()
     }
-
+    
     public func deleteAll() throws {
         try context.delete(model: WardrobeItemEntity.self)
         try context.delete(model: ItemFingerprintEntity.self)
@@ -107,7 +111,7 @@ final class WardrobeItemEntity {
     var styleVersion: String?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
-
+    
     init(_ item: WardrobeItem) {
         id = item.id
         name = item.name
@@ -120,7 +124,7 @@ final class WardrobeItemEntity {
         createdAt = item.createdAt
         updatedAt = item.updatedAt
     }
-
+    
     var domain: WardrobeItem {
         WardrobeItem(
             id: id,
@@ -148,7 +152,7 @@ final class ItemFingerprintEntity {
     @Attribute(.externalStorage) var featurePrint: Data = Data()
     var maskQuality: Float = 0
     var createdAt: Date = Date()
-
+    
     init(_ fingerprint: ItemFingerprint) {
         id = fingerprint.id
         itemID = fingerprint.itemID
@@ -159,7 +163,7 @@ final class ItemFingerprintEntity {
         maskQuality = fingerprint.maskQuality
         createdAt = fingerprint.createdAt
     }
-
+    
     var domain: ItemFingerprint {
         ItemFingerprint(
             id: id,
@@ -181,14 +185,14 @@ final class WearRecordEntity {
     var itemID: UUID = UUID()
     var completionID: UUID?
     var wornAt: Date = Date()
-
+    
     init(_ wear: WearRecord) {
         id = wear.id
         itemID = wear.itemID
         completionID = wear.completionID
         wornAt = wear.wornAt
     }
-
+    
     var domain: WearRecord {
         WearRecord(id: id, itemID: itemID, completionID: completionID, wornAt: wornAt)
     }

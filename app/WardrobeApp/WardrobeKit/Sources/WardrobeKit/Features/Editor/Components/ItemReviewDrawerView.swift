@@ -60,7 +60,9 @@ struct ItemReviewDrawerView: View {
                     ScannedGarmentRowView(
                         garment: garment,
                         scannedImage: thumbnail(garment.cutoutFile),
-                        candidateImage: itemThumbnail
+                        candidateImage: itemThumbnail,
+                        allowsMatching: true
+                        
                     ) { decision in
                         onChoose(garment.id, decision)
                     }
