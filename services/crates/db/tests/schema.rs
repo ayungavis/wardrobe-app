@@ -684,3 +684,57 @@ async fn recent_stickers_are_capped_and_follow_the_account(pool: PgPool) -> sqlx
     assert_eq!(remaining, 0, "preferences are deleted with the account");
     Ok(())
 }
+
+// ------------------------------------------------------------ error facts
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_database_error_yields_a_constraint_name_and_no_row_content(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let account_id = account(&pool).await?;
+    let item_id = item(&pool, account_id).await?;
+    sqlx::query("update wardrobe_item set name = 'Kemeja linen biru' where id = $1")
+        .bind(item_id)
+        .execute(&pool)
+        .await?;
+
+    let rejected =
+        sqlx::query("update wardrobe_item set description = repeat('x', 501) where id = $1")
+            .bind(item_id)
+            .execute(&pool)
+            .await
+            .expect_err("the length check must reject it");
+    let facts = wardrobe_db::error_facts(&rejected);
+
+    assert_eq!(facts.code, "database");
+    assert_eq!(facts.sqlstate.as_deref(), Some("23514"));
+    assert_eq!(
+        facts.constraint.as_deref(),
+        Some("wardrobe_item_description_check")
+    );
+    let recorded = format!(
+        "{facts:?}",
+        facts = (facts.code, &facts.sqlstate, &facts.constraint)
+    );
+    assert!(
+        !recorded.contains("Kemeja"),
+        "nothing derived from the error may carry a row value"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_missing_row_is_classified_without_touching_the_database_variant(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let missing = sqlx::query_scalar::<_, i64>("select change_seq from account where id = $1")
+        .bind(Uuid::now_v7())
+        .fetch_one(&pool)
+        .await
+        .expect_err("no such account");
+    let facts = wardrobe_db::error_facts(&missing);
+
+    assert_eq!(facts.code, "row_not_found");
+    assert!(facts.sqlstate.is_none() && facts.constraint.is_none());
+    Ok(())
+}

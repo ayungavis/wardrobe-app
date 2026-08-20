@@ -59,3 +59,37 @@ pub async fn claim_job(conn: &mut PgConnection, kind: &str) -> sqlx::Result<Opti
     .fetch_optional(conn)
     .await
 }
+
+// ---------------------------------------------------------------- errors
+
+pub struct ErrorFacts {
+    pub code: &'static str,
+    pub sqlstate: Option<String>,
+    pub constraint: Option<String>,
+}
+
+#[must_use]
+pub fn error_facts(error: &sqlx::Error) -> ErrorFacts {
+    let (code, database) = match error {
+        sqlx::Error::RowNotFound => ("row_not_found", None),
+        sqlx::Error::PoolTimedOut => ("pool_timed_out", None),
+        sqlx::Error::PoolClosed => ("pool_closed", None),
+        sqlx::Error::Io(_) => ("io", None),
+        sqlx::Error::Tls(_) => ("tls", None),
+        sqlx::Error::Protocol(_) => ("protocol", None),
+        sqlx::Error::Configuration(_) => ("configuration", None),
+        sqlx::Error::ColumnNotFound(_) | sqlx::Error::ColumnIndexOutOfBounds { .. } => {
+            ("column_not_found", None)
+        }
+        sqlx::Error::ColumnDecode { .. } | sqlx::Error::Decode(_) => ("decode", None),
+        sqlx::Error::Migrate(_) => ("migrate", None),
+        sqlx::Error::Database(source) => ("database", Some(source)),
+        _ => ("other", None),
+    };
+
+    ErrorFacts {
+        code,
+        sqlstate: database.and_then(|source| source.code().map(std::borrow::Cow::into_owned)),
+        constraint: database.and_then(|source| source.constraint().map(str::to_owned)),
+    }
+}

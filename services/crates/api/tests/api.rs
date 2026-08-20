@@ -211,3 +211,34 @@ fn the_committed_openapi_file_matches_the_code() {
         "services/openapi.json is stale — run `make backend-openapi`"
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn every_response_carries_a_request_id(pool: PgPool) -> sqlx::Result<()> {
+    let response = call(pool.clone(), get("/health")).await;
+
+    let id = response
+        .headers()
+        .get("x-request-id")
+        .expect("the layer stamps one when the caller sends none");
+    assert!(Uuid::parse_str(id.to_str().expect("ascii")).is_ok());
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_caller_supplied_request_id_is_propagated(pool: PgPool) -> sqlx::Result<()> {
+    let supplied = "0199aa11-2233-7445-8899-aabbccddeeff";
+    let request = Request::builder()
+        .uri("/health")
+        .header("x-request-id", supplied)
+        .body(Body::empty())
+        .expect("request");
+
+    let response = call(pool.clone(), request).await;
+
+    assert_eq!(
+        response.headers().get("x-request-id").unwrap(),
+        supplied,
+        "a client tracing one call across services must see its own id back"
+    );
+    Ok(())
+}

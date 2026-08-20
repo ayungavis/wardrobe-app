@@ -4,6 +4,10 @@ use std::env::{self, VarError};
 pub struct Config {
     pub database_url: String,
     pub bind_addr: String,
+    pub sentry_dsn: Option<String>,
+    pub sentry_environment: String,
+    pub sentry_traces_sample_rate: f32,
+    pub release: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -22,6 +26,13 @@ impl Config {
         Ok(Self {
             database_url: required("DATABASE_URL")?,
             bind_addr: bind_addr(optional("BIND_ADDR")?, optional("PORT")?),
+            sentry_dsn: optional("SENTRY_DSN")?,
+            sentry_environment: optional("SENTRY_ENVIRONMENT")?
+                .unwrap_or_else(|| "development".to_owned()),
+            sentry_traces_sample_rate: optional("SENTRY_TRACES_SAMPLE_RATE")?
+                .and_then(|raw| raw.parse().ok())
+                .unwrap_or(0.0),
+            release: optional("GIT_SHA")?.or(optional("RAILWAY_GIT_COMMIT_SHA")?),
         })
     }
 }

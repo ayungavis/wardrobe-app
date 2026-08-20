@@ -3,17 +3,35 @@ use std::process::ExitCode;
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
-use wardrobe_api::config::Config;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use wardrobe_api::{config::Config, observability};
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
+fn main() -> ExitCode {
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    // The guard flushes buffered events on drop, so it has to outlive the
+    // runtime rather than live inside it.
+    let _sentry = observability::init(&config);
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(tracing_subscriber::fmt::layer())
+        .with(sentry::integrations::tracing::layer())
         .init();
 
-    match run().await {
+    serve(config)
+}
+
+#[tokio::main]
+async fn serve(config: Config) -> ExitCode {
+    match run(config).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!("{error}");
@@ -22,9 +40,7 @@ async fn main() -> ExitCode {
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::from_env()?;
-
+async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let pool = PgPoolOptions::new()
         .max_connections(10)
         .connect(&config.database_url)
