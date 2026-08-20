@@ -38,8 +38,6 @@ pub struct MutationRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SyncResponse {
     pub results: Vec<MutationResult>,
-    /// The account's change position after this batch; pull `/v1/changes` from here.
-    pub next_since: i64,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -112,9 +110,5 @@ pub async fn sync(
         });
     }
 
-    let next_since = sync::current_change_seq(&state.pool, session.account_id).await?;
-    Ok(Json(SyncResponse {
-        results,
-        next_since,
-    }))
+    Ok(Json(SyncResponse { results }))
 }

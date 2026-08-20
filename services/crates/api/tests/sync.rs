@@ -88,7 +88,6 @@ async fn replaying_a_batch_changes_nothing_and_does_not_advance_the_cursor(
     let first = sync(&pool, &token, &body).await;
     assert_eq!(first["results"][0]["status"], "applied");
     let after_first = change_seq(&pool, account_id).await;
-    assert_eq!(first["nextSince"], after_first);
 
     let again = sync(&pool, &token, &body).await;
     assert_eq!(
@@ -376,6 +375,52 @@ async fn the_mutation_span_carries_the_mutation_name(pool: PgPool) -> sqlx::Resu
     assert!(
         names.iter().any(|name| name == probe),
         "without the name in the span every write in the system looks like one POST /v1/sync"
+    );
+    Ok(())
+}
+
+// ------------------------------------------------------------------ the cursor
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_write_never_lets_this_device_skip_another_devices_changes(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let (token, account_id) = session(&pool, Duration::days(1), false).await?;
+    let item_id = item(&pool, account_id).await?;
+
+    sync(
+        &pool,
+        &token,
+        &batch(&[upsert_preferences(&json!({ "recentStickerIds": ["star"] }))]),
+    )
+    .await;
+
+    let mine = sync(&pool, &token, &batch(&[delete_item(item_id)])).await;
+    assert!(
+        mine.get("nextSince").is_none(),
+        "a write response is not a cursor: it knows nothing about positions this device never pulled"
+    );
+
+    let response = call(
+        pool.clone(),
+        Request::builder()
+            .uri("/v1/changes?since=0")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::empty())
+            .expect("request"),
+    )
+    .await;
+    let feed = body_json(response).await;
+    let kinds: Vec<&str> = feed["changes"]
+        .as_array()
+        .expect("changes")
+        .iter()
+        .map(|change| change["kind"].as_str().expect("a kind"))
+        .collect();
+
+    assert!(
+        kinds.contains(&"accountPreference"),
+        "storing a write response as the cursor skips every position this device never pulled"
     );
     Ok(())
 }

@@ -1295,15 +1295,9 @@
         "type": "object",
         "description": "The outcome of every mutation in the batch, in the order they were sent.",
         "required": [
-          "results",
-          "nextSince"
+          "results"
         ],
         "properties": {
-          "nextSince": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The account's change position after this batch; pull `/v1/changes` from here."
-          },
           "results": {
             "type": "array",
             "items": {
