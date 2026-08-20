@@ -8,9 +8,11 @@ enum OnboardingStep: Int, CaseIterable {
     var titleKey: String {
         "onboarding.\(self).title"
     }
-    var descKey: String {
-        "onboarding.\(self).description"
+
+    var descKey: String? {
+        self == .firstChallenge ? nil : "onboarding.\(self).description"
     }
+
     var image: String {
         switch self {
         case .wardrobe: "obPreview-1"

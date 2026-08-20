@@ -13,20 +13,16 @@ public struct OnboardingView: View {
         @Bindable var viewModel = viewModel
 
         VStack(spacing: Spacing.xl) {
-            
-
             Spacer()
 
-            OnboardingStepView(step: viewModel.step){
+            OnboardingStepView(step: viewModel.step) {
                 actions
             }
-                .id(viewModel.step)
-                .transition(.opacity)
-
-            //Spacer()
+            .id(viewModel.step)
+            .transition(.opacity)
 
             progress
-            
+
             Spacer()
         }
         .padding(Spacing.xl)
@@ -114,10 +110,10 @@ public struct OnboardingView: View {
                         }
                         .accessibilityIdentifier("onboarding.back")
                     } else {
-                        Spacer().frame(width: 1) // keeps Next right-aligned on step 1
+                        Spacer().frame(width: 1)
                     }
                     Spacer()
-                    PrimaryButtonView(Text("onboarding.next", bundle: .module), minHeight: 28, action: viewModel.next)
+                    PrimaryButtonView(Text("onboarding.next", bundle: .module), action: viewModel.next)
                         .fixedSize()
                         .accessibilityIdentifier("onboarding.next")
                 }

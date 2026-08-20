@@ -53,29 +53,17 @@ public struct WardrobeItemDetailView: View {
                                 }
                             } label: {
                                 Image(systemName: isEditing ? "checkmark" : "square.and.pencil")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.black)
+                                    .font(AppFont.title)
+                                    .foregroundStyle(AppColor.textPrimary)
                                     .frame(width: 50, height: 50)
-                                    .background(Circle().fill(Color.white))
-                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                    .background(Circle().fill(AppColor.background))
+                                    .appShadow(.card)
                             }
-                            // Adjust these padding values to push it exactly where you want it on the corner
-                            .padding(.top, 5)
-                            .padding(.trailing, 10)
+                            .padding(.top, Spacing.xs)
+                            .padding(.trailing, Spacing.sm)
                         }
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
-
-//                        if isEditing {
-//                            Button(role: .destructive) {
-//                                isDeleteConfirmationPresented = true
-//                            } label: {
-//                                Image(systemName: "trash.circle")
-//                                    .font(.system(size: 32, weight: .light))
-//                                    .foregroundColor(.black)
-//                            }
-//                            .padding(.top, Spacing.lg)
-//                        }
 
                         if !isEditing {
                             VStack(spacing: Spacing.xl) {
@@ -92,7 +80,7 @@ public struct WardrobeItemDetailView: View {
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-#endif
+        #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(role: .destructive) {
@@ -101,11 +89,11 @@ public struct WardrobeItemDetailView: View {
                     }
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.red) // Styled red to indicate destructive action
+                        .font(AppFont.caption.weight(.bold))
+                        .foregroundStyle(AppColor.destructive)
                         .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.white))
-                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        .background(Circle().fill(AppColor.background))
+                        .appShadow(.card)
                 }
             }
         }
