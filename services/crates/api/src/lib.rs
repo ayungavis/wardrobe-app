@@ -7,6 +7,7 @@ pub mod openapi;
 pub mod routes;
 pub mod session;
 pub mod state;
+pub mod sync;
 
 use std::sync::Arc;
 
@@ -31,6 +32,7 @@ fn api_router() -> OpenApiRouter<AppState> {
         .routes(routes!(routes::sessions::apple))
         .routes(routes!(routes::sessions::refresh))
         .routes(routes!(routes::sessions::sign_out))
+        .routes(routes!(routes::sync::sync))
 }
 
 pub fn app(pool: PgPool, apple: Arc<auth::apple::Verifier>) -> Router {

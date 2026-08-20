@@ -212,6 +212,72 @@
         }
       }
     },
+    "/v1/sync": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Applies a batch of named mutations, each in its own transaction.",
+        "operationId": "sync",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Every mutation reported individually",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope itself could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 100 mutations, or a body past 1 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/whoami": {
       "get": {
         "tags": [
@@ -330,6 +396,94 @@
           }
         }
       },
+      "MutationRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "args"
+        ],
+        "properties": {
+          "args": {
+            "type": "object",
+            "description": "Arguments for this mutation."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The client's own id for this mutation, echoed back in its result."
+          },
+          "name": {
+            "type": "string",
+            "description": "Which mutation to run, such as `deleteItem`."
+          }
+        }
+      },
+      "MutationResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Outcome": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "status"
+            ],
+            "properties": {
+              "record": {
+                "type": "object",
+                "description": "The record as it now stands, which a replay returns unchanged."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "error",
+              "status"
+            ],
+            "properties": {
+              "error": {
+                "$ref": "#/components/schemas/ErrorDetail",
+                "description": "This mutation alone failed; its neighbours were still applied."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            }
+          }
+        ]
+      },
       "RefreshRequest": {
         "type": "object",
         "required": [
@@ -371,6 +525,41 @@
           },
           "refreshToken": {
             "type": "string"
+          }
+        }
+      },
+      "SyncRequest": {
+        "type": "object",
+        "required": [
+          "mutations"
+        ],
+        "properties": {
+          "mutations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MutationRequest"
+            }
+          }
+        }
+      },
+      "SyncResponse": {
+        "type": "object",
+        "description": "The outcome of every mutation in the batch, in the order they were sent.",
+        "required": [
+          "results",
+          "nextSince"
+        ],
+        "properties": {
+          "nextSince": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The account's change position after this batch; pull `/v1/changes` from here."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MutationResult"
+            }
           }
         }
       },

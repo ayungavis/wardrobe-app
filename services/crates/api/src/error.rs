@@ -12,6 +12,10 @@ pub enum Error {
     Unauthenticated,
     #[error("the request conflicts with stored state")]
     Conflict,
+    #[error("the referenced record does not exist")]
+    NotFound,
+    #[error("the request is too large")]
+    TooLarge,
     #[error("service unavailable")]
     Unavailable,
     #[error("internal error")]
@@ -24,6 +28,8 @@ impl Error {
             Self::BadRequest => StatusCode::BAD_REQUEST,
             Self::Unauthenticated => StatusCode::UNAUTHORIZED,
             Self::Conflict => StatusCode::CONFLICT,
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -34,6 +40,8 @@ impl Error {
             Self::BadRequest => "bad_request",
             Self::Unauthenticated => "unauthenticated",
             Self::Conflict => "conflict",
+            Self::NotFound => "not_found",
+            Self::TooLarge => "payload_too_large",
             Self::Unavailable => "unavailable",
             Self::Internal(_) => "internal",
         }
@@ -45,6 +53,10 @@ impl Error {
             Self::Unauthenticated => "Authentication is required for this request.",
             Self::Conflict => {
                 "This device already holds data for a different account. Sign in on a fresh install, or contact support to merge them."
+            }
+            Self::NotFound => "That record does not exist.",
+            Self::TooLarge => {
+                "The request is larger than this endpoint accepts. Send fewer changes at a time."
             }
             Self::Unavailable => "The service is temporarily unavailable. Try again shortly.",
             Self::Internal(_) => "Something went wrong on our side.",
@@ -68,9 +80,10 @@ pub struct ErrorDetail {
     pub message: String,
 }
 
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        if let Self::Internal(source) = &self {
+impl Error {
+    #[must_use]
+    pub fn detail(&self) -> ErrorDetail {
+        if let Self::Internal(source) = self {
             let facts = wardrobe_db::error_facts(source);
             tracing::error!(
                 error.kind = facts.code,
@@ -80,12 +93,22 @@ impl IntoResponse for Error {
             );
         }
 
-        let body = ErrorBody {
-            error: ErrorDetail {
-                code: self.code().to_owned(),
-                message: self.message().to_owned(),
-            },
-        };
-        (self.status(), Json(body)).into_response()
+        ErrorDetail {
+            code: self.code().to_owned(),
+            message: self.message().to_owned(),
+        }
+    }
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let status = self.status();
+        (
+            status,
+            Json(ErrorBody {
+                error: self.detail(),
+            }),
+        )
+            .into_response()
     }
 }
