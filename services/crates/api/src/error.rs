@@ -69,7 +69,6 @@ pub struct ErrorDetail {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         if let Self::Internal(source) = &self {
-            // Logged with its cause, returned without it.
             tracing::error!(error = %source, "internal error");
         }
 

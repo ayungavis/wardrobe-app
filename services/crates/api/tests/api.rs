@@ -92,9 +92,6 @@ async fn health_reports_unavailable_when_the_database_is_gone(pool: PgPool) {
 }
 
 // -------------------------------------------------------------------- auth
-//
-// Each rejection is its own test because each is a different way in, and a
-// single "bad token" case would let three of them regress unnoticed.
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_valid_token_resolves_to_its_account(pool: PgPool) -> sqlx::Result<()> {

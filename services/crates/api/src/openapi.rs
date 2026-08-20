@@ -15,7 +15,6 @@ use utoipa::{Modify, openapi::OpenApi as OpenApiDoc};
         description = "Backend for the Wardrobe Challenge App. Session tokens are issued by the server; \
                        the client never asserts an identity of its own.",
         version = "0.1.0",
-        // Without this, utoipa emits an empty license object from Cargo.toml.
         license(name = "Proprietary"),
     ),
     modifiers(&SecurityAddon),
@@ -48,8 +47,6 @@ struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut OpenApiDoc) {
-        // `components` is always present once anything is registered, but the
-        // type is optional; adding it here keeps the scheme defined either way.
         let components = openapi.components.get_or_insert_with(Default::default);
         components.add_security_scheme(
             "session",

@@ -16,8 +16,6 @@ async fn main() -> ExitCode {
     match run().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            // Startup failures must name the thing that failed; a stack trace
-            // helps nobody at 3am.
             tracing::error!("{error}");
             ExitCode::FAILURE
         }
@@ -32,11 +30,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&config.database_url)
         .await?;
 
-    // Before the listener opens, so no request ever meets a half-applied
-    // schema. sqlx takes an advisory lock, so concurrent instances are safe.
-    // A failing migration takes the process down with it, which is the correct
-    // outcome: the platform keeps the previous deployment serving rather than
-    // promoting an API running against the wrong schema.
     wardrobe_db::MIGRATOR.run(&pool).await?;
     tracing::info!("migrations applied");
 

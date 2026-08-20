@@ -44,8 +44,6 @@ impl FromRequestParts<AppState> for Session {
 ///
 /// Returns [`Error::Internal`] when the database cannot be queried.
 pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Error> {
-    // Expiry and revocation are part of the query rather than a later check, so
-    // there is no window in which a caller counts as authenticated first.
     let row: Option<(Uuid, Uuid)> = sqlx::query_as(
         "select id, account_id
            from session
@@ -73,7 +71,6 @@ pub fn hash_token(token: &str) -> Vec<u8> {
 fn bearer(parts: &Parts) -> Option<String> {
     let value = parts.headers.get(AUTHORIZATION)?.to_str().ok()?;
     let (scheme, token) = value.split_once(' ')?;
-    // Case-insensitive per RFC 7235; some clients send "bearer".
     if !scheme.eq_ignore_ascii_case("bearer") || token.trim().is_empty() {
         return None;
     }

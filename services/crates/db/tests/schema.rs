@@ -308,7 +308,6 @@ async fn two_claimants_never_receive_the_same_job(pool: PgPool) -> sqlx::Result<
     let mut second = pool.begin().await?;
 
     let claimed = wardrobe_db::claim_job(&mut first, "illustration").await?;
-    // Still inside the first transaction, so the row is locked.
     let stolen = wardrobe_db::claim_job(&mut second, "illustration").await?;
 
     assert!(claimed.is_some());
