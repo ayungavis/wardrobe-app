@@ -20,15 +20,25 @@ public struct OnboardingView: View {
             }
             .id(viewModel.step)
             .transition(.opacity)
+            .animation(.snappy, value: viewModel.step)
 
             progress
         }
         .padding(Spacing.xl)
-        .animation(.snappy, value: viewModel.step)
-        .confirmationDialog(
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(.rect)
+        .gesture(
+            DragGesture(minimumDistance: 20).onEnded { value in
+                switch OnboardingSwipe.direction(for: value.translation) {
+                case .next: viewModel.next()
+                case .back: viewModel.back()
+                case nil: break
+                }
+            }
+        )
+        .alert(
             Text("onboarding.skip.title", bundle: .module),
-            isPresented: $viewModel.isSkipConfirmationPresented,
-            titleVisibility: .visible
+            isPresented: $viewModel.isSkipConfirmationPresented
         ) {
             Button(role: .destructive) {
                 viewModel.confirmSkip()
