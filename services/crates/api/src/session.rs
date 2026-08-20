@@ -43,7 +43,26 @@ pub async fn issue(
     account_id: Uuid,
     device_id: Uuid,
 ) -> Result<Issued, Error> {
+    write_session(conn, account_id, Some(device_id), None).await
+}
+
+async fn issue_in_family(
+    tx: &mut Transaction<'_, Postgres>,
+    account_id: Uuid,
+    device_id: Option<Uuid>,
+    family_id: Uuid,
+) -> Result<Issued, Error> {
+    write_session(tx, account_id, device_id, Some(family_id)).await
+}
+
+async fn write_session(
+    conn: &mut PgConnection,
+    account_id: Uuid,
+    device_id: Option<Uuid>,
+    family_id: Option<Uuid>,
+) -> Result<Issued, Error> {
     let id = Uuid::now_v7();
+    let family_id = family_id.unwrap_or(id);
     let access_token = secret();
     let refresh_token = secret();
     let expires_at = Utc::now() + Duration::days(ACCESS_LIFETIME_DAYS);
@@ -53,7 +72,7 @@ pub async fn issue(
         "insert into session
              (id, account_id, device_id, family_id, token_hash, refresh_token_hash,
               expires_at, refresh_expires_at)
-         values ($1, $2, $3, $1, $4, $5, $6, $7)",
+         values ($1, $2, $3, $8, $4, $5, $6, $7)",
     )
     .bind(id)
     .bind(account_id)
@@ -62,6 +81,7 @@ pub async fn issue(
     .bind(hash_token(&refresh_token))
     .bind(expires_at)
     .bind(refresh_expires_at)
+    .bind(family_id)
     .execute(&mut *conn)
     .await?;
 
@@ -74,127 +94,77 @@ pub async fn issue(
     })
 }
 
+#[derive(sqlx::FromRow)]
+struct RefreshRow {
+    id: Uuid,
+    account_id: Uuid,
+    device_id: Option<Uuid>,
+    family_id: Uuid,
+    rotated_at: Option<DateTime<Utc>>,
+    revoked_at: Option<DateTime<Utc>>,
+    refresh_expires_at: Option<DateTime<Utc>>,
+}
+
+pub enum Refreshed {
+    Rotated(Issued),
+    Replayed,
+    Unknown,
+}
+
 /// # Errors
 ///
 /// Returns any database error unchanged.
-pub async fn anonymous_account(
+pub async fn rotate(
     tx: &mut Transaction<'_, Postgres>,
-    device_id: Uuid,
-) -> Result<Uuid, Error> {
-    if let Some((account_id,)) = existing_device(tx, device_id).await? {
-        return Ok(account_id);
+    refresh_token: &str,
+) -> Result<Refreshed, Error> {
+    let row: Option<RefreshRow> = sqlx::query_as(
+        "select id, account_id, device_id, family_id, rotated_at, revoked_at, refresh_expires_at
+           from session
+          where refresh_token_hash = $1
+          for update",
+    )
+    .bind(hash_token(refresh_token))
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    let Some(row) = row else {
+        return Ok(Refreshed::Unknown);
+    };
+
+    // Checked before revocation, because a rotated row is also a revoked one and
+    // the order decides whether a replay is merely refused or treated as theft.
+    if row.rotated_at.is_some() {
+        revoke_family(tx, row.family_id).await?;
+        return Ok(Refreshed::Replayed);
+    }
+    if row.revoked_at.is_some() || row.refresh_expires_at.is_none_or(|at| at <= Utc::now()) {
+        return Ok(Refreshed::Unknown);
     }
 
-    let account_id = Uuid::now_v7();
-    sqlx::query("insert into account (id) values ($1)")
-        .bind(account_id)
+    // The old access token dies with its refresh token. A 30-day access token
+    // that outlives the rotation that replaced it would make rotation cosmetic.
+    sqlx::query("update session set rotated_at = now(), revoked_at = now() where id = $1")
+        .bind(row.id)
         .execute(&mut **tx)
         .await?;
-    register_device(tx, device_id, account_id).await?;
-    Ok(account_id)
+
+    let issued = issue_in_family(tx, row.account_id, row.device_id, row.family_id).await?;
+    Ok(Refreshed::Rotated(issued))
 }
 
 /// # Errors
 ///
-/// Returns [`Error::Conflict`] when this device already holds data for a
-/// different account, which needs a merge rather than a link.
-pub async fn link_apple(
+/// Returns any database error unchanged.
+pub async fn revoke_family(
     tx: &mut Transaction<'_, Postgres>,
-    subject: &str,
-    device_id: Uuid,
-) -> Result<Uuid, Error> {
-    let existing: Option<(Uuid,)> =
-        sqlx::query_as("select id from account where apple_subject = $1 and deleted_at is null")
-            .bind(subject)
-            .fetch_optional(&mut **tx)
-            .await?;
-    let device_account = existing_device(tx, device_id).await?.map(|(id,)| id);
-
-    match (existing, device_account) {
-        // Already this account's device.
-        (Some((account_id,)), Some(device)) if device == account_id => Ok(account_id),
-
-        // Second device. Moving the device row is the whole of it while the
-        // anonymous account holds nothing; anything else is a merge (T06b).
-        (Some((account_id,)), Some(device)) => {
-            if holds_data(tx, device).await? {
-                return Err(Error::Conflict);
-            }
-            register_device(tx, device_id, account_id).await?;
-            sqlx::query("delete from account where id = $1")
-                .bind(device)
-                .execute(&mut **tx)
-                .await?;
-            Ok(account_id)
-        }
-        (Some((account_id,)), None) => {
-            register_device(tx, device_id, account_id).await?;
-            Ok(account_id)
-        }
-
-        // First sign-in: the anonymous account becomes the Apple account, so no
-        // row moves and no change_seq needs renumbering.
-        (None, Some(account_id)) => {
-            sqlx::query("update account set apple_subject = $2 where id = $1")
-                .bind(account_id)
-                .bind(subject)
-                .execute(&mut **tx)
-                .await?;
-            Ok(account_id)
-        }
-        (None, None) => {
-            let account_id = Uuid::now_v7();
-            sqlx::query("insert into account (id, apple_subject) values ($1, $2)")
-                .bind(account_id)
-                .bind(subject)
-                .execute(&mut **tx)
-                .await?;
-            register_device(tx, device_id, account_id).await?;
-            Ok(account_id)
-        }
-    }
-}
-
-async fn existing_device(
-    tx: &mut Transaction<'_, Postgres>,
-    device_id: Uuid,
-) -> Result<Option<(Uuid,)>, Error> {
-    sqlx::query_as("select account_id from account_device where anonymous_id = $1")
-        .bind(device_id)
-        .fetch_optional(&mut **tx)
-        .await
-        .map_err(Error::from)
-}
-
-async fn register_device(
-    tx: &mut Transaction<'_, Postgres>,
-    device_id: Uuid,
-    account_id: Uuid,
+    family_id: Uuid,
 ) -> Result<(), Error> {
     sqlx::query(
-        "insert into account_device (anonymous_id, account_id, last_seen_at)
-         values ($1, $2, now())
-         on conflict (anonymous_id) do update
-            set account_id = excluded.account_id, last_seen_at = now()",
+        "update session set revoked_at = now() where family_id = $1 and revoked_at is null",
     )
-    .bind(device_id)
-    .bind(account_id)
+    .bind(family_id)
     .execute(&mut **tx)
     .await?;
     Ok(())
-}
-
-async fn holds_data(tx: &mut Transaction<'_, Postgres>, account_id: Uuid) -> Result<bool, Error> {
-    let (any,): (bool,) = sqlx::query_as(
-        "select exists (select 1 from wardrobe_item where account_id = $1)
-             or exists (select 1 from photo           where account_id = $1)
-             or exists (select 1 from challenge_completion where account_id = $1)
-             or exists (select 1 from wear_record     where account_id = $1)
-             or exists (select 1 from active_challenge where account_id = $1)
-             or exists (select 1 from account_preference where account_id = $1)",
-    )
-    .bind(account_id)
-    .fetch_one(&mut **tx)
-    .await?;
-    Ok(any)
 }

@@ -171,6 +171,47 @@
         ]
       }
     },
+    "/v1/sessions/refresh": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Exchanges a refresh token for a new pair and retires the old one.",
+        "operationId": "refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A rotated session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown, expired, revoked, or already-used refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/whoami": {
       "get": {
         "tags": [
@@ -286,6 +327,18 @@
             "type": "string",
             "description": "`ok` when the process is up and the database answers.",
             "example": "ok"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token from the previous session response."
           }
         }
       },

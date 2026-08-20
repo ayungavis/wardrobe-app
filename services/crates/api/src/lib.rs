@@ -1,3 +1,4 @@
+pub mod account;
 pub mod auth;
 pub mod config;
 pub mod error;
@@ -25,9 +26,10 @@ use crate::state::AppState;
 fn api_router() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(routes::health::health))
-        .routes(routes!(routes::session::whoami))
+        .routes(routes!(routes::whoami::whoami))
         .routes(routes!(routes::sessions::anonymous))
         .routes(routes!(routes::sessions::apple))
+        .routes(routes!(routes::sessions::refresh))
         .routes(routes!(routes::sessions::sign_out))
 }
 

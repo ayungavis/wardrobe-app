@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::account;
 use crate::auth::Session;
 use crate::auth::apple::AppleError;
 use crate::error::Error;
-use crate::session::{self, Issued};
+use crate::session::{self, Issued, Refreshed};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -17,6 +18,13 @@ use crate::state::AppState;
 pub struct AnonymousRequest {
     /// The UUID the client holds in its Keychain.
     pub device_id: Uuid,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshRequest {
+    /// The refresh token from the previous session response.
+    pub refresh_token: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -78,7 +86,7 @@ pub async fn anonymous(
     Json(request): Json<AnonymousRequest>,
 ) -> Result<Json<SessionResponse>, Error> {
     let mut tx = state.pool.begin().await?;
-    let account_id = session::anonymous_account(&mut tx, request.device_id).await?;
+    let account_id = account::anonymous_account(&mut tx, request.device_id).await?;
     let issued = session::issue(&mut tx, account_id, request.device_id).await?;
     tx.commit().await?;
 
@@ -108,11 +116,43 @@ pub async fn apple(
         .await?;
 
     let mut tx = state.pool.begin().await?;
-    let account_id = session::link_apple(&mut tx, &identity.subject, request.device_id).await?;
+    let account_id = account::link_apple(&mut tx, &identity.subject, request.device_id).await?;
     let issued = session::issue(&mut tx, account_id, request.device_id).await?;
     tx.commit().await?;
 
     Ok(Json(issued.into()))
+}
+
+/// Exchanges a refresh token for a new pair and retires the old one.
+#[utoipa::path(
+    post,
+    path = "/v1/sessions/refresh",
+    tag = "session",
+    request_body = RefreshRequest,
+    responses(
+        (status = 200, description = "A rotated session", body = SessionResponse),
+        (status = 401, description = "Unknown, expired, revoked, or already-used refresh token", body = crate::error::ErrorBody),
+    )
+)]
+pub async fn refresh(
+    State(state): State<AppState>,
+    Json(request): Json<RefreshRequest>,
+) -> Result<Json<SessionResponse>, Error> {
+    let mut tx = state.pool.begin().await?;
+    let outcome = session::rotate(&mut tx, &request.refresh_token).await?;
+    tx.commit().await?;
+
+    match outcome {
+        Refreshed::Rotated(issued) => Ok(Json(issued.into())),
+        Refreshed::Replayed => {
+            // A refresh token presented twice means a copy of it exists somewhere
+            // it should not. The family goes, and the device re-authenticates
+            // silently from its Keychain identity.
+            tracing::warn!("a rotated refresh token was replayed; its session family was revoked");
+            Err(Error::Unauthenticated)
+        }
+        Refreshed::Unknown => Err(Error::Unauthenticated),
+    }
 }
 
 /// Revokes every session in this device's family.
