@@ -8,11 +8,6 @@ use uuid::Uuid;
 use crate::error::Error;
 use crate::state::AppState;
 
-/// An authenticated caller.
-///
-/// This extractor is the only route to an `account_id`. Handlers never read the
-/// header themselves, so an unauthenticated endpoint has to be written that way
-/// on purpose rather than by forgetting.
 #[derive(Debug, Clone, Copy)]
 pub struct Session {
     pub account_id: Uuid,
@@ -33,16 +28,9 @@ impl FromRequestParts<AppState> for Session {
     }
 }
 
-/// Looks up a session token.
-///
-/// `Ok(None)` means the token is not usable — unknown, expired, or revoked.
-/// A database failure stays an error rather than collapsing into "not
-/// authenticated", so an outage is never reported to the client as a rejected
-/// credential.
-///
 /// # Errors
 ///
-/// Returns [`Error::Internal`] when the database cannot be queried.
+/// Returns any database error unchanged.
 pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Error> {
     let row: Option<(Uuid, Uuid)> = sqlx::query_as(
         "select id, account_id
@@ -61,8 +49,6 @@ pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Erro
     }))
 }
 
-/// The stored form of a session token. Only the hash is ever persisted, so a
-/// leaked database yields no usable sessions.
 #[must_use]
 pub fn hash_token(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()

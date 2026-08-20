@@ -2,12 +2,6 @@ use utoipa::OpenApi;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, openapi::OpenApi as OpenApiDoc};
 
-/// The document served at `/openapi.json` and rendered at `/docs`.
-///
-/// It is generated from the handlers themselves, so it cannot describe an
-/// endpoint that does not exist. The decisions it *cannot* express — why the
-/// cursor is what it is, what idempotency guarantees, what an anonymous account
-/// actually protects — live in `docs/api-contract.md`.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -25,11 +19,6 @@ use utoipa::{Modify, openapi::OpenApi as OpenApiDoc};
 )]
 pub struct ApiDoc;
 
-/// The document as it is committed to `services/openapi.json`.
-///
-/// One function behind both the generator and the drift test, so the file and
-/// the check can never disagree about formatting.
-///
 /// # Panics
 ///
 /// Panics if the derived document cannot be serialised, which would mean the

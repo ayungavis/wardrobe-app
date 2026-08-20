@@ -14,9 +14,6 @@ pub struct WhoAmI {
 }
 
 /// Confirms which account a session token belongs to.
-///
-/// The client uses it after sign-in or restore to check that its stored token is
-/// still good, without having to attempt a real write to find out.
 #[utoipa::path(
     get,
     path = "/v1/whoami",

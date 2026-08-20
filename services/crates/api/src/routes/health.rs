@@ -14,10 +14,6 @@ pub struct Health {
 }
 
 /// Liveness and readiness in one.
-///
-/// It deliberately touches `PostgreSQL`: a health check that does not would only
-/// report that this process is running, which is the least useful thing to know
-/// about a service whose entire job is reading and writing a database.
 #[utoipa::path(
     get,
     path = "/health",

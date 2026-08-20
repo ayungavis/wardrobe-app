@@ -1,9 +1,5 @@
 use std::env::{self, VarError};
 
-/// Everything the process needs from its environment, read once at startup.
-///
-/// Missing configuration fails here with the variable's name rather than
-/// surfacing later as a connection error nobody can trace back.
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,
@@ -21,8 +17,7 @@ pub enum ConfigError {
 impl Config {
     /// # Errors
     ///
-    /// Returns [`ConfigError`] naming the first variable that is missing or
-    /// unreadable.
+    /// Returns [`ConfigError`] when a required variable is absent or unusable.
     pub fn from_env() -> Result<Self, ConfigError> {
         Ok(Self {
             database_url: required("DATABASE_URL")?,
@@ -31,12 +26,6 @@ impl Config {
     }
 }
 
-/// Where to listen, in the order that lets one binary serve both worlds.
-///
-/// `BIND_ADDR` wins so local development can pin an interface. `PORT` is what
-/// Railway and most other platforms inject, and it must be bound on `0.0.0.0`:
-/// binding loopback there produces a process that looks healthy to itself and
-/// never receives a single request.
 fn bind_addr(explicit: Option<String>, port: Option<String>) -> String {
     match (explicit, port) {
         (Some(addr), _) => addr,
@@ -69,8 +58,6 @@ mod tests {
         assert_eq!(resolved, "127.0.0.1:9000");
     }
 
-    /// The platform case: `PORT` alone must reach every interface, or the
-    /// health check never arrives.
     #[test]
     fn a_platform_port_binds_every_interface() {
         assert_eq!(bind_addr(None, Some("3000".into())), "0.0.0.0:3000");

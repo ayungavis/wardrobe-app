@@ -4,19 +4,12 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Every failure the API can return.
-///
-/// One enum and one `IntoResponse` means the status mapping lives in a single
-/// place: once a variant has a status, every handler is consistent without
-/// having to remember anything.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("authentication required")]
     Unauthenticated,
     #[error("service unavailable")]
     Unavailable,
-    /// The source is logged, never returned: it can quote SQL, object keys, or
-    /// provider payloads, none of which may leave the process (PRD §18.12).
     #[error("internal error")]
     Internal(#[from] sqlx::Error),
 }
@@ -30,8 +23,6 @@ impl Error {
         }
     }
 
-    /// A stable identifier clients may branch on. Unlike the message, this is
-    /// part of the contract and does not change with wording.
     fn code(&self) -> &'static str {
         match self {
             Self::Unauthenticated => "unauthenticated",
@@ -40,7 +31,6 @@ impl Error {
         }
     }
 
-    /// Safe to show a user. Deliberately not derived from the source error.
     fn message(&self) -> &'static str {
         match self {
             Self::Unauthenticated => "Authentication is required for this request.",

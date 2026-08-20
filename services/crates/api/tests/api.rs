@@ -1,6 +1,3 @@
-//! The API's boundary behaviour: what gets in, what comes back out, and what
-//! must never appear in a response body.
-
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response;
@@ -40,8 +37,6 @@ fn get_with_auth(path: &str, header: &str) -> Request<Body> {
         .expect("request")
 }
 
-/// Inserts a session and returns the plaintext token, which exists only here —
-/// the database stores its hash.
 async fn session(
     pool: &PgPool,
     expires_in: Duration,
@@ -54,11 +49,12 @@ async fn session(
         .await?;
 
     let token = format!("token-{}", Uuid::now_v7());
+    let session_id = Uuid::now_v7();
     sqlx::query(
-        "insert into session (id, account_id, token_hash, expires_at, revoked_at)
-         values ($1, $2, $3, $4, $5)",
+        "insert into session (id, account_id, family_id, token_hash, expires_at, revoked_at)
+         values ($1, $2, $1, $3, $4, $5)",
     )
-    .bind(Uuid::now_v7())
+    .bind(session_id)
     .bind(account_id)
     .bind(hash_token(&token))
     .bind(Utc::now() + expires_in)
@@ -79,8 +75,6 @@ async fn health_reports_ok_when_the_database_answers(pool: PgPool) {
     assert_eq!(body_json(response).await["status"], "ok");
 }
 
-/// The point of touching `PostgreSQL` in the health check: when it is gone, the
-/// endpoint must say so instead of cheerfully reporting that the process is up.
 #[sqlx::test(migrations = "../../migrations")]
 async fn health_reports_unavailable_when_the_database_is_gone(pool: PgPool) {
     pool.close().await;
@@ -179,7 +173,6 @@ async fn a_protected_route_accepts_a_valid_token(pool: PgPool) -> sqlx::Result<(
     Ok(())
 }
 
-/// `bearer` is valid per RFC 7235 and some clients send it lowercase.
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_bearer_scheme_is_case_insensitive(pool: PgPool) -> sqlx::Result<()> {
     let (token, _) = session(&pool, Duration::hours(1), false).await?;
@@ -206,8 +199,6 @@ async fn the_openapi_document_is_served(pool: PgPool) {
     assert!(document["paths"]["/health"].is_object());
 }
 
-/// The committed file is what the iOS side and any generator read, so it has to
-/// match the code. Regenerate with `make backend-openapi`.
 #[test]
 fn the_committed_openapi_file_matches_the_code() {
     let committed = std::fs::read_to_string("../../openapi.json")

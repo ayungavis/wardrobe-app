@@ -15,7 +15,6 @@
           "health"
         ],
         "summary": "Liveness and readiness in one.",
-        "description": "It deliberately touches `PostgreSQL`: a health check that does not would only\nreport that this process is running, which is the least useful thing to know\nabout a service whose entire job is reading and writing a database.",
         "operationId": "health",
         "responses": {
           "200": {
@@ -47,7 +46,6 @@
           "session"
         ],
         "summary": "Confirms which account a session token belongs to.",
-        "description": "The client uses it after sign-in or restore to check that its stored token is\nstill good, without having to attempt a real write to find out.",
         "operationId": "whoami",
         "responses": {
           "200": {

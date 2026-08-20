@@ -1,36 +1,17 @@
-//! Schema and the two database operations whose correctness is subtle enough
-//! that the rest of the backend should never re-implement them.
-//!
-//! Everything else about the schema is documented in `docs/backend-schema.md`.
-//!
-//! ponytail: queries here use the runtime API rather than `sqlx::query!`, so
-//! nothing needs a live database or a committed `.sqlx` cache to compile. Move
-//! to the macros once there are enough queries for compile-time SQL checking to
-//! pay for the offline-cache workflow.
+// Queries here use the runtime API rather than `sqlx::query!`, so
+// nothing needs a live database or a committed `.sqlx` cache to compile. Move to
+// the macros once there are enough queries for compile-time SQL checking to pay
+// for the offline-cache workflow.
 
 use sqlx::PgConnection;
 use sqlx::migrate::Migrator;
 use uuid::Uuid;
 
-/// The migrations that define the schema, embedded so tests and the binaries
-/// apply exactly the same files.
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
-/// Allocates this account's next position in its change feed.
-///
-/// The pull cursor is `change_seq`, not `updated_at`, because `now()` is the
-/// transaction's *start* time: two concurrent writers can commit in the reverse
-/// order of their timestamps, and a client that advanced past the later-visible
-/// row would never sync it (FR-059). Bumping a counter on the account row makes
-/// the feed totally ordered, at the cost of serialising writes for one account —
-/// which is one person's phone.
-///
-/// Must be called inside the same transaction as the domain write.
-///
 /// # Errors
 ///
-/// Returns [`sqlx::Error::RowNotFound`] when the account does not exist, and any
-/// other database error unchanged.
+/// Returns [`sqlx::Error::RowNotFound`] when the account does not exist.
 pub async fn next_change_seq(conn: &mut PgConnection, account_id: Uuid) -> sqlx::Result<i64> {
     sqlx::query_scalar::<_, i64>(
         "update account
@@ -44,7 +25,6 @@ pub async fn next_change_seq(conn: &mut PgConnection, account_id: Uuid) -> sqlx:
     .await
 }
 
-/// A job this worker now owns.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ClaimedJob {
     pub id: Uuid,
@@ -53,12 +33,6 @@ pub struct ClaimedJob {
     pub attempts: i32,
 }
 
-/// Takes the next runnable job of `kind`, or nothing if none is due.
-///
-/// `for update skip locked` is what lets several workers share one table without
-/// a broker: a row already locked by another claimant is stepped over instead of
-/// waited on, so two workers can never hold the same job.
-///
 /// # Errors
 ///
 /// Returns any database error unchanged.
