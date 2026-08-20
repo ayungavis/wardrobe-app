@@ -1,9 +1,12 @@
 import DesignSystem
+import Lottie
 import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
     @State private var isDevMenuPresented = DevMode.opensOnLaunch
+    @State private var hasSwiped = false
+
     private let container: AppContainer
 
     private let backgroundStickers: [StickerPlacement] = [
@@ -78,7 +81,28 @@ public struct ChallengeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if !hasSwiped, !viewModel.hasCompletedToday, viewModel.activeChallenge == nil {
+                    ZStack {
+                        AppColor.surface.opacity(0.1)
+                        LottieView(animation: .named("HandSwipeAnimation", bundle: .module))
+                            .playbackMode(.playing(.fromFrame(40, toFrame: 120, loopMode: .autoReverse)))
+                            .resizable()
+                            .frame(width: 300, height: 300)
+                            .allowsHitTesting(false)
+                            .offset(y: 280)
+                            .transition(.opacity)
+                    }
+                }
             }
+            .simultaneousGesture(
+                DragGesture().onChanged { _ in
+                    if !hasSwiped {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            hasSwiped = true
+                        }
+                    }
+                }
+            )
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 1).onEnded { _ in
                     isDevMenuPresented = true

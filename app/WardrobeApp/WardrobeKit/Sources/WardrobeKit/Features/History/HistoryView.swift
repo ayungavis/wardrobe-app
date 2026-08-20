@@ -52,9 +52,17 @@ public struct HistoryView: View {
                     HistoryDetailView(
                         completion: completion,
                         previewData: viewModel.previewData(for: completion),
-                        viewModel: viewModel
+                        viewModel: viewModel,
+                        onSelectGarment: { garmentID in
+                            navigationPath.append(GarmentRoute(id: garmentID))
+                        }
                     )
                 }
+            }
+            .navigationDestination(for: GarmentRoute.self) { route in
+                WardrobeItemDetailView(
+                    viewModel: container.makeWardrobeItemDetailViewModel(itemID: route.id)
+                )
             }
         }
         .task { viewModel.load() }

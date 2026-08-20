@@ -6,6 +6,7 @@ struct ChallengeCardView: View {
     let onAccept: () -> Void
     private static let frameWidth: CGFloat = 346
     private static let frameHeight: CGFloat = 617
+    @State private var isPulsing = false
 
     private static func sticker(
         _ name: String,
@@ -73,7 +74,15 @@ struct ChallengeCardView: View {
 
                 PrimaryButtonView(Text("challenge.accept", bundle: .module), action: onAccept)
                     .frame(width: cw * Self.takePicPosition.widthFraction)
+                    .scaleEffect(isPulsing ? 1.08 : 1.0)
+                    .animation(
+                        .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
+                        value: isPulsing
+                    )
                     .position(x: cw * Self.takePicPosition.x, y: ch * Self.takePicPosition.y)
+                    .onAppear {
+                        isPulsing = true
+                    }
 
                 Text("challenge.card.title", bundle: .module)
                     .font(AppFont.customTitle)

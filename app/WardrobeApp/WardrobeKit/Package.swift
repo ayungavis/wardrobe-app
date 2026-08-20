@@ -10,6 +10,9 @@ let package = Package(
         .library(name: "WardrobeKit", targets: ["WardrobeKit"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/airbnb/lottie-ios.git", .upToNextMinor(from: "4.6.1")),
+    ],
     targets: [
         .target(
             name: "DesignSystem",
@@ -17,7 +20,10 @@ let package = Package(
         ),
         .target(
             name: "WardrobeKit",
-            dependencies: ["DesignSystem"],
+            dependencies: [
+                "DesignSystem",
+                .product(name: "Lottie", package: "lottie-ios"),
+            ],
             resources: [.process("Resources")]
         ),
         .testTarget(

@@ -43,19 +43,27 @@ public struct WardrobeItemDetailView: View {
                             description: $editableDescription,
                             lastWornAt: viewModel.lastWornAt
                         )
+                        .overlay(alignment: .topTrailing) {
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    if isEditing {
+                                        viewModel.updateItem(name: editableName, description: editableDescription)
+                                    }
+                                    isEditing.toggle()
+                                }
+                            } label: {
+                                Image(systemName: isEditing ? "checkmark" : "square.and.pencil")
+                                    .font(AppFont.title)
+                                    .foregroundStyle(AppColor.textPrimary)
+                                    .frame(width: 50, height: 50)
+                                    .background(Circle().fill(AppColor.background))
+                                    .appShadow(.card)
+                            }
+                            .padding(.top, Spacing.xs)
+                            .padding(.trailing, Spacing.sm)
+                        }
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
-
-                        if isEditing {
-                            Button(role: .destructive) {
-                                isDeleteConfirmationPresented = true
-                            } label: {
-                                Image(systemName: "trash.circle")
-                                    .font(.system(size: 32, weight: .light))
-                                    .foregroundColor(.black)
-                            }
-                            .padding(.top, Spacing.lg)
-                        }
 
                         if !isEditing {
                             VStack(spacing: Spacing.xl) {
@@ -75,20 +83,17 @@ public struct WardrobeItemDetailView: View {
         #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
+                Button(role: .destructive) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        if isEditing {
-                            viewModel.updateItem(name: editableName, description: editableDescription)
-                        }
-                        isEditing.toggle()
+                        isDeleteConfirmationPresented = true
                     }
                 } label: {
-                    Image(systemName: isEditing ? "checkmark" : "pencil")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.black)
+                    Image(systemName: "trash")
+                        .font(AppFont.caption.weight(.bold))
+                        .foregroundStyle(AppColor.destructive)
                         .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.white))
-                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        .background(Circle().fill(AppColor.background))
+                        .appShadow(.card)
                 }
             }
         }

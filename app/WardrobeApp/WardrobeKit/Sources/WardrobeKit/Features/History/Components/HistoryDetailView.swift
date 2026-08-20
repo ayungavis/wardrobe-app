@@ -6,12 +6,20 @@ public struct HistoryDetailView: View {
     public let previewData: Data?
     let viewModel: HistoryViewModel
 
+    let onSelectGarment: (UUID) -> Void
+
     @State private var garments: [(item: WardrobeItem, wearCount: Int)] = []
 
-    public init(completion: CompletedChallenge, previewData: Data?, viewModel: HistoryViewModel) {
+    public init(
+        completion: CompletedChallenge,
+        previewData: Data?,
+        viewModel: HistoryViewModel,
+        onSelectGarment: @escaping (UUID) -> Void
+    ) {
         self.completion = completion
         self.previewData = previewData
         self.viewModel = viewModel
+        self.onSelectGarment = onSelectGarment
     }
 
     public var body: some View {
@@ -86,7 +94,12 @@ public struct HistoryDetailView: View {
             } else {
                 HStack(spacing: 16) {
                     ForEach(garments, id: \.item.id) { entry in
-                        garmentView(item: entry.item, wearCount: entry.wearCount)
+                        Button {
+                            onSelectGarment(entry.item.id)
+                        } label: {
+                            garmentView(item: entry.item, wearCount: entry.wearCount)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
