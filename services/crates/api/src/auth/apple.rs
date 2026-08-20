@@ -45,9 +45,6 @@ struct Claims {
     nonce: Option<String>,
 }
 
-// The whole security surface lives here: pure, synchronous, and reachable from a
-// test without a network or a clock.
-///
 /// # Errors
 ///
 /// Returns [`AppleError::UnknownKey`] when no key matches the token's `kid`, and
@@ -66,8 +63,6 @@ pub fn verify(
         .find(|candidate| candidate.kid == kid)
         .ok_or(AppleError::UnknownKey)?;
 
-    // Only RS256. Accepting the header's own choice would let a forger sign with
-    // HS256 using the public key as the HMAC secret.
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_issuer(&[ISSUER]);
     validation.set_audience(&[audience]);
@@ -131,8 +126,6 @@ impl Verifier {
         let audience = self.audience.clone().ok_or(AppleError::NotConfigured)?;
 
         match verify(token, &self.cached_keys().await?, &audience, nonce) {
-            // Apple rotates signing keys, so an unknown kid means the cache is
-            // stale rather than the token being forged.
             Err(AppleError::UnknownKey) => {
                 verify(token, &self.refreshed_keys().await?, &audience, nonce)
             }
@@ -153,8 +146,6 @@ impl Verifier {
 
     async fn refreshed_keys(&self) -> Result<Vec<AppleKey>, AppleError> {
         let mut cached = self.keys.write().await;
-        // Another task may have refreshed while this one waited for the lock, and
-        // a forged kid must not become a way to hammer Apple.
         if cached
             .fetched_at
             .is_some_and(|at| at.elapsed() < REFETCH_FLOOR)
@@ -203,8 +194,6 @@ mod tests {
         nonce: String,
     }
 
-    // RSA keygen is slow enough that ten tests generating their own would read as
-    // a hung suite.
     fn keypair() -> &'static (RsaPrivateKey, AppleKey) {
         static PAIR: OnceLock<(RsaPrivateKey, AppleKey)> = OnceLock::new();
         PAIR.get_or_init(|| {

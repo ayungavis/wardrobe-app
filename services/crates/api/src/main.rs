@@ -17,9 +17,7 @@ fn main() -> ExitCode {
         }
     };
 
-    // The guard flushes buffered events on drop, so it has to outlive the
-    // runtime rather than live inside it.
-    let _sentry = observability::init(&config);
+    let _sentry_guard_outliving_the_runtime = observability::init(&config);
 
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))

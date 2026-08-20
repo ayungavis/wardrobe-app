@@ -2,7 +2,7 @@
     import UIKit
 #endif
 
-/// ponytail: called straight through, no protocol and no injection. CLAUDE.md
+/// ponytail: called straight through, no protocol and no injection.
 /// classes a seam outside the process as a service, and the Taptic Engine is
 /// one — but there is nothing here to assert, nothing to fake, and no failure
 /// mode, so injecting it would thread a protocol through nine views to buy

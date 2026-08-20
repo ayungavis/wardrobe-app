@@ -145,9 +145,6 @@ pub async fn refresh(
     match outcome {
         Refreshed::Rotated(issued) => Ok(Json(issued.into())),
         Refreshed::Replayed => {
-            // A refresh token presented twice means a copy of it exists somewhere
-            // it should not. The family goes, and the device re-authenticates
-            // silently from its Keychain identity.
             tracing::warn!("a rotated refresh token was replayed; its session family was revoked");
             Err(Error::Unauthenticated)
         }

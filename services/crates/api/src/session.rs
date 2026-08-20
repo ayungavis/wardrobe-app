@@ -23,8 +23,6 @@ pub struct Issued {
 #[must_use]
 pub fn secret() -> String {
     let mut bytes = [0_u8; 32];
-    // The OS CSPRNG directly: a session token has no business depending on a
-    // userspace generator's seeding.
     getrandom::fill(&mut bytes).expect("the operating system must provide randomness");
     bytes
         .iter()
@@ -132,8 +130,6 @@ pub async fn rotate(
         return Ok(Refreshed::Unknown);
     };
 
-    // Checked before revocation, because a rotated row is also a revoked one and
-    // the order decides whether a replay is merely refused or treated as theft.
     if row.rotated_at.is_some() {
         revoke_family(tx, row.family_id).await?;
         return Ok(Refreshed::Replayed);
@@ -142,8 +138,6 @@ pub async fn rotate(
         return Ok(Refreshed::Unknown);
     }
 
-    // The old access token dies with its refresh token. A 30-day access token
-    // that outlives the rotation that replaced it would make rotation cosmetic.
     sqlx::query("update session set rotated_at = now(), revoked_at = now() where id = $1")
         .bind(row.id)
         .execute(&mut **tx)

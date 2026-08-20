@@ -71,10 +71,6 @@ pub struct ErrorDetail {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         if let Self::Internal(source) = &self {
-            // A Postgres message quotes the failing row, so it can carry item
-            // names and other user content that §18.12 forbids in a log. Only
-            // the classification, the SQLSTATE, and the constraint name — which
-            // name schema objects, never values — are safe to record.
             let facts = wardrobe_db::error_facts(source);
             tracing::error!(
                 error.kind = facts.code,

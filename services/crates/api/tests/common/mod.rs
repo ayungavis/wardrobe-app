@@ -1,4 +1,4 @@
-// One shared module for every test binary, so a helper only two of
+// ponytail: one shared module for every test binary, so a helper only two of
 // the three use is dead code in the third. Split into per-subject submodules if
 // that ever hides a real unused helper.
 #![allow(dead_code)]

@@ -40,11 +40,8 @@ pub async fn link_apple(
     let device_account = existing_device(tx, device_id).await?.map(|(id,)| id);
 
     match (existing, device_account) {
-        // Already this account's device.
         (Some((account_id,)), Some(device)) if device == account_id => Ok(account_id),
 
-        // Second device. Moving the device row is the whole of it while the
-        // anonymous account holds nothing; anything else is a merge (T06b).
         (Some((account_id,)), Some(device)) => {
             if holds_data(tx, device).await? {
                 return Err(Error::Conflict);
@@ -61,8 +58,6 @@ pub async fn link_apple(
             Ok(account_id)
         }
 
-        // First sign-in: the anonymous account becomes the Apple account, so no
-        // row moves and no change_seq needs renumbering.
         (None, Some(account_id)) => {
             sqlx::query("update account set apple_subject = $2 where id = $1")
                 .bind(account_id)

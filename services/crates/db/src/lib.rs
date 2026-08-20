@@ -1,4 +1,4 @@
-// Queries here use the runtime API rather than `sqlx::query!`, so
+// ponytail: queries here use the runtime API rather than `sqlx::query!`, so
 // nothing needs a live database or a committed `.sqlx` cache to compile. Move to
 // the macros once there are enough queries for compile-time SQL checking to pay
 // for the offline-cache workflow.
