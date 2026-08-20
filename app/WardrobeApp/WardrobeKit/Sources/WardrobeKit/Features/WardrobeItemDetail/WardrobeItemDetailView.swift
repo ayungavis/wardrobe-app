@@ -43,19 +43,39 @@ public struct WardrobeItemDetailView: View {
                             description: $editableDescription,
                             lastWornAt: viewModel.lastWornAt
                         )
+                        .overlay(alignment: .topTrailing) {
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    if isEditing {
+                                        viewModel.updateItem(name: editableName, description: editableDescription)
+                                    }
+                                    isEditing.toggle()
+                                }
+                            } label: {
+                                Image(systemName: isEditing ? "checkmark" : "square.and.pencil")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.black)
+                                    .frame(width: 50, height: 50)
+                                    .background(Circle().fill(Color.white))
+                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            }
+                            // Adjust these padding values to push it exactly where you want it on the corner
+                            .padding(.top, 5)
+                            .padding(.trailing, 10)
+                        }
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
 
-                        if isEditing {
-                            Button(role: .destructive) {
-                                isDeleteConfirmationPresented = true
-                            } label: {
-                                Image(systemName: "trash.circle")
-                                    .font(.system(size: 32, weight: .light))
-                                    .foregroundColor(.black)
-                            }
-                            .padding(.top, Spacing.lg)
-                        }
+//                        if isEditing {
+//                            Button(role: .destructive) {
+//                                isDeleteConfirmationPresented = true
+//                            } label: {
+//                                Image(systemName: "trash.circle")
+//                                    .font(.system(size: 32, weight: .light))
+//                                    .foregroundColor(.black)
+//                            }
+//                            .padding(.top, Spacing.lg)
+//                        }
 
                         if !isEditing {
                             VStack(spacing: Spacing.xl) {
@@ -72,20 +92,17 @@ public struct WardrobeItemDetailView: View {
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
+#endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
+                Button(role: .destructive) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        if isEditing {
-                            viewModel.updateItem(name: editableName, description: editableDescription)
-                        }
-                        isEditing.toggle()
+                        isDeleteConfirmationPresented = true
                     }
                 } label: {
-                    Image(systemName: isEditing ? "checkmark" : "pencil")
+                    Image(systemName: "trash")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.black)
+                        .foregroundColor(.red) // Styled red to indicate destructive action
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(Color.white))
                         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
