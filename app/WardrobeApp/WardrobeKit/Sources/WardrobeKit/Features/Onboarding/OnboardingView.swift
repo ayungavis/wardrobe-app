@@ -13,7 +13,7 @@ public struct OnboardingView: View {
         @Bindable var viewModel = viewModel
 
         VStack(spacing: Spacing.xl) {
-            Spacer()
+            Spacer(minLength: 0)
 
             OnboardingStepView(step: viewModel.step) {
                 actions
@@ -22,8 +22,6 @@ public struct OnboardingView: View {
             .transition(.opacity)
 
             progress
-
-            Spacer()
         }
         .padding(Spacing.xl)
         .animation(.snappy, value: viewModel.step)

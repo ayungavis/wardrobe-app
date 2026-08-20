@@ -10,15 +10,18 @@ struct OnboardingStepView<Actions: View>: View {
             if step != .firstChallenge {
                 Image(step.image, bundle: .module)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: 283, height: 486)
+                    .scaledToFit()
+                    .frame(maxWidth: 283, maxHeight: 486)
             } else {
                 Text("onboarding.firstChallenge.cta", bundle: .module)
                     .font(AppFont.largeTitle)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Image(step.image, bundle: .module)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: 353.17, height: 318.57)
+                    .scaledToFit()
+                    .frame(maxWidth: 353.17, maxHeight: 318.57)
             }
 
             ZStack {
