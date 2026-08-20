@@ -10,6 +10,7 @@ publish = false
 [workspace.dependencies]
 axum = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+getrandom = "0.3"
 jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rust_decimal = "1"

@@ -5,6 +5,7 @@ use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use wardrobe_api::auth::apple;
 use wardrobe_api::{config::Config, observability};
 
 fn main() -> ExitCode {
@@ -52,7 +53,9 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&config.bind_addr).await?;
     tracing::info!(addr = %config.bind_addr, "listening; docs at /docs");
 
-    axum::serve(listener, wardrobe_api::app(pool))
+    let apple = std::sync::Arc::new(apple::Verifier::new(config.apple_bundle_id.clone()));
+
+    axum::serve(listener, wardrobe_api::app(pool, apple))
         .with_graceful_shutdown(shutdown())
         .await?;
     Ok(())

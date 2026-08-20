@@ -40,6 +40,137 @@
         }
       }
     },
+    "/v1/sessions/anonymous": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Starts or resumes an anonymous account for a device.",
+        "operationId": "anonymous",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnonymousRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A session for the device's anonymous account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The device id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/apple": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Verifies an Apple identity token and links it to this device's account.",
+        "operationId": "apple",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A session for the Apple-backed account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The identity token did not verify",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This device holds data for another account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Apple sign-in is not configured or Apple is unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/current": {
+      "delete": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Revokes every session in this device's family.",
+        "operationId": "sign_out",
+        "responses": {
+          "204": {
+            "description": "The family is revoked; server data is untouched"
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/whoami": {
       "get": {
         "tags": [
@@ -79,6 +210,41 @@
   },
   "components": {
     "schemas": {
+      "AnonymousRequest": {
+        "type": "object",
+        "required": [
+          "deviceId"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The UUID the client holds in its Keychain."
+          }
+        }
+      },
+      "AppleRequest": {
+        "type": "object",
+        "required": [
+          "deviceId",
+          "identityToken",
+          "nonce"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identityToken": {
+            "type": "string",
+            "description": "The identity token Apple returned to the client."
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The raw nonce whose SHA-256 the client sent to Apple."
+          }
+        }
+      },
       "ErrorBody": {
         "type": "object",
         "description": "The single error shape every endpoint returns.",
@@ -120,6 +286,38 @@
             "type": "string",
             "description": "`ok` when the process is up and the database answers.",
             "example": "ok"
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "description": "A newly issued session.",
+        "required": [
+          "accountId",
+          "accessToken",
+          "refreshToken",
+          "expiresAt",
+          "refreshExpiresAt"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Returned exactly once; only its hash is stored."
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string"
           }
         }
       },

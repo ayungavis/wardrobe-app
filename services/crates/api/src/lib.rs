@@ -4,7 +4,10 @@ pub mod error;
 pub mod observability;
 pub mod openapi;
 pub mod routes;
+pub mod session;
 pub mod state;
+
+use std::sync::Arc;
 
 use axum::Router;
 use sqlx::PgPool;
@@ -23,11 +26,14 @@ fn api_router() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(routes::health::health))
         .routes(routes!(routes::session::whoami))
+        .routes(routes!(routes::sessions::anonymous))
+        .routes(routes!(routes::sessions::apple))
+        .routes(routes!(routes::sessions::sign_out))
 }
 
-pub fn app(pool: PgPool) -> Router {
+pub fn app(pool: PgPool, apple: Arc<auth::apple::Verifier>) -> Router {
     let (router, api) = api_router()
-        .with_state(AppState::new(pool))
+        .with_state(AppState::new(pool, apple))
         .split_for_parts();
 
     let observability = tower::ServiceBuilder::new()
