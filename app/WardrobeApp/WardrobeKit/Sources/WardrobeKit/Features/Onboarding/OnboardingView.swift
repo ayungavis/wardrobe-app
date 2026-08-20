@@ -13,17 +13,21 @@ public struct OnboardingView: View {
         @Bindable var viewModel = viewModel
 
         VStack(spacing: Spacing.xl) {
-            progress
+            
 
             Spacer()
 
-            OnboardingStepView(step: viewModel.step)
+            OnboardingStepView(step: viewModel.step){
+                actions
+            }
                 .id(viewModel.step)
                 .transition(.opacity)
 
-            Spacer()
+            //Spacer()
 
-            actions
+            progress
+            
+            Spacer()
         }
         .padding(Spacing.xl)
         .animation(.snappy, value: viewModel.step)
@@ -80,28 +84,43 @@ public struct OnboardingView: View {
                     handle(result)
                 }
                 .signInWithAppleButtonStyle(.black)
-                .frame(height: 54)
+                .frame(height: 45)
                 .accessibilityIdentifier("onboarding.signIn")
 
-                Button(action: viewModel.skip) {
-                    Text("onboarding.skip", bundle: .module)
-                        .font(AppFont.body)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                HStack {
+                    if viewModel.canGoBack {
+                        Button(action: viewModel.back) {
+                            Text("onboarding.back", bundle: .module)
+                                .font(AppFont.body)
+                                .foregroundStyle(AppColor.textSecondary)
+                        }
+                        .accessibilityIdentifier("onboarding.back")
+                    }
+                    Spacer()
+                    Button(action: viewModel.skip) {
+                        Text("onboarding.skip", bundle: .module)
+                            .font(AppFont.body)
+                            .foregroundStyle(AppColor.textSecondary)
+                    }
+                    .accessibilityIdentifier("onboarding.skip")
                 }
-                .accessibilityIdentifier("onboarding.skip")
             } else {
-                PrimaryButtonView(Text("onboarding.next", bundle: .module), action: viewModel.next)
-                    .accessibilityIdentifier("onboarding.next")
-            }
-
-            if viewModel.canGoBack {
-                Button(action: viewModel.back) {
-                    Text("onboarding.back", bundle: .module)
-                        .font(AppFont.body)
-                        .foregroundStyle(AppColor.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                HStack {
+                    if viewModel.canGoBack {
+                        Button(action: viewModel.back) {
+                            Text("onboarding.back", bundle: .module)
+                                .font(AppFont.body)
+                                .foregroundStyle(AppColor.textSecondary)
+                        }
+                        .accessibilityIdentifier("onboarding.back")
+                    } else {
+                        Spacer().frame(width: 1) // keeps Next right-aligned on step 1
+                    }
+                    Spacer()
+                    PrimaryButtonView(Text("onboarding.next", bundle: .module), minHeight: 28, action: viewModel.next)
+                        .fixedSize()
+                        .accessibilityIdentifier("onboarding.next")
                 }
-                .accessibilityIdentifier("onboarding.back")
             }
         }
     }

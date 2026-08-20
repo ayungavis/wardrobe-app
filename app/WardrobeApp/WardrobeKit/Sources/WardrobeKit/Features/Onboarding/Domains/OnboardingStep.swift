@@ -8,12 +8,14 @@ enum OnboardingStep: Int, CaseIterable {
     var titleKey: String {
         "onboarding.\(self).title"
     }
-
-    var symbolName: String {
+    var descKey: String {
+        "onboarding.\(self).description"
+    }
+    var image: String {
         switch self {
-        case .wardrobe: "tshirt.fill"
-        case .collage: "sparkles.rectangle.stack.fill"
-        case .firstChallenge: "flag.checkered"
+        case .wardrobe: "obPreview-1"
+        case .collage: "obPreview-2"
+        case .firstChallenge: "obPreview-3"
         }
     }
 

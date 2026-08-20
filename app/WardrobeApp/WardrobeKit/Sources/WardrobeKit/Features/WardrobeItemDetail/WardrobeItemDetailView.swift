@@ -178,7 +178,7 @@ public struct WardrobeItemDetailView: View {
 
         var body: some View {
             ZStack(alignment: .top) {
-                Image("WardrobeItemDetail", bundle: .module)
+                Image("ShortPaper", bundle: .module)
                     .resizable()
 
                 VStack(alignment: .leading, spacing: 16) {
