@@ -8,6 +8,7 @@ pub struct Config {
     pub sentry_environment: String,
     pub sentry_traces_sample_rate: f32,
     pub release: Option<String>,
+    pub apple_bundle_id: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -33,6 +34,7 @@ impl Config {
                 .and_then(|raw| raw.parse().ok())
                 .unwrap_or(0.0),
             release: optional("GIT_SHA")?.or(optional("RAILWAY_GIT_COMMIT_SHA")?),
+            apple_bundle_id: optional("APPLE_BUNDLE_ID")?,
         })
     }
 }

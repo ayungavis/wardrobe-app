@@ -149,6 +149,7 @@ mod tests {
             sentry_environment: "test".to_owned(),
             sentry_traces_sample_rate: 0.0,
             release: None,
+            apple_bundle_id: None,
         }
     }
 
