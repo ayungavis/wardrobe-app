@@ -1,5 +1,6 @@
 pub mod account;
 pub mod auth;
+pub mod changes;
 pub mod config;
 pub mod error;
 pub mod observability;
@@ -33,6 +34,7 @@ fn api_router() -> OpenApiRouter<AppState> {
         .routes(routes!(routes::sessions::refresh))
         .routes(routes!(routes::sessions::sign_out))
         .routes(routes!(routes::sync::sync))
+        .routes(routes!(routes::changes::changes))
 }
 
 pub fn app(pool: PgPool, apple: Arc<auth::apple::Verifier>) -> Router {

@@ -40,6 +40,64 @@
         }
       }
     },
+    "/v1/changes": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Returns every record written after a cursor position, deletions included.",
+        "operationId": "changes",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "description": "The last `changeSeq` you received; omit to start from the beginning.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many records to return, clamped to 1000.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of changes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/sessions/anonymous": {
       "post": {
         "tags": [
@@ -317,6 +375,93 @@
   },
   "components": {
     "schemas": {
+      "AccountPreference": {
+        "type": "object",
+        "required": [
+          "recentStickerIds",
+          "lastTextStyle",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastTextStyle": {
+            "type": "object"
+          },
+          "onboardingCompletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "recentStickerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ActiveChallenge": {
+        "type": "object",
+        "required": [
+          "id",
+          "cardId",
+          "acceptedAt",
+          "localDate",
+          "timeZone",
+          "changeSeq"
+        ],
+        "properties": {
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "photoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        }
+      },
       "AnonymousRequest": {
         "type": "object",
         "required": [
@@ -349,6 +494,166 @@
           "nonce": {
             "type": "string",
             "description": "The raw nonce whose SHA-256 the client sent to Apple."
+          }
+        }
+      },
+      "CanvasDocument": {
+        "type": "object",
+        "required": [
+          "id",
+          "completionId",
+          "derivativeId",
+          "schemaVersion",
+          "mediaObjectId",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "derivativeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "historyMediaObjectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "historyStepCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ChallengeCompletion": {
+        "type": "object",
+        "required": [
+          "id",
+          "cardId",
+          "localDate",
+          "timeZone",
+          "completedAt",
+          "status",
+          "changeSeq"
+        ],
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currentDerivativeId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "photoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        }
+      },
+      "Change": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Record"
+          },
+          {
+            "type": "object",
+            "required": [
+              "changeSeq"
+            ],
+            "properties": {
+              "changeSeq": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The feed position of this record; the cursor is the last one you received."
+              }
+            }
+          }
+        ]
+      },
+      "ChangesResponse": {
+        "type": "object",
+        "description": "One page of the change feed, oldest position first.",
+        "required": [
+          "changes",
+          "nextSince"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "nextSince": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pass this back as `since`; it never moves past a record this page omitted."
           }
         }
       },
@@ -393,6 +698,156 @@
             "type": "string",
             "description": "`ok` when the process is up and the database answers.",
             "example": "ok"
+          }
+        }
+      },
+      "ItemCutout": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "mediaObjectId",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourcePhotoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "ItemFingerprint": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "version",
+          "colorLab",
+          "aspectRatio",
+          "featurePrint",
+          "maskQuality",
+          "changeSeq"
+        ],
+        "properties": {
+          "aspectRatio": {
+            "type": "number",
+            "format": "float"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "colorLab": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "featurePrint": {
+            "type": "string",
+            "format": "byte"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maskQuality": {
+            "type": "number",
+            "format": "float"
+          },
+          "sourcePhotoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ItemIllustration": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "mediaObjectId",
+          "styleVersion",
+          "model",
+          "promptVersion",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "styleVersion": {
+            "type": "string"
           }
         }
       },
@@ -484,6 +939,300 @@
           }
         ]
       },
+      "Photo": {
+        "type": "object",
+        "required": [
+          "id",
+          "mediaObjectId",
+          "source",
+          "changeSeq"
+        ],
+        "properties": {
+          "capturedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "PhotoDerivative": {
+        "type": "object",
+        "required": [
+          "id",
+          "photoId",
+          "mediaObjectId",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "photoId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Record": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wardrobeItem"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/WardrobeItem"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "itemFingerprint"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ItemFingerprint"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "itemCutout"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ItemCutout"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "itemIllustration"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ItemIllustration"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wardrobeItemConflict"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/WardrobeItemConflict"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "photo"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/Photo"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "photoDerivative"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/PhotoDerivative"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "canvasDocument"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/CanvasDocument"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "challengeCompletion"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ChallengeCompletion"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "activeChallenge"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ActiveChallenge"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wearRecord"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/WearRecord"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "accountPreference"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/AccountPreference"
+              }
+            }
+          }
+        ]
+      },
       "RefreshRequest": {
         "type": "object",
         "required": [
@@ -560,6 +1309,178 @@
             "items": {
               "$ref": "#/components/schemas/MutationResult"
             }
+          }
+        }
+      },
+      "WardrobeItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "attributeRevisions",
+          "illustrationState",
+          "changeSeq"
+        ],
+        "properties": {
+          "attributeRevisions": {
+            "type": "object"
+          },
+          "category": {
+            "type": "string"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentIllustrationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "garmentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "illustrationState": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "WardrobeItemConflict": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "field",
+          "revision",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "field": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originDevice": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "resolvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "This table resolves rather than deletes, so it carries no tombstone."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "WearRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "wornOn",
+          "revision",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourcePhotoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "wornOn": {
+            "type": "string",
+            "format": "date"
           }
         }
       },

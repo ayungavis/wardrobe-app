@@ -9,6 +9,7 @@ publish = false
 
 [workspace.dependencies]
 axum = "0.8"
+base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 getrandom = "0.3"
 jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }

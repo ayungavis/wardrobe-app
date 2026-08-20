@@ -3,6 +3,7 @@
 // section would restate it in a place no client generator reads.
 #![allow(clippy::missing_errors_doc)]
 
+pub mod changes;
 pub mod health;
 pub mod sessions;
 pub mod sync;
