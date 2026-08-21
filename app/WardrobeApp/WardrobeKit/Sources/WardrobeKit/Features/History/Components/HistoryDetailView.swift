@@ -24,9 +24,9 @@ public struct HistoryDetailView: View {
 
     public var body: some View {
         ZStack {
-            Image("appBG", bundle: .module)
-                .resizable()
-                .ignoresSafeArea()
+//            Image("appBG", bundle: .module)
+//                .resizable()
+//                .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .top) {
@@ -48,6 +48,7 @@ public struct HistoryDetailView: View {
                 }
             }
         }
+        .appBackgroundOnly()
         .task { garments = viewModel.garmentsWorn(in: completion) }
         .navigationTitle(Text("tab.history", bundle: .module))
         #if os(iOS)

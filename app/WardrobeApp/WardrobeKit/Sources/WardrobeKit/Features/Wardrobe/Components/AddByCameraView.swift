@@ -140,7 +140,7 @@ struct AddByCameraView: View {
             }
         } else {
             List {
-                GarmentReviewListView(review: review)
+                GarmentReviewListView(review: review, allowsMatching: false)
             }
         }
     }

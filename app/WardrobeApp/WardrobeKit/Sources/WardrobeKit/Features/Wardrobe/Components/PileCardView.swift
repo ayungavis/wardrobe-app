@@ -14,12 +14,13 @@ struct PileCardView: View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
                 Text(category.title, bundle: .module)
-                    .font(AppFont.title)
+                    .font(AppFont.roundedTitle)
                 Text("\(items.count)")
-                    .font(.caption)
+                    .font(AppFont.roundedCaption)
+                    .foregroundStyle(AppColor.accent)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(AppColor.accent.opacity(0.15)))
+                    .background(Capsule().fill(AppColor.surface))
             }
             .padding(.vertical, Spacing.md)
 

@@ -18,7 +18,7 @@ struct AddByPhotosView: View {
                     picker
                 }
 
-                GarmentReviewListView(review: review)
+                GarmentReviewListView(review: review, allowsMatching: false)
             }
             .navigationTitle(Text("wardrobe.add.photos.title", bundle: .module))
             #if os(iOS)

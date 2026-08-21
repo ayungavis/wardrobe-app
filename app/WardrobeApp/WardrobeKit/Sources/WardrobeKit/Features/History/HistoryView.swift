@@ -19,10 +19,8 @@ public struct HistoryView: View {
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                Image("appBG", bundle: .module)
-                    .resizable()
-                    .ignoresSafeArea()
-
+                VStack{
+                    header
                 if viewModel.completions.isEmpty {
                     emptyState
                 } else {
@@ -46,7 +44,9 @@ public struct HistoryView: View {
                     }
                 }
             }
-            .navigationTitle(Text("tab.history", bundle: .module))
+            }
+            .appBackgroundStickers()
+            //.navigationTitle(Text("tab.history", bundle: .module))
             .navigationDestination(for: UUID.self) { completionID in
                 if let completion = viewModel.completions.first(where: { $0.id == completionID }) {
                     HistoryDetailView(
@@ -67,7 +67,16 @@ public struct HistoryView: View {
         }
         .task { viewModel.load() }
     }
-
+    private var header: some View {
+        Text("tab.history", bundle: .module)
+            .font(AppFont.roundedLargeTitle)
+            .foregroundStyle(AppColor.textPrimary)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, Spacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
     private var emptyState: some View {
         VStack {
             Text("history.empty.title", bundle: .module)

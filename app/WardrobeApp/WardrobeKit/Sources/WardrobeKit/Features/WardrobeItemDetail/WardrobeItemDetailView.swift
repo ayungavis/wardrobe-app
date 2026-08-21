@@ -16,9 +16,9 @@ public struct WardrobeItemDetailView: View {
 
     public var body: some View {
         ZStack {
-            Image("appBG", bundle: .module)
-                .resizable()
-                .ignoresSafeArea()
+//            Image("appBG", bundle: .module)
+//                .resizable()
+//                .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -78,6 +78,7 @@ public struct WardrobeItemDetailView: View {
                 .padding(.bottom, 100)
             }
         }
+        .appBackgroundOnly()
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

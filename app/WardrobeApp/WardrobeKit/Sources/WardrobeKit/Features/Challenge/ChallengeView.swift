@@ -9,36 +9,6 @@ public struct ChallengeView: View {
 
     private let container: AppContainer
 
-    private let backgroundStickers: [StickerPlacement] = [
-        StickerPlacement(
-            "StampElement",
-            figmaX: 284,
-            figmaY: 56,
-            figmaWidth: 142,
-            figmaHeight: 162,
-            frameWidth: 375,
-            frameHeight: 812
-        ),
-        StickerPlacement(
-            "StampDetail",
-            figmaX: 38,
-            figmaY: 752,
-            figmaWidth: 104,
-            figmaHeight: 120,
-            frameWidth: 375,
-            frameHeight: 812
-        ),
-        StickerPlacement(
-            "Kancing2",
-            figmaX: -18,
-            figmaY: 257,
-            figmaWidth: 104,
-            figmaHeight: 120,
-            frameWidth: 375,
-            frameHeight: 812
-        ),
-    ]
-
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
@@ -49,24 +19,7 @@ public struct ChallengeView: View {
 
         NavigationStack {
             ZStack {
-                Image("appBG", bundle: .module)
-                    .resizable()
-                    .ignoresSafeArea()
-
-                GeometryReader { screenGeo in
-                    let sw = screenGeo.size.width
-                    let sh = screenGeo.size.height
-
-                    ForEach(backgroundStickers) { sticker in
-                        Image(sticker.imageName, bundle: .module)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: sw * sticker.widthFraction)
-                            .rotationEffect(.degrees(sticker.rotation))
-                            .position(x: sw * sticker.x, y: sh * sticker.y)
-                    }
-                }
-
+                
                 Group {
                     if viewModel.hasCompletedToday {
                         CompletedTodayView()
@@ -94,6 +47,8 @@ public struct ChallengeView: View {
                     }
                 }
             }
+            .appBackgroundStickers()
+            // interaction listener
             .simultaneousGesture(
                 DragGesture().onChanged { _ in
                     if !hasSwiped {
@@ -103,6 +58,14 @@ public struct ChallengeView: View {
                     }
                 }
             )
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 1).onEnded { _ in
+                    isDevMenuPresented = true
+                },
+                including: DevMode.isEnabled ? .all : .none
+            )
+            
+            
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 1).onEnded { _ in
                     isDevMenuPresented = true
@@ -153,9 +116,9 @@ public struct ChallengeView: View {
                 }
             }
         )
-        #endif
+#endif
     }
-
+    
     @ViewBuilder
     private var deckContent: some View {
         switch viewModel.deck {
@@ -167,7 +130,7 @@ public struct ChallengeView: View {
             deckView(cards)
         }
     }
-
+    
     private func errorView(_ error: AppError) -> some View {
         ContentUnavailableView {
             Label {
@@ -185,7 +148,7 @@ public struct ChallengeView: View {
             }
         }
     }
-
+    
     private func deckView(_ cards: [ChallengeCard]) -> some View {
         // ponytail: paged TabView as the stacked-carousel stand-in; revisit
         // when the real card-deck design lands (FR-007 also needs non-swipe
