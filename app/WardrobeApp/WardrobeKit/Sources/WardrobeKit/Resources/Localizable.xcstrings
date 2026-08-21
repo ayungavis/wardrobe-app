@@ -357,6 +357,72 @@
         }
       }
     },
+    "capture.scanReview.continueToEdit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue to edit"
+          }
+        }
+      }
+    },
+    "capture.scanReview.existingItem" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing Item"
+          }
+        }
+      }
+    },
+    "capture.scanReview.newItem" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Item"
+          }
+        }
+      }
+    },
+    "capture.scanReview.retake" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retake"
+          }
+        }
+      }
+    },
+    "capture.scanReview.search" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search existing items"
+          }
+        }
+      }
+    },
+    "capture.scanReview.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan Review"
+          }
+        }
+      }
+    },
     "capture.tips.bullet1" : {
       "extractionState" : "manual",
       "localizations" : {

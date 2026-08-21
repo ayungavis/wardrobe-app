@@ -113,7 +113,7 @@ public final class CaptureFlowViewModel {
                 challenge: challenge,
                 permission: camera.permission
             )
-        case .crop, .editor:
+        case .crop,.scanReview, .editor:
             break
         }
     }
@@ -232,13 +232,18 @@ public final class CaptureFlowViewModel {
         }
         challenge.document.setCrop(crop, ofLayer: layerID)
         activeRepository.save(challenge)
-        stage = .editor
+        stage = .scanReview
         review.scanIfNeeded(photoID: photoID)
+    }
+    
+    public func continueToEditor() {
+        stage = .editor
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
 
     public func discardPhoto() {
+        review.cancel()
         photoRepository.deleteOriginals(of: challenge.document, and: challenge.photoID)
         challenge.photoID = nil
         challenge.document = EditorDocument(layers: [])

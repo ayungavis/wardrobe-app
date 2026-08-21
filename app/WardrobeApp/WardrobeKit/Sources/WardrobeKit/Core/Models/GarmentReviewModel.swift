@@ -150,4 +150,8 @@ public final class GarmentReviewModel {
         )
         try thumbnails.delete(file: garment.cutoutFile)
     }
+    
+    public func wardrobeItems(in category: GarmentCategory) -> [WardrobeItem] {
+        (try? wardrobeRepository.items().filter { $0.category == category }) ?? []
+    }
 }

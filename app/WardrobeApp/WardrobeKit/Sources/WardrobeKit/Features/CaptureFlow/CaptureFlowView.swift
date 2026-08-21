@@ -46,6 +46,12 @@ public struct CaptureFlowView: View {
                 .animation(.default, value: viewModel.isTipsPresented)
             case .crop:
                 cropStage
+            case .scanReview:
+                ScanReviewView(
+                    review: viewModel.review,
+                    onRetake: { viewModel.discardPhoto() },
+                    onContinue: { viewModel.continueToEditor() }
+                )
             case .editor:
                 EditorView(
                     viewModel: makeEditorViewModel(viewModel.challenge),

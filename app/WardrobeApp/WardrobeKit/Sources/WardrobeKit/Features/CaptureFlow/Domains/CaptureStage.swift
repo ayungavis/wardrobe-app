@@ -6,5 +6,6 @@ public enum CaptureStage: Equatable {
     case denied
     case camera
     case crop
+    case scanReview 
     case editor
 }

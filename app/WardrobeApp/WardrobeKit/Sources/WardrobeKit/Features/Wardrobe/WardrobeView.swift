@@ -39,9 +39,9 @@ public struct WardrobeView: View {
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                Image("appBG", bundle: .module)
-                    .resizable()
-                    .ignoresSafeArea()
+//                Image("appBG", bundle: .module)
+//                    .resizable()
+//                    .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     topBar
@@ -80,6 +80,7 @@ public struct WardrobeView: View {
                     }
                 }
             }
+            .appBackgroundStickers()
             .navigationDestination(for: UUID.self) { itemID in
                 WardrobeItemDetailView(
                     viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID)
