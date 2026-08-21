@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/api", "crates/db"]
+members = ["crates/api", "crates/db", "crates/storage"]
 
 [workspace.package]
 edition = "2024"
@@ -9,6 +9,11 @@ publish = false
 
 [workspace.dependencies]
 axum = "0.8"
+aws-sdk-s3 = { version = "1.96", default-features = false, features = [
+    "behavior-version-latest",
+    "rt-tokio",
+] }
+aws-smithy-http-client = { version = "1", default-features = false, features = ["rustls-ring"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 getrandom = "0.3"

@@ -16,18 +16,19 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/api/Cargo.toml crates/api/Cargo.toml
 COPY crates/db/Cargo.toml crates/db/Cargo.toml
-RUN mkdir -p crates/api/src/bin crates/db/src \
+COPY crates/storage/Cargo.toml crates/storage/Cargo.toml
+RUN mkdir -p crates/api/src/bin crates/db/src crates/storage/src \
     && echo 'fn main() {}' > crates/api/src/main.rs \
     && echo 'fn main() {}' > crates/api/src/bin/openapi.rs \
-    && touch crates/api/src/lib.rs crates/db/src/lib.rs \
+    && touch crates/api/src/lib.rs crates/db/src/lib.rs crates/storage/src/lib.rs \
     && cargo build --release --locked --bin wardrobe-api \
-    && rm -rf crates/api/src crates/db/src
+    && rm -rf crates/api/src crates/db/src crates/storage/src
 
 COPY crates crates
 COPY migrations migrations
 # The dummy files above leave stale fingerprints; touching the real sources
 # forces a rebuild of our crates without touching the cached dependencies.
-RUN touch crates/api/src/main.rs crates/db/src/lib.rs \
+RUN touch crates/api/src/main.rs crates/db/src/lib.rs crates/storage/src/lib.rs \
     && cargo build --release --locked --bin wardrobe-api
 
 # ponytail: debian-slim keeps a shell, which is worth having the first time a

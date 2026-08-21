@@ -38,8 +38,31 @@ jobs:
           --health-retries 15
     env:
       DATABASE_URL: postgres://wardrobe:wardrobe@localhost:5433/wardrobe
+      S3_ENDPOINT: http://localhost:9100
+      S3_REGION: us-east-1
+      S3_BUCKET: wardrobe
+      S3_ACCESS_KEY_ID: wardrobe
+      S3_SECRET_ACCESS_KEY: wardrobe-dev-secret
+      S3_FORCE_PATH_STYLE: "true"
     steps:
       - uses: actions/checkout@v4
+      # A service container cannot pass command arguments, and this image needs
+      # `server /data`. Switching to an image that self-starts would mean CI and
+      # compose.yaml running different builds, which is half the point of testing
+      # against a real object store.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9100:9000 \
+            -e MINIO_ROOT_USER=wardrobe \
+            -e MINIO_ROOT_PASSWORD=wardrobe-dev-secret \
+            minio/minio:latest server /data
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:9100/minio/health/live && exit 0
+            sleep 1
+          done
+          echo "MinIO never became ready" >&2
+          docker logs minio >&2
+          exit 1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt

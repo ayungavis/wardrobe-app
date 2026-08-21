@@ -98,6 +98,150 @@
         ]
       }
     },
+    "/v1/media": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Registers an object and returns a signed URL to upload it.",
+        "operationId": "reserve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReserveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A signed upload URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown kind or unusable metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That id belongs to another account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Object storage is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/media/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Returns a signed URL to download an object whose bytes have arrived.",
+        "operationId": "download",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The media id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A signed download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such object, or its bytes never arrived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Object storage is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/sessions/anonymous": {
       "post": {
         "tags": [
@@ -688,6 +832,35 @@
           }
         }
       },
+      "GrantResponse": {
+        "type": "object",
+        "description": "A short-lived grant to move bytes, never an identity to store.",
+        "required": [
+          "mediaId",
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "byteSize": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "required": [
@@ -1242,6 +1415,35 @@
           "refreshToken": {
             "type": "string",
             "description": "The refresh token from the previous session response."
+          }
+        }
+      },
+      "ReserveRequest": {
+        "type": "object",
+        "required": [
+          "mediaId",
+          "kind",
+          "contentType"
+        ],
+        "properties": {
+          "byteSize": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "One of original, derivative, cutout, illustration, document, history."
+          },
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The client's own id for this object, reused on a retry."
           }
         }
       },

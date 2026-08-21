@@ -2,6 +2,12 @@
 export
 
 DATABASE_URL ?= postgres://wardrobe:wardrobe@localhost:5433/wardrobe
+S3_ENDPOINT ?= http://localhost:9100
+S3_REGION ?= us-east-1
+S3_BUCKET ?= wardrobe
+S3_ACCESS_KEY_ID ?= wardrobe
+S3_SECRET_ACCESS_KEY ?= wardrobe-dev-secret
+S3_FORCE_PATH_STYLE ?= true
 
 .PHONY: up down migrate reset run openapi test fmt lint validate
 

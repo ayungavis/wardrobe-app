@@ -143,6 +143,7 @@ mod tests {
 
     fn config(dsn: Option<&str>) -> Config {
         Config {
+            storage: None,
             database_url: String::new(),
             bind_addr: String::new(),
             sentry_dsn: dsn.map(str::to_owned),

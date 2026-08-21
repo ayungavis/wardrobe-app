@@ -18,7 +18,31 @@ pub fn verifier() -> std::sync::Arc<wardrobe_api::auth::apple::Verifier> {
 }
 
 pub async fn call(pool: PgPool, request: Request<Body>) -> Response {
-    wardrobe_api::app(pool, verifier())
+    wardrobe_api::app(pool, verifier(), Some(storage()))
+        .oneshot(request)
+        .await
+        .expect("the router is infallible")
+}
+
+pub fn storage() -> std::sync::Arc<wardrobe_storage::Storage> {
+    let settings = wardrobe_storage::Settings {
+        endpoint: env("S3_ENDPOINT", "http://localhost:9100"),
+        region: env("S3_REGION", "us-east-1"),
+        bucket: env("S3_BUCKET", "wardrobe"),
+        access_key_id: env("S3_ACCESS_KEY_ID", "wardrobe"),
+        secret_access_key: env("S3_SECRET_ACCESS_KEY", "wardrobe-dev-secret"),
+        path_style: true,
+        presign_ttl: std::time::Duration::from_secs(300),
+    };
+    std::sync::Arc::new(wardrobe_storage::Storage::new(&settings))
+}
+
+fn env(name: &str, fallback: &str) -> String {
+    std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
+}
+
+pub async fn call_without_storage(pool: PgPool, request: Request<Body>) -> Response {
+    wardrobe_api::app(pool, verifier(), None)
         .oneshot(request)
         .await
         .expect("the router is infallible")

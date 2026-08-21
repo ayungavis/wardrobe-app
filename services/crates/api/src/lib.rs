@@ -3,6 +3,7 @@ pub mod auth;
 pub mod changes;
 pub mod config;
 pub mod error;
+pub mod media;
 pub mod observability;
 pub mod openapi;
 pub mod routes;
@@ -35,11 +36,17 @@ fn api_router() -> OpenApiRouter<AppState> {
         .routes(routes!(routes::sessions::sign_out))
         .routes(routes!(routes::sync::sync))
         .routes(routes!(routes::changes::changes))
+        .routes(routes!(routes::media::reserve))
+        .routes(routes!(routes::media::download))
 }
 
-pub fn app(pool: PgPool, apple: Arc<auth::apple::Verifier>) -> Router {
+pub fn app(
+    pool: PgPool,
+    apple: Arc<auth::apple::Verifier>,
+    storage: Option<Arc<wardrobe_storage::Storage>>,
+) -> Router {
     let (router, api) = api_router()
-        .with_state(AppState::new(pool, apple))
+        .with_state(AppState::new(pool, apple, storage))
         .split_for_parts();
 
     let observability = tower::ServiceBuilder::new()

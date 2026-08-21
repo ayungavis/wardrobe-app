@@ -8,11 +8,20 @@ use crate::auth::apple;
 pub struct AppState {
     pub pool: PgPool,
     pub apple: Arc<apple::Verifier>,
+    pub storage: Option<Arc<wardrobe_storage::Storage>>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new(pool: PgPool, apple: Arc<apple::Verifier>) -> Self {
-        Self { pool, apple }
+    pub fn new(
+        pool: PgPool,
+        apple: Arc<apple::Verifier>,
+        storage: Option<Arc<wardrobe_storage::Storage>>,
+    ) -> Self {
+        Self {
+            pool,
+            apple,
+            storage,
+        }
     }
 }

@@ -5,6 +5,7 @@
 
 pub mod changes;
 pub mod health;
+pub mod media;
 pub mod sessions;
 pub mod sync;
 pub mod whoami;

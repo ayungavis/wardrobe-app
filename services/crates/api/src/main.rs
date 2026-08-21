@@ -53,7 +53,12 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
 
     let apple = std::sync::Arc::new(apple::Verifier::new(config.apple_bundle_id.clone()));
 
-    axum::serve(listener, wardrobe_api::app(pool, apple))
+    let storage = config
+        .storage
+        .as_ref()
+        .map(|settings| std::sync::Arc::new(wardrobe_storage::Storage::new(settings)));
+
+    axum::serve(listener, wardrobe_api::app(pool, apple, storage))
         .with_graceful_shutdown(shutdown())
         .await?;
     Ok(())
