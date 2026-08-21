@@ -114,3 +114,50 @@ pub async fn session(
 
     Ok((token, account_id))
 }
+
+// ------------------------------------------------------------ captured events
+
+static EVENTS: std::sync::OnceLock<std::sync::Arc<std::sync::Mutex<Vec<String>>>> =
+    std::sync::OnceLock::new();
+
+struct Capture(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+struct Fields<'a>(&'a mut String);
+
+impl tracing::field::Visit for Fields<'_> {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        use std::fmt::Write;
+        let _ = write!(self.0, "{}={value:?} ", field.name());
+    }
+}
+
+impl<S: tracing::Subscriber> tracing_subscriber::layer::Layer<S> for Capture {
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let mut line = String::new();
+        event.record(&mut Fields(&mut line));
+        self.0.lock().expect("an unpoisoned lock").push(line);
+    }
+}
+
+pub fn events() -> &'static std::sync::Arc<std::sync::Mutex<Vec<String>>> {
+    EVENTS.get_or_init(|| {
+        use tracing_subscriber::prelude::*;
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let _ = tracing_subscriber::registry()
+            .with(Capture(std::sync::Arc::clone(&seen)))
+            .try_init();
+        seen
+    })
+}
+
+pub fn recorded(needle: &str) -> bool {
+    events()
+        .lock()
+        .expect("an unpoisoned lock")
+        .iter()
+        .any(|line| line.contains(needle))
+}

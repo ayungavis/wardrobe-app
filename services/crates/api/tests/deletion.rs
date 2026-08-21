@@ -7,7 +7,9 @@ use chrono::Duration;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use common::{body_json, call, call_with, call_without_storage, session, storage, storage_in};
+use common::{
+    body_json, call, call_with, call_without_storage, recorded, session, storage, storage_in,
+};
 
 // ------------------------------------------------------------------- fixtures
 
@@ -217,4 +219,23 @@ async fn deleting_without_a_token_is_unauthenticated(pool: PgPool) {
     )
     .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refused_store_is_recorded_rather_than_swallowed(pool: PgPool) -> sqlx::Result<()> {
+    common::events();
+    let mine = owned(&pool).await?;
+
+    call_with(
+        pool.clone(),
+        delete_me(&mine.token),
+        Some(storage_in("a-bucket-that-does-not-exist")),
+    )
+    .await;
+
+    assert!(
+        recorded("storage.kind"),
+        "a 503 with no log line means a misconfigured bucket looks exactly like a healthy one"
+    );
+    Ok(())
 }

@@ -35,6 +35,7 @@ struct Stored {
     account_id: Uuid,
     storage_key: String,
     content_type: String,
+    byte_size: Option<i64>,
     uploaded_at: Option<DateTime<Utc>>,
 }
 
@@ -46,7 +47,7 @@ fn expires_at(storage: &Storage) -> DateTime<Utc> {
 
 async fn stored(pool: &PgPool, media_id: Uuid, account_id: Uuid) -> Result<Option<Stored>, Error> {
     let found: Option<Stored> = sqlx::query_as(
-        "select account_id, storage_key, content_type, uploaded_at
+        "select account_id, storage_key, content_type, byte_size, uploaded_at
            from media_object
           where id = $1",
     )
@@ -118,24 +119,26 @@ pub async fn download(
         Err(other) => return Err(other),
     };
 
-    let Some(size) = storage.head(&row.storage_key).await? else {
-        return Err(Error::NotFound);
-    };
-
-    let size = i64::try_from(size).unwrap_or(i64::MAX);
-    if row.uploaded_at.is_none() {
+    let byte_size = if row.uploaded_at.is_some() {
+        row.byte_size
+    } else {
+        let Some(size) = storage.head(&row.storage_key).await? else {
+            return Err(Error::NotFound);
+        };
+        let size = i64::try_from(size).unwrap_or(i64::MAX);
         sqlx::query("update media_object set uploaded_at = now(), byte_size = $2 where id = $1")
             .bind(media_id)
             .bind(size)
             .execute(pool)
             .await?;
-    }
+        Some(size)
+    };
 
     Ok(Granted {
         media_id,
         url: storage.presign_get(&row.storage_key).await?,
         expires_at: expires_at(storage),
-        byte_size: Some(size),
+        byte_size,
     })
 }
 
@@ -143,7 +146,12 @@ impl From<wardrobe_storage::Error> for Error {
     fn from(error: wardrobe_storage::Error) -> Self {
         match error {
             wardrobe_storage::Error::NotFound => Self::NotFound,
-            wardrobe_storage::Error::Rejected | wardrobe_storage::Error::Unavailable => {
+            wardrobe_storage::Error::Rejected => {
+                tracing::error!(storage.kind = "rejected", "object store failure");
+                Self::Unavailable
+            }
+            wardrobe_storage::Error::Unavailable => {
+                tracing::error!(storage.kind = "unreachable", "object store failure");
                 Self::Unavailable
             }
         }

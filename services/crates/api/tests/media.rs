@@ -8,7 +8,9 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use common::{body_json, call, call_without_storage, get_with_auth, session};
+use common::{
+    body_json, call, call_with, call_without_storage, get_with_auth, session, storage_in,
+};
 
 // ------------------------------------------------------------------- fixtures
 
@@ -204,4 +206,42 @@ async fn media_without_a_token_is_unauthenticated(pool: PgPool) {
     )
     .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_stamped_object_is_served_without_asking_the_store_again(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let (token, _) = session(&pool, Duration::days(1), false).await?;
+    let media_id = Uuid::now_v7();
+
+    let granted = body_json(call(pool.clone(), reserve(&token, &original(media_id))).await).await;
+    reqwest::Client::new()
+        .put(granted["url"].as_str().expect("a url"))
+        .header("content-type", "image/jpeg")
+        .body("twelve bytes")
+        .send()
+        .await
+        .expect("reachable")
+        .error_for_status()
+        .expect("accepted");
+    assert_eq!(
+        download(&pool, &token, media_id).await.status(),
+        StatusCode::OK
+    );
+
+    let blind = call_with(
+        pool.clone(),
+        get_with_auth(&format!("/v1/media/{media_id}"), &format!("Bearer {token}")),
+        Some(storage_in("a-bucket-that-does-not-exist")),
+    )
+    .await;
+
+    assert_eq!(
+        blind.status(),
+        StatusCode::OK,
+        "once the size is stored, asking the store again is a round trip on every image the app shows"
+    );
+    assert_eq!(body_json(blind).await["byteSize"], 12);
+    Ok(())
 }
