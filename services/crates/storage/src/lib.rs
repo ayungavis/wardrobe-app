@@ -5,6 +5,9 @@ use aws_sdk_s3::config::{Credentials, Region};
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::{Delete, ObjectIdentifier};
+
+const BATCH: usize = 1000;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -195,7 +198,39 @@ impl Storage {
             .send()
             .await
             .map(|_| ())
-            .map_err(|error| classify(&error))
+            .map_err(|error| refusal(&error))
+    }
+
+    /// # Errors
+    ///
+    /// Returns [`Error::Rejected`] when the store refuses any key. Deleting a
+    /// key that holds nothing succeeds, so a retry is safe.
+    pub async fn delete_many(&self, keys: &[String]) -> Result<(), Error> {
+        for batch in keys.chunks(BATCH) {
+            let objects = batch
+                .iter()
+                .map(|key| ObjectIdentifier::builder().key(key).build())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| Error::Rejected)?;
+            let request = Delete::builder()
+                .set_objects(Some(objects))
+                .build()
+                .map_err(|_| Error::Rejected)?;
+
+            let outcome = self
+                .client
+                .delete_objects()
+                .bucket(&self.bucket)
+                .delete(request)
+                .send()
+                .await
+                .map_err(|error| refusal(&error))?;
+
+            if !outcome.errors().is_empty() {
+                return Err(Error::Rejected);
+            }
+        }
+        Ok(())
     }
 
     /// # Errors
@@ -234,6 +269,13 @@ impl Storage {
     #[must_use]
     pub fn presign_ttl(&self) -> Duration {
         self.presign_ttl
+    }
+}
+
+fn refusal<E>(error: &SdkError<E>) -> Error {
+    match classify(error) {
+        Error::NotFound => Error::Rejected,
+        other => other,
     }
 }
 

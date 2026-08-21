@@ -2,6 +2,7 @@ pub mod account;
 pub mod auth;
 pub mod changes;
 pub mod config;
+pub mod deletion;
 pub mod error;
 pub mod media;
 pub mod observability;
@@ -38,6 +39,7 @@ fn api_router() -> OpenApiRouter<AppState> {
         .routes(routes!(routes::changes::changes))
         .routes(routes!(routes::media::reserve))
         .routes(routes!(routes::media::download))
+        .routes(routes!(routes::users::delete_me))
 }
 
 pub fn app(

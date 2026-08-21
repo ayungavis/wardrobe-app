@@ -8,4 +8,5 @@ pub mod health;
 pub mod media;
 pub mod sessions;
 pub mod sync;
+pub mod users;
 pub mod whoami;

@@ -480,6 +480,45 @@
         ]
       }
     },
+    "/v1/users/me": {
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Removes the account: its rows, its objects, and every session it owns.",
+        "operationId": "delete_me",
+        "responses": {
+          "204": {
+            "description": "Rows and objects are gone; nothing remains to retry"
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Objects remain and could not be removed; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/whoami": {
       "get": {
         "tags": [

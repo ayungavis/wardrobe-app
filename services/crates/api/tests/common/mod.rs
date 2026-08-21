@@ -25,7 +25,11 @@ pub async fn call(pool: PgPool, request: Request<Body>) -> Response {
 }
 
 pub fn storage() -> std::sync::Arc<wardrobe_storage::Storage> {
-    let settings = wardrobe_storage::Settings {
+    std::sync::Arc::new(wardrobe_storage::Storage::new(&settings()))
+}
+
+fn settings() -> wardrobe_storage::Settings {
+    wardrobe_storage::Settings {
         endpoint: env("S3_ENDPOINT", "http://localhost:9100"),
         region: env("S3_REGION", "us-east-1"),
         bucket: env("S3_BUCKET", "wardrobe"),
@@ -33,19 +37,32 @@ pub fn storage() -> std::sync::Arc<wardrobe_storage::Storage> {
         secret_access_key: env("S3_SECRET_ACCESS_KEY", "wardrobe-dev-secret"),
         path_style: true,
         presign_ttl: std::time::Duration::from_secs(300),
-    };
-    std::sync::Arc::new(wardrobe_storage::Storage::new(&settings))
+    }
 }
 
 fn env(name: &str, fallback: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
 }
 
-pub async fn call_without_storage(pool: PgPool, request: Request<Body>) -> Response {
-    wardrobe_api::app(pool, verifier(), None)
+pub fn storage_in(bucket: &str) -> std::sync::Arc<wardrobe_storage::Storage> {
+    let mut settings = settings();
+    bucket.clone_into(&mut settings.bucket);
+    std::sync::Arc::new(wardrobe_storage::Storage::new(&settings))
+}
+
+pub async fn call_with(
+    pool: PgPool,
+    request: Request<Body>,
+    storage: Option<std::sync::Arc<wardrobe_storage::Storage>>,
+) -> Response {
+    wardrobe_api::app(pool, verifier(), storage)
         .oneshot(request)
         .await
         .expect("the router is infallible")
+}
+
+pub async fn call_without_storage(pool: PgPool, request: Request<Body>) -> Response {
+    call_with(pool, request, None).await
 }
 
 pub async fn body_json(response: Response) -> Value {
