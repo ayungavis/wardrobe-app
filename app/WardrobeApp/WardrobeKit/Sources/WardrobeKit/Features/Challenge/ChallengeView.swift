@@ -1,22 +1,22 @@
 import DesignSystem
-import SwiftUI
 import Lottie
+import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
     @State private var isDevMenuPresented = DevMode.opensOnLaunch
     @State private var hasSwiped = false
-    
+
     private let container: AppContainer
 
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
     }
-    
+
     public var body: some View {
         @Bindable var viewModel = viewModel
-        
+
         NavigationStack {
             ZStack {
                 
@@ -34,19 +34,17 @@ public struct ChallengeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                //lottie animation here
-                if !hasSwiped && !viewModel.hasCompletedToday && viewModel.activeChallenge == nil {
+                if !hasSwiped, !viewModel.hasCompletedToday, viewModel.activeChallenge == nil {
                     ZStack {
-                        Color(AppColor.surface.opacity(0.1))
+                        AppColor.surface.opacity(0.1)
                         LottieView(animation: .named("HandSwipeAnimation", bundle: .module))
                             .playbackMode(.playing(.fromFrame(40, toFrame: 120, loopMode: .autoReverse)))
                             .resizable()
                             .frame(width: 300, height: 300)
                             .allowsHitTesting(false)
-                            .offset(y: 280) // position over cards
+                            .offset(y: 280)
                             .transition(.opacity)
                     }
-                    
                 }
             }
             .appBackgroundStickers()
@@ -104,7 +102,7 @@ public struct ChallengeView: View {
         } message: {
             Text("challenge.abandon.confirm.message", bundle: .module)
         }
-#if os(iOS)
+        #if os(iOS)
         .fullScreenCover(
             isPresented: $viewModel.isCaptureFlowPresented,
             onDismiss: { viewModel.refreshActiveChallenge() },

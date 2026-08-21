@@ -7,7 +7,7 @@ struct PileCardView: View {
     let thumbnailData: (WardrobeItem) -> Data?
     let namespace: Namespace.ID
     let onTap: () -> Void
-    
+
     @State private var isFannedOut = false
 
     var body: some View {
@@ -36,7 +36,7 @@ struct PileCardView: View {
                             .zIndex(Double(index))
                             .animation(
                                 .spring(response: 0.4, dampingFraction: 0.6)
-                                .delay(Double(index) * 0.08),
+                                    .delay(Double(index) * 0.08),
                                 value: isFannedOut
                             )
                     }
@@ -47,16 +47,14 @@ struct PileCardView: View {
         }
         .padding(Spacing.lg)
         .onTapGesture { onTap() }
-        .onAppear {
+        .task {
             isFannedOut = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                isFannedOut = true
-            }
+            try? await Task.sleep(for: .seconds(0.3))
+            isFannedOut = true
         }
         .onDisappear {
             isFannedOut = false
         }
-        
     }
 
     private func pileRotation(for index: Int) -> Double {

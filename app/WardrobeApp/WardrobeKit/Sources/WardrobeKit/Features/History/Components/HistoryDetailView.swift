@@ -5,9 +5,9 @@ public struct HistoryDetailView: View {
     public let completion: CompletedChallenge
     public let previewData: Data?
     let viewModel: HistoryViewModel
-    
+
     let onSelectGarment: (UUID) -> Void
-    
+
     @State private var garments: [(item: WardrobeItem, wearCount: Int)] = []
 
     public init(
@@ -95,7 +95,6 @@ public struct HistoryDetailView: View {
             } else {
                 HStack(spacing: 16) {
                     ForEach(garments, id: \.item.id) { entry in
-                        //garmentView(item: entry.item, wearCount: entry.wearCount)
                         Button {
                             onSelectGarment(entry.item.id)
                         } label: {
