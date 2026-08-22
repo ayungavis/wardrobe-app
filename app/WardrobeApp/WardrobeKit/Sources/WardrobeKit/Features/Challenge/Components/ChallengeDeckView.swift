@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+    import UIKit
+#endif
 
 struct ChallengeDeckView: View {
     let cards: [ChallengeCard]
@@ -7,13 +10,26 @@ struct ChallengeDeckView: View {
     @State private var currentIndex = 0
     @State private var dragOffset: CGFloat = 0
     @State private var bringBackOffset: CGFloat = 0
+    @State private var lastHapticTickOffset: CGFloat = 0
 
     private let parkedOffsetX: CGFloat = -300
     private let parkedOffsetY: CGFloat = -100
     private let swipeThreshold: CGFloat = 120
-
+    private let hapticStepDistance: CGFloat = 12
+    
+    private static let freestyleCard = ChallengeCard(id: UUID(), prompt: "Freestyle")
+    
+    private var isDeckCleared: Bool {
+            currentIndex >= cards.count
+        }
+    
     var body: some View {
         ZStack {
+            FreestyleOutfitView(onAccept: { onAccept(Self.freestyleCard) })
+                .aspectRatio(346 / 617, contentMode: .fit)
+                .zIndex(-Double(cards.count) - 1)
+                .allowsHitTesting(isDeckCleared)
+            
             ForEach(cards.indices, id: \.self) { index in
                 cardView(for: index)
             }
@@ -54,9 +70,15 @@ struct ChallengeDeckView: View {
         DragGesture()
             .onChanged { value in
                 dragOffset = min(0, value.translation.width)
+                tickIfNeeded(currentOffset: dragOffset)
+                if dragOffset == 0 {
+                    Self.prepareHaptic()   // new — primes it right as the drag starts
+                }
             }
             .onEnded { value in
+                lastHapticTickOffset = 0
                 if value.translation.width < -swipeThreshold {
+                    Self.playImpactHaptic()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                         currentIndex += 1
                         dragOffset = 0
@@ -73,9 +95,12 @@ struct ChallengeDeckView: View {
         DragGesture()
             .onChanged { value in
                 bringBackOffset = max(0, value.translation.width)
+                tickIfNeeded(currentOffset: bringBackOffset)
             }
             .onEnded { value in
+                lastHapticTickOffset = 0
                 if value.translation.width > swipeThreshold / 2 {
+                    Self.playImpactHaptic()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                         currentIndex -= 1
                         bringBackOffset = 0
@@ -87,6 +112,52 @@ struct ChallengeDeckView: View {
                 }
             }
     }
+    private static let hapticGenerator: UIImpactFeedbackGenerator = {
+        #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light)
+        #endif
+    }()
+
+    private static func prepareHaptic() {
+        #if os(iOS)
+            hapticGenerator.prepare()
+        #endif
+    }
+    private static func playHaptic() {
+            #if os(iOS)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+            #endif
+        }
+    private func tickIfNeeded(currentOffset: CGFloat) {
+            guard abs(currentOffset - lastHapticTickOffset) >= hapticStepDistance else { return }
+            lastHapticTickOffset = currentOffset
+            Self.playSelectionHaptic()
+        }
+
+        private static let selectionGenerator: UISelectionFeedbackGenerator = {
+            #if os(iOS)
+                UISelectionFeedbackGenerator()
+            #endif
+        }()
+
+        private static let impactGenerator: UIImpactFeedbackGenerator = {
+            #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light)
+            #endif
+        }()
+
+        private static func playSelectionHaptic() {
+            #if os(iOS)
+                selectionGenerator.selectionChanged()
+            #endif
+        }
+
+        private static func playImpactHaptic() {
+            #if os(iOS)
+                impactGenerator.impactOccurred()
+            #endif
+        }
 }
 
 #Preview {

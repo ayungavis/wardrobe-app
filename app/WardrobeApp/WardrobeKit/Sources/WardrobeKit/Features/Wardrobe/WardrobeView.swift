@@ -188,7 +188,7 @@ public struct WardrobeView: View {
                     }
                 )
             }
-            .padding(Spacing.lg)
+            .padding(Spacing.md)
         }
     }
 }
