@@ -50,9 +50,9 @@ public final class DevMenuViewModel {
         )
     }
 
-    public func resetOnboarding() {
+    public func resetOnboarding() async {
         do {
-            try onboarding.reset()
+            try await onboarding.reset()
             Log.ui.info("Dev: onboarding reset")
         } catch {
             Log.report(error)

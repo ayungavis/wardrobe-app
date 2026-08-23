@@ -6,7 +6,10 @@ import Observation
 public final class OnboardingViewModel {
     var step: OnboardingStep = .wardrobe
     var isSkipConfirmationPresented = false
+    var isSigningIn = false
     public var alertError: AppError?
+
+    private var pendingNonce: String?
 
     private let onboarding: OnboardingModel
 
@@ -41,16 +44,33 @@ public final class OnboardingViewModel {
         onboarding.skip()
     }
 
-    func signedIn(_ account: AppleAccount) {
+    func beginSignIn() -> String {
+        let nonce = SignInNonce.make()
+        pendingNonce = nonce
+        return SignInNonce.hashed(nonce)
+    }
+
+    func signedIn(identityToken: String, profile: AppleProfile) async {
+        guard let nonce = pendingNonce else {
+            alertError = .unexpected
+            return
+        }
+        pendingNonce = nil
+        isSigningIn = true
+        defer { isSigningIn = false }
+
         do {
-            try onboarding.signIn(account)
+            try await onboarding.signIn(
+                identityToken: identityToken, nonce: nonce, profile: profile
+            )
         } catch {
             Log.report(error)
-            alertError = .unexpected
+            alertError = AppError(wrapping: error)
         }
     }
 
     func signInFailed(_ error: Error) {
+        pendingNonce = nil
         Log.report(error)
     }
 }

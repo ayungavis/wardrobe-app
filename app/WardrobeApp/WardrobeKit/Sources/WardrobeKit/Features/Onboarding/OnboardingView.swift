@@ -84,11 +84,13 @@ public struct OnboardingView: View {
             if viewModel.isLastStep {
                 SignInWithAppleButton(.signIn) { request in
                     request.requestedScopes = [.fullName, .email]
+                    request.nonce = viewModel.beginSignIn()
                 } onCompletion: { result in
                     handle(result)
                 }
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 45)
+                .disabled(viewModel.isSigningIn)
                 .accessibilityIdentifier("onboarding.signIn")
 
                 HStack {
@@ -132,15 +134,18 @@ public struct OnboardingView: View {
     private func handle(_ result: Result<ASAuthorization, Error>) {
         switch result {
         case let .success(authorization):
-            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let token = credential.identityToken,
+                  let identityToken = String(data: token, encoding: .utf8)
+            else {
                 viewModel.signInFailed(AppError.unexpected)
                 return
             }
-            viewModel.signedIn(AppleAccount(
-                userID: credential.user,
+            let profile = AppleProfile(
                 fullName: credential.fullName?.formatted(.name(style: .medium)),
                 email: credential.email
-            ))
+            )
+            Task { await viewModel.signedIn(identityToken: identityToken, profile: profile) }
         case let .failure(error):
             viewModel.signInFailed(error)
         }

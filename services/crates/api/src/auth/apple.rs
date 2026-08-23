@@ -344,6 +344,16 @@ mod tests {
     }
 
     #[test]
+    fn the_nonce_digest_is_lowercase_hex_of_the_raw_bytes() {
+        assert_eq!(
+            hash_nonce(NONCE),
+            "6a264878f1535f17aff4db3feda236163ac2e1fd1b7d9374772d5228b458a0eb",
+            "SignInNonceTests on iOS pins the same pair; changing one side alone \
+             turns every Apple sign-in into an unexplained rejection"
+        );
+    }
+
+    #[test]
     fn a_replayed_token_fails_because_its_nonce_belongs_to_another_sign_in() {
         let token = sign(&claims(), &rs256());
 

@@ -3982,6 +3982,38 @@
         }
       }
     },
+    "error.serverRejected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server could not complete that. Try again in a moment."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server tidak bisa menyelesaikannya. Coba lagi sebentar."
+          }
+        }
+      }
+    },
+    "error.sessionExpired": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session has ended. Sign in again to keep syncing."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesimu sudah berakhir. Masuk lagi untuk melanjutkan sinkronisasi."
+          }
+        }
+      }
+    },
     "error.unexpected": {
       "localizations": {
         "en": {

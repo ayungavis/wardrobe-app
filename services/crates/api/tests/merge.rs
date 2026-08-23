@@ -114,6 +114,12 @@ async fn a_photo_still_precedes_its_derivative(pool: PgPool) -> sqlx::Result<()>
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_earlier_completion_stays_canonical(pool: PgPool) -> sqlx::Result<()> {
     let (destination, source, held, arriving) = two_full_accounts(&pool).await?;
+    sqlx::query(
+        "update challenge_completion set completed_at = now() + interval '1 hour' where id = $1",
+    )
+    .bind(arriving.completion)
+    .execute(&pool)
+    .await?;
 
     run(&pool, destination, source).await.expect("a merge");
 
@@ -168,6 +174,12 @@ async fn an_arriving_earlier_completion_demotes_the_one_already_here(
 #[sqlx::test(migrations = "../../migrations")]
 async fn only_the_newest_active_challenge_survives(pool: PgPool) -> sqlx::Result<()> {
     let (destination, source, held, arriving) = two_full_accounts(&pool).await?;
+    sqlx::query(
+        "update active_challenge set accepted_at = now() + interval '1 hour' where id = $1",
+    )
+    .bind(arriving.challenge)
+    .execute(&pool)
+    .await?;
 
     let before = seq_of(&pool, "active_challenge", held.challenge).await?;
     run(&pool, destination, source).await.expect("a merge");

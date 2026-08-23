@@ -2,6 +2,8 @@ import Foundation
 
 public enum AppError: Error, Equatable, Sendable {
     case network
+    case sessionExpired
+    case serverRejected
     case unexpected
     case cameraUnavailable
     case captureFailed
@@ -15,6 +17,10 @@ public enum AppError: Error, Equatable, Sendable {
         switch self {
         case .network:
             String(localized: "error.network", bundle: .module)
+        case .sessionExpired:
+            String(localized: "error.sessionExpired", bundle: .module)
+        case .serverRejected:
+            String(localized: "error.serverRejected", bundle: .module)
         case .unexpected:
             String(localized: "error.unexpected", bundle: .module)
         case .cameraUnavailable:

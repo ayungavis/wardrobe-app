@@ -10,6 +10,7 @@ public final class AppContainer {
     let preferencesRepository: AccountPreferencesRepository
     private let completionPreviewRepository: CompletionPreviewRepository
     let onboarding: OnboardingModel
+    private let session: SessionService
     private let cameraService: CameraService
 
     public init(
@@ -19,7 +20,8 @@ public final class AppContainer {
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
-        appleAccountRepository: AppleAccountRepository = KeychainAppleAccountRepository(),
+        appleAccountRepository: AppleAccountRepository = StoredAppleAccountRepository(),
+        session: SessionService? = nil,
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
@@ -28,10 +30,37 @@ public final class AppContainer {
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
+        let session = session ?? Self.defaultSession()
+        self.session = session
         onboarding = OnboardingModel(
-            preferences: preferencesRepository, accounts: appleAccountRepository
+            preferences: preferencesRepository,
+            accounts: appleAccountRepository,
+            session: session
         )
         self.cameraService = cameraService ?? Self.defaultCameraService()
+    }
+
+    private static func defaultSession() -> SessionService {
+        ServerSessionService(
+            client: URLSessionAPIClient(baseURL: apiBaseURL),
+            identities: StoredAnonymousIdentityRepository(),
+            tokens: StoredSessionTokenRepository()
+        )
+    }
+
+    private static var apiBaseURL: URL {
+        let configured = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String
+        guard let configured, let url = URL(string: configured), url.host()?.isEmpty == false else {
+            Log.network.error("APIBaseURL is missing or unusable; the app stays local-only")
+            // A compile-time constant that provably parses; every request against
+            // it then fails and the app runs local-only, which is the intent.
+            return URL(string: "http://localhost")!
+        }
+        return url
+    }
+
+    public func startSession() async {
+        await session.start()
     }
 
     private static func defaultCameraService() -> CameraService {

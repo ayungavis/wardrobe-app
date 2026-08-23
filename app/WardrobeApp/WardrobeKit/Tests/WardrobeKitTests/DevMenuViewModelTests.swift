@@ -13,7 +13,8 @@ struct DevMenuViewModelTests {
         previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository(),
         onboarding: OnboardingModel = OnboardingModel(
             preferences: InMemoryAccountPreferencesRepository(),
-            accounts: InMemoryAppleAccountRepository()
+            accounts: StoredAppleAccountRepository(store: InMemorySecureStore()),
+            session: FakeSessionService()
         )
     ) -> DevMenuViewModel {
         DevMenuViewModel(
@@ -50,29 +51,34 @@ struct DevMenuViewModelTests {
         #expect(sut.lastAction != nil)
     }
 
-    @Test func resetOnboardingSignsOutAndReopensOnboarding() throws {
+    @Test func resetOnboardingSignsOutAndReopensOnboarding() async throws {
         let preferences = InMemoryAccountPreferencesRepository()
-        let accounts = InMemoryAppleAccountRepository()
-        let onboarding = OnboardingModel(preferences: preferences, accounts: accounts)
-        try onboarding.signIn(AppleAccount(userID: "u1"))
+        let accounts = StoredAppleAccountRepository(store: InMemorySecureStore())
+        let onboarding = OnboardingModel(preferences: preferences, accounts: accounts, session: FakeSessionService())
+        try await onboarding.signIn(
+            identityToken: "jwt", nonce: "raw", profile: AppleProfile(fullName: nil, email: nil)
+        )
         let sut = makeSUT(onboarding: onboarding)
 
-        sut.resetOnboarding()
+        await sut.resetOnboarding()
 
         #expect(onboarding.isCompleted == false)
         #expect(preferences.stored.hasCompletedOnboarding == false)
-        #expect(accounts.stored == nil)
+        #expect(accounts.load() == nil)
         #expect(sut.summary.hasCompletedOnboarding == false)
         #expect(sut.summary.isSignedIn == false)
         #expect(sut.lastAction != nil)
     }
 
-    @Test func summaryReportsOnboardingAndSignIn() throws {
+    @Test func summaryReportsOnboardingAndSignIn() async throws {
         let onboarding = OnboardingModel(
             preferences: InMemoryAccountPreferencesRepository(),
-            accounts: InMemoryAppleAccountRepository()
+            accounts: StoredAppleAccountRepository(store: InMemorySecureStore()),
+            session: FakeSessionService()
         )
-        try onboarding.signIn(AppleAccount(userID: "u1"))
+        try await onboarding.signIn(
+            identityToken: "jwt", nonce: "raw", profile: AppleProfile(fullName: nil, email: nil)
+        )
         let sut = makeSUT(onboarding: onboarding)
 
         sut.refresh()

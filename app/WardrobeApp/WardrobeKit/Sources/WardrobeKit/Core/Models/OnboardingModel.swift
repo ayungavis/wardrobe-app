@@ -8,10 +8,16 @@ public final class OnboardingModel {
 
     private let preferences: AccountPreferencesRepository
     private let accounts: AppleAccountRepository
+    private let session: SessionService
 
-    public init(preferences: AccountPreferencesRepository, accounts: AppleAccountRepository) {
+    public init(
+        preferences: AccountPreferencesRepository,
+        accounts: AppleAccountRepository,
+        session: SessionService
+    ) {
         self.preferences = preferences
         self.accounts = accounts
+        self.session = session
         isCompleted = preferences.load().hasCompletedOnboarding
     }
 
@@ -19,8 +25,11 @@ public final class OnboardingModel {
         accounts.load() != nil
     }
 
-    func signIn(_ account: AppleAccount) throws {
-        try accounts.save(account)
+    func signIn(identityToken: String, nonce: String, profile: AppleProfile) async throws {
+        let accountID = try await session.linkApple(identityToken: identityToken, nonce: nonce)
+        try accounts.save(
+            AppleAccount(accountID: accountID, fullName: profile.fullName, email: profile.email)
+        )
         setCompleted(true)
     }
 
@@ -28,8 +37,9 @@ public final class OnboardingModel {
         setCompleted(true)
     }
 
-    func reset() throws {
+    func reset() async throws {
         try accounts.clear()
+        try await session.signOut()
         setCompleted(false)
     }
 

@@ -1,31 +1,37 @@
+import Foundation
 import Testing
 @testable import WardrobeKit
 
 struct AppleAccountTests {
-    @Test func aLaterSignInWithoutNameOrEmailKeepsWhatAppleGaveOnce() {
-        let first = AppleAccount(userID: "u1", fullName: "Ada Lovelace", email: "ada@example.com")
+    private static let one = UUID.v7()
+    private static let two = UUID.v7()
 
-        let merged = first.merged(with: AppleAccount(userID: "u1"))
+    @Test func aLaterSignInWithoutNameOrEmailKeepsWhatAppleGaveOnce() {
+        let first = AppleAccount(accountID: Self.one, fullName: "Ada Lovelace", email: "ada@example.com")
+
+        let merged = first.merged(with: AppleAccount(accountID: Self.one))
 
         #expect(merged.fullName == "Ada Lovelace")
         #expect(merged.email == "ada@example.com")
     }
 
     @Test func newerDetailsWin() {
-        let first = AppleAccount(userID: "u1", fullName: "Ada", email: nil)
+        let first = AppleAccount(accountID: Self.one, fullName: "Ada", email: nil)
 
-        let merged = first.merged(with: AppleAccount(userID: "u1", fullName: "Ada L.", email: "ada@example.com"))
+        let merged = first.merged(
+            with: AppleAccount(accountID: Self.one, fullName: "Ada L.", email: "ada@example.com")
+        )
 
         #expect(merged.fullName == "Ada L.")
         #expect(merged.email == "ada@example.com")
     }
 
     @Test func aDifferentAppleUserReplacesTheStoredOneOutright() {
-        let first = AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
+        let first = AppleAccount(accountID: Self.one, fullName: "Ada", email: "ada@example.com")
 
-        let merged = first.merged(with: AppleAccount(userID: "u2"))
+        let merged = first.merged(with: AppleAccount(accountID: Self.two))
 
-        #expect(merged.userID == "u2")
+        #expect(merged.accountID == Self.two)
         #expect(merged.fullName == nil)
         #expect(merged.email == nil)
     }
@@ -35,13 +41,19 @@ struct AppleAccountTests {
 struct OnboardingModelTests {
     @MainActor private struct Setup {
         let model: OnboardingModel
-        let accounts: InMemoryAppleAccountRepository
+        let accounts: StoredAppleAccountRepository
+        let store: InMemorySecureStore
         let preferences: InMemoryAccountPreferencesRepository
+        let session: FakeSessionService
 
         init() {
-            accounts = InMemoryAppleAccountRepository()
+            store = InMemorySecureStore()
+            accounts = StoredAppleAccountRepository(store: store)
             preferences = InMemoryAccountPreferencesRepository()
-            model = OnboardingModel(preferences: preferences, accounts: accounts)
+            session = FakeSessionService()
+            model = OnboardingModel(
+                preferences: preferences, accounts: accounts, session: session
+            )
         }
     }
 
@@ -50,7 +62,9 @@ struct OnboardingModelTests {
         preferences.stored = AccountPreferences(hasCompletedOnboarding: true)
 
         let model = OnboardingModel(
-            preferences: preferences, accounts: InMemoryAppleAccountRepository()
+            preferences: preferences,
+            accounts: StoredAppleAccountRepository(store: InMemorySecureStore()),
+            session: FakeSessionService()
         )
 
         #expect(model.isCompleted)
@@ -66,51 +80,81 @@ struct OnboardingModelTests {
         #expect(setup.model.isSignedIn == false)
     }
 
-    @Test func signingInStoresTheAccountAndFinishes() throws {
+    @Test func signingInStoresTheAccountTheServerNamedAndFinishes() async throws {
         let setup = Setup()
-        let account = AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
+        let profile = AppleProfile(fullName: "Ada", email: "ada@example.com")
 
-        try setup.model.signIn(account)
+        try await setup.model.signIn(identityToken: "jwt", nonce: "raw", profile: profile)
 
-        #expect(setup.accounts.stored == account)
+        #expect(setup.session.linkedWith?.identityToken == "jwt")
+        #expect(setup.session.linkedWith?.nonce == "raw")
+        #expect(setup.accounts.load()?.accountID == setup.session.linkedAccountID)
+        #expect(setup.accounts.load()?.fullName == "Ada")
         #expect(setup.model.isSignedIn)
         #expect(setup.model.isCompleted)
         #expect(setup.preferences.stored.hasCompletedOnboarding)
     }
 
-    /// The merge rule has to survive the trip through the model, not just the
-    /// domain: Apple sends the name and email exactly once.
-    @Test func aSecondSignInDoesNotEraseTheStoredNameAndEmail() throws {
+    @Test func aSecondSignInDoesNotEraseTheStoredNameAndEmail() async throws {
         let setup = Setup()
-        try setup.model.signIn(
-            AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
+        try await setup.model.signIn(
+            identityToken: "jwt",
+            nonce: "raw",
+            profile: AppleProfile(fullName: "Ada", email: "ada@example.com")
         )
 
-        try setup.model.signIn(AppleAccount(userID: "u1"))
+        try await setup.model.signIn(
+            identityToken: "jwt",
+            nonce: "raw2",
+            profile: AppleProfile(fullName: nil, email: nil)
+        )
 
-        #expect(setup.accounts.stored?.fullName == "Ada")
-        #expect(setup.accounts.stored?.email == "ada@example.com")
+        #expect(setup.accounts.load()?.fullName == "Ada")
+        #expect(setup.accounts.load()?.email == "ada@example.com")
     }
 
-    @Test func resettingSignsOutAndReopensOnboarding() throws {
+    @Test func resettingSignsOutAndReopensOnboarding() async throws {
         let setup = Setup()
-        try setup.model.signIn(AppleAccount(userID: "u1"))
+        try await setup.model.signIn(
+            identityToken: "jwt", nonce: "raw", profile: AppleProfile(fullName: nil, email: nil)
+        )
 
-        try setup.model.reset()
+        try await setup.model.reset()
 
         #expect(setup.model.isCompleted == false)
         #expect(setup.preferences.stored.hasCompletedOnboarding == false)
-        #expect(setup.accounts.stored == nil)
+        #expect(setup.accounts.load() == nil)
         #expect(setup.model.isSignedIn == false)
+        #expect(setup.session.signedOut)
     }
 
-    @Test func aFailedSaveFinishesNothing() {
+    @Test func aKeychainThatRefusesTheWriteFinishesNothing() async {
         let setup = Setup()
-        setup.accounts.saveError = .unexpected
+        setup.store.saveError = .unexpected
 
-        #expect(throws: AppError.unexpected) {
-            try setup.model.signIn(AppleAccount(userID: "u1"))
+        await #expect(throws: AppError.unexpected) {
+            try await setup.model.signIn(
+                identityToken: "jwt",
+                nonce: "raw",
+                profile: AppleProfile(fullName: nil, email: nil)
+            )
         }
+        #expect(setup.model.isCompleted == false)
+        #expect(setup.preferences.stored.hasCompletedOnboarding == false)
+    }
+
+    @Test func aRejectedIdentityTokenFinishesNothing() async {
+        let setup = Setup()
+        setup.session.linkError = .serverRejected
+
+        await #expect(throws: AppError.serverRejected) {
+            try await setup.model.signIn(
+                identityToken: "forged",
+                nonce: "raw",
+                profile: AppleProfile(fullName: nil, email: nil)
+            )
+        }
+        #expect(setup.accounts.load() == nil)
         #expect(setup.model.isCompleted == false)
         #expect(setup.preferences.stored.hasCompletedOnboarding == false)
     }
@@ -121,13 +165,19 @@ struct OnboardingViewModelTests {
     @MainActor private struct Setup {
         let model: OnboardingViewModel
         let onboarding: OnboardingModel
-        let accounts: InMemoryAppleAccountRepository
+        let accounts: StoredAppleAccountRepository
+        let store: InMemorySecureStore
         let preferences: InMemoryAccountPreferencesRepository
+        let session: FakeSessionService
 
         init() {
-            accounts = InMemoryAppleAccountRepository()
+            store = InMemorySecureStore()
+            accounts = StoredAppleAccountRepository(store: store)
             preferences = InMemoryAccountPreferencesRepository()
-            onboarding = OnboardingModel(preferences: preferences, accounts: accounts)
+            session = FakeSessionService()
+            onboarding = OnboardingModel(
+                preferences: preferences, accounts: accounts, session: session
+            )
             model = OnboardingViewModel(onboarding: onboarding)
         }
     }
@@ -190,30 +240,48 @@ struct OnboardingViewModelTests {
 
         #expect(setup.model.isSkipConfirmationPresented == false)
         #expect(setup.onboarding.isCompleted)
-        #expect(setup.accounts.stored == nil)
+        #expect(setup.accounts.load() == nil)
     }
 
-    @Test func signingInStoresTheAccountAndFinishes() {
+    @Test func theNonceGoesToAppleHashedAndToTheServerRaw() async {
         let setup = Setup()
-        let account = AppleAccount(userID: "u1", fullName: "Ada", email: "ada@example.com")
+        let hashed = setup.model.beginSignIn()
 
-        setup.model.signedIn(account)
+        await setup.model.signedIn(
+            identityToken: "jwt", profile: AppleProfile(fullName: "Ada", email: nil)
+        )
 
-        #expect(setup.accounts.stored == account)
+        let raw = try? #require(setup.session.linkedWith?.nonce)
+        #expect(SignInNonce.hashed(raw ?? "") == hashed)
+        #expect(raw != hashed)
+        #expect(setup.accounts.load()?.accountID == setup.session.linkedAccountID)
         #expect(setup.onboarding.isCompleted)
     }
 
-    /// Onboarding is the only gate in front of the app: finishing it on a failed
-    /// save would leave the user inside with no identity and no way back.
-    @Test func aFailedSaveFinishesNothingAndSurfacesTheError() {
+    @Test func aCompletionWithoutARequestNeverReachesTheServer() async {
         let setup = Setup()
-        setup.accounts.saveError = .unexpected
 
-        setup.model.signedIn(AppleAccount(userID: "u1"))
+        await setup.model.signedIn(
+            identityToken: "jwt", profile: AppleProfile(fullName: nil, email: nil)
+        )
+
+        #expect(setup.session.linkedWith == nil)
+        #expect(setup.model.alertError == .unexpected)
+        #expect(setup.onboarding.isCompleted == false)
+    }
+
+    @Test func aRejectedTokenFinishesNothingAndSurfacesTheError() async {
+        let setup = Setup()
+        setup.session.linkError = .serverRejected
+        _ = setup.model.beginSignIn()
+
+        await setup.model.signedIn(
+            identityToken: "forged", profile: AppleProfile(fullName: nil, email: nil)
+        )
 
         #expect(setup.onboarding.isCompleted == false)
         #expect(setup.preferences.stored.hasCompletedOnboarding == false)
-        #expect(setup.model.alertError == .unexpected)
+        #expect(setup.model.alertError == .serverRejected)
     }
 
     @Test func aFailedSignInLeavesTheUserWhereTheyWere() {

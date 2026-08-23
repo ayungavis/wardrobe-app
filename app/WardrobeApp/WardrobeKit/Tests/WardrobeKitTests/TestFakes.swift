@@ -366,24 +366,3 @@ final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, 
         stored = preferences
     }
 }
-
-final class InMemoryAppleAccountRepository: AppleAccountRepository, @unchecked Sendable {
-    // @unchecked: tests drive it from one actor at a time.
-    var stored: AppleAccount?
-    var saveError: AppError?
-
-    func load() -> AppleAccount? {
-        stored
-    }
-
-    func save(_ account: AppleAccount) throws {
-        if let saveError {
-            throw saveError
-        }
-        stored = stored.map { $0.merged(with: account) } ?? account
-    }
-
-    func clear() throws {
-        stored = nil
-    }
-}

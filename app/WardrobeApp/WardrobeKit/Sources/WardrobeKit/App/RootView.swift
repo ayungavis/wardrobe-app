@@ -21,6 +21,7 @@ public struct RootView: View {
             }
         }
         .preferredColorScheme(.light)
+        .task { await container.startSession() }
     }
 
     private var tabs: some View {

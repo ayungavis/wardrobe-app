@@ -118,7 +118,7 @@ struct DevMenuView: View {
                 ) {
                     Button(role: .destructive) {
                         dismiss()
-                        viewModel.resetOnboarding()
+                        Task { await viewModel.resetOnboarding() }
                     } label: {
                         Text(verbatim: "Reset")
                     }
