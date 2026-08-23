@@ -573,3 +573,199 @@ async fn the_job_key_carries_the_style_version(pool: PgPool) -> sqlx::Result<()>
     );
     Ok(())
 }
+
+// -------------------------------------------------------------- resolution
+
+async fn resolve(pool: &PgPool, stage: &Stage, completion: Uuid) -> Value {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", stage.token))
+        .body(Body::from(
+            json!({ "mutations": [{
+                "id": Uuid::now_v7(), "name": "resolveCompletion",
+                "args": { "completionId": completion }
+            }]})
+            .to_string(),
+        ))
+        .expect("request");
+    let response = call(pool.clone(), request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["results"][0].clone()
+}
+
+async fn status_of(pool: &PgPool, completion: Uuid) -> String {
+    sqlx::query_scalar("select status from challenge_completion where id = $1")
+        .bind(completion)
+        .fetch_one(pool)
+        .await
+        .expect("the completion row")
+}
+
+async fn canonical_count(pool: &PgPool, account: Uuid) -> i64 {
+    sqlx::query_scalar(
+        "select count(*) from challenge_completion
+          where account_id = $1 and status = 'canonical' and deleted_at is null",
+    )
+    .bind(account)
+    .fetch_one(pool)
+    .await
+    .expect("count")
+}
+
+/// Two completions on one local day: the first canonical, the second conflicting.
+async fn a_contested_day(pool: &PgPool, stage: &Stage) -> sqlx::Result<(Ticket, Ticket)> {
+    let first = fresh();
+    let second = fresh();
+    complete(pool, stage, &args(stage, &first, "2026-08-21")).await;
+    complete(pool, stage, &args(stage, &second, "2026-08-21")).await;
+    Ok((first, second))
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn resolution_leaves_exactly_one_canonical_for_the_day(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let (first, second) = a_contested_day(&pool, &stage).await?;
+
+    let result = resolve(&pool, &stage, second.completion).await;
+    assert_eq!(result["record"]["status"], "canonical");
+
+    assert_eq!(
+        canonical_count(&pool, stage.account).await,
+        1,
+        "counting rows is the check that matters: asserting only on the winner stays green even \
+         when the loser was never demoted, and that only surfaces on the next checkmark"
+    );
+    assert_eq!(status_of(&pool, first.completion).await, "superseded");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_loser_keeps_its_photo_and_is_not_deleted(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let (first, second) = a_contested_day(&pool, &stage).await?;
+
+    resolve(&pool, &stage, second.completion).await;
+
+    let kept: (Option<Uuid>, Option<chrono::DateTime<chrono::Utc>>) =
+        sqlx::query_as("select photo_id, deleted_at from challenge_completion where id = $1")
+            .bind(first.completion)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(kept.0, Some(first.photo));
+    assert!(
+        kept.1.is_none(),
+        "neither photo is deleted during a conflict"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn every_affected_wear_reappears_in_the_feed(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let (_, second) = a_contested_day(&pool, &stage).await?;
+    let before = change_seq(&pool, stage.account).await;
+
+    resolve(&pool, &stage, second.completion).await;
+
+    let feed = body_json(
+        call(
+            pool.clone(),
+            Request::builder()
+                .uri(format!("/v1/changes?since={before}"))
+                .header("authorization", format!("Bearer {}", stage.token))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await,
+    )
+    .await;
+    let kinds: Vec<&str> = feed["changes"]
+        .as_array()
+        .expect("changes")
+        .iter()
+        .map(|change| change["kind"].as_str().expect("kind"))
+        .collect();
+
+    assert!(
+        kinds.contains(&"wearRecord"),
+        "the wear rows did not change, only the status of what they point at — without a new \
+         position the client is never told to recount: {kinds:?}"
+    );
+    assert!(kinds.contains(&"challengeCompletion"));
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn resolving_twice_moves_no_cursor(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let (_, second) = a_contested_day(&pool, &stage).await?;
+
+    resolve(&pool, &stage, second.completion).await;
+    let settled = change_seq(&pool, stage.account).await;
+    resolve(&pool, &stage, second.completion).await;
+
+    assert_eq!(change_seq(&pool, stage.account).await, settled);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn choosing_the_superseded_one_reverses_the_decision(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let (first, second) = a_contested_day(&pool, &stage).await?;
+    resolve(&pool, &stage, second.completion).await;
+
+    resolve(&pool, &stage, first.completion).await;
+
+    assert_eq!(status_of(&pool, first.completion).await, "canonical");
+    assert_eq!(status_of(&pool, second.completion).await, "superseded");
+    assert_eq!(canonical_count(&pool, stage.account).await, 1);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_day_without_a_conflict_is_left_alone(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let only = fresh();
+    complete(&pool, &stage, &args(&stage, &only, "2026-08-21")).await;
+    let settled = change_seq(&pool, stage.account).await;
+
+    resolve(&pool, &stage, only.completion).await;
+
+    assert_eq!(
+        change_seq(&pool, stage.account).await,
+        settled,
+        "resolving a day nobody contested must not spend feed positions"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn another_accounts_completion_cannot_be_resolved(pool: PgPool) -> sqlx::Result<()> {
+    let mine = stage(&pool).await?;
+    let theirs = stage(&pool).await?;
+    let ticket = fresh();
+    complete(&pool, &theirs, &args(&theirs, &ticket, "2026-08-21")).await;
+
+    let result = resolve(&pool, &mine, ticket.completion).await;
+
+    assert_eq!(result["error"]["code"], "conflict");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_tombstoned_completion_cannot_win(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let (first, second) = a_contested_day(&pool, &stage).await?;
+    sqlx::query("update challenge_completion set deleted_at = now() where id = $1")
+        .bind(second.completion)
+        .execute(&pool)
+        .await?;
+
+    let result = resolve(&pool, &stage, second.completion).await;
+
+    assert_eq!(result["error"]["code"], "not_found");
+    assert_eq!(status_of(&pool, first.completion).await, "canonical");
+    Ok(())
+}

@@ -1,5 +1,6 @@
 pub mod complete_challenge;
 pub mod delete_item;
+pub mod resolve_completion;
 pub mod upsert_item;
 pub mod upsert_preferences;
 
