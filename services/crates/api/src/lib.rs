@@ -5,7 +5,6 @@ pub mod config;
 pub mod deletion;
 pub mod error;
 pub mod media;
-pub mod observability;
 pub mod openapi;
 pub mod routes;
 pub mod session;

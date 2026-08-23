@@ -16,20 +16,27 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/api/Cargo.toml crates/api/Cargo.toml
 COPY crates/db/Cargo.toml crates/db/Cargo.toml
+COPY crates/observability/Cargo.toml crates/observability/Cargo.toml
 COPY crates/storage/Cargo.toml crates/storage/Cargo.toml
-RUN mkdir -p crates/api/src/bin crates/db/src crates/storage/src \
+COPY crates/worker/Cargo.toml crates/worker/Cargo.toml
+RUN mkdir -p crates/api/src/bin crates/db/src crates/observability/src \
+        crates/storage/src crates/worker/src \
     && echo 'fn main() {}' > crates/api/src/main.rs \
     && echo 'fn main() {}' > crates/api/src/bin/openapi.rs \
-    && touch crates/api/src/lib.rs crates/db/src/lib.rs crates/storage/src/lib.rs \
-    && cargo build --release --locked --bin wardrobe-api \
-    && rm -rf crates/api/src crates/db/src crates/storage/src
+    && echo 'fn main() {}' > crates/worker/src/main.rs \
+    && touch crates/api/src/lib.rs crates/db/src/lib.rs \
+        crates/observability/src/lib.rs crates/storage/src/lib.rs crates/worker/src/lib.rs \
+    && cargo build --release --locked --bin wardrobe-api --bin wardrobe-worker \
+    && rm -rf crates/api/src crates/db/src crates/observability/src \
+        crates/storage/src crates/worker/src
 
 COPY crates crates
 COPY migrations migrations
 # The dummy files above leave stale fingerprints; touching the real sources
 # forces a rebuild of our crates without touching the cached dependencies.
-RUN touch crates/api/src/main.rs crates/db/src/lib.rs crates/storage/src/lib.rs \
-    && cargo build --release --locked --bin wardrobe-api
+RUN touch crates/api/src/main.rs crates/db/src/lib.rs crates/observability/src/lib.rs \
+        crates/storage/src/lib.rs crates/worker/src/main.rs \
+    && cargo build --release --locked --bin wardrobe-api --bin wardrobe-worker
 
 # ponytail: debian-slim keeps a shell, which is worth having the first time a
 # deployment misbehaves. The image is ~170 MB, almost all of it this base — swap
@@ -46,6 +53,10 @@ USER wardrobe
 WORKDIR /app
 
 COPY --from=builder /build/target/release/wardrobe-api /usr/local/bin/wardrobe-api
+# One image, two services on Railway: the worker runs the same image with
+# `wardrobe-worker` as its command, and with the healthcheck turned off because
+# it serves no HTTP.
+COPY --from=builder /build/target/release/wardrobe-worker /usr/local/bin/wardrobe-worker
 
 # Migrations are embedded in the binary at compile time (sqlx::migrate!), so the
 # image needs no SQL files and no sqlx-cli.

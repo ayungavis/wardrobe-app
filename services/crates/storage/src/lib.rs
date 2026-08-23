@@ -19,6 +19,30 @@ pub enum Error {
     Unavailable,
 }
 
+impl Settings {
+    #[must_use]
+    pub fn from_env() -> Option<Self> {
+        fn var(name: &str) -> Option<String> {
+            std::env::var(name).ok().filter(|value| !value.is_empty())
+        }
+
+        Some(Self {
+            endpoint: var("S3_ENDPOINT")?,
+            region: var("S3_REGION").unwrap_or_else(|| "auto".to_owned()),
+            bucket: var("S3_BUCKET")?,
+            access_key_id: var("S3_ACCESS_KEY_ID")?,
+            secret_access_key: var("S3_SECRET_ACCESS_KEY")?,
+            path_style: var("S3_FORCE_PATH_STYLE")
+                .is_none_or(|raw| raw.eq_ignore_ascii_case("true")),
+            presign_ttl: Duration::from_secs(
+                var("S3_PRESIGN_SECS")
+                    .and_then(|raw| raw.parse().ok())
+                    .unwrap_or(300),
+            ),
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct Settings {
     pub endpoint: String,

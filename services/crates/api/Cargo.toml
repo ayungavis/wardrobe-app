@@ -28,6 +28,7 @@ utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
 uuid.workspace = true
 wardrobe-db = { path = "../db" }
+wardrobe-observability = { path = "../observability" }
 wardrobe-storage = { path = "../storage" }
 
 [dev-dependencies]

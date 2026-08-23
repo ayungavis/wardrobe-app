@@ -4,13 +4,49 @@ use std::sync::Arc;
 use sentry::ClientInitGuard;
 use sentry::protocol::Event;
 
-use crate::config::Config;
-
 const REDACTED: &str = "[redacted]";
 
-pub fn init(config: &Config) -> Option<ClientInitGuard> {
-    let dsn = config
-        .sentry_dsn
+#[derive(Clone, Default)]
+pub struct Settings {
+    pub dsn: Option<String>,
+    pub environment: String,
+    pub traces_sample_rate: f32,
+    pub release: Option<String>,
+}
+
+impl Settings {
+    #[must_use]
+    pub fn from_env() -> Self {
+        fn var(name: &str) -> Option<String> {
+            std::env::var(name).ok().filter(|value| !value.is_empty())
+        }
+
+        Self {
+            dsn: var("SENTRY_DSN"),
+            environment: var("SENTRY_ENVIRONMENT").unwrap_or_else(|| "development".to_owned()),
+            traces_sample_rate: var("SENTRY_TRACES_SAMPLE_RATE")
+                .and_then(|raw| raw.parse().ok())
+                .unwrap_or(0.0),
+            release: var("GIT_SHA").or_else(|| var("RAILWAY_GIT_COMMIT_SHA")),
+        }
+    }
+}
+
+impl std::fmt::Debug for Settings {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Settings")
+            .field("dsn", &self.dsn.as_ref().map(|_| REDACTED))
+            .field("environment", &self.environment)
+            .field("traces_sample_rate", &self.traces_sample_rate)
+            .field("release", &self.release)
+            .finish()
+    }
+}
+
+pub fn init(settings: &Settings) -> Option<ClientInitGuard> {
+    let dsn = settings
+        .dsn
         .as_deref()
         .map(str::trim)
         .filter(|dsn| !dsn.is_empty())?
@@ -19,9 +55,9 @@ pub fn init(config: &Config) -> Option<ClientInitGuard> {
     Some(sentry::init((
         dsn,
         sentry::ClientOptions {
-            release: config.release.clone().map(Cow::from),
-            environment: Some(Cow::from(config.sentry_environment.clone())),
-            traces_sample_rate: config.sentry_traces_sample_rate,
+            release: settings.release.clone().map(Cow::from),
+            environment: Some(Cow::from(settings.environment.clone())),
+            traces_sample_rate: settings.traces_sample_rate,
             send_default_pii: false,
             before_send: Some(Arc::new(scrub)),
             ..sentry::ClientOptions::default()
@@ -141,23 +177,18 @@ mod tests {
         assert!(!scrubbed.message.unwrap().contains("deadbeef"));
     }
 
-    fn config(dsn: Option<&str>) -> Config {
-        Config {
-            storage: None,
-            database_url: String::new(),
-            bind_addr: String::new(),
-            sentry_dsn: dsn.map(str::to_owned),
-            sentry_environment: "test".to_owned(),
-            sentry_traces_sample_rate: 0.0,
-            release: None,
-            apple_bundle_id: None,
+    fn settings(dsn: Option<&str>) -> Settings {
+        Settings {
+            dsn: dsn.map(str::to_owned),
+            environment: "test".to_owned(),
+            ..Settings::default()
         }
     }
 
     #[test]
     fn the_sdk_stays_off_without_a_dsn() {
-        assert!(init(&config(None)).is_none());
-        assert!(init(&config(Some(""))).is_none());
+        assert!(init(&settings(None)).is_none());
+        assert!(init(&settings(Some(""))).is_none());
     }
 
     #[test]

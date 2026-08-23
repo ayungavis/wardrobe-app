@@ -6,7 +6,8 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use wardrobe_api::auth::apple;
-use wardrobe_api::{config::Config, observability};
+use wardrobe_api::config::Config;
+use wardrobe_observability as observability;
 
 fn main() -> ExitCode {
     let config = match Config::from_env() {
@@ -17,7 +18,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let _sentry_guard_outliving_the_runtime = observability::init(&config);
+    let _sentry_guard_outliving_the_runtime = observability::init(&config.observability);
 
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))

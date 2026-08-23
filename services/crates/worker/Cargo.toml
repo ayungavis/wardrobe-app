@@ -1,0 +1,28 @@
+[package]
+name = "wardrobe-worker"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono.workspace = true
+sqlx.workspace = true
+tokio = { workspace = true, features = ["time"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+sentry.workspace = true
+wardrobe-db = { path = "../db" }
+wardrobe-observability = { path = "../observability" }
+wardrobe-storage = { path = "../storage" }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[[bin]]
+name = "wardrobe-worker"
+path = "src/main.rs"
+
+[lints]
+workspace = true

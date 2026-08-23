@@ -3958,6 +3958,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "wardrobe-db",
+ "wardrobe-observability",
  "wardrobe-storage",
 ]
 
@@ -3974,6 +3975,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "wardrobe-observability"
+version = "0.1.0"
+dependencies = [
+ "sentry",
+ "uuid",
+]
+
+[[package]]
 name = "wardrobe-storage"
 version = "0.1.0"
 dependencies = [
@@ -3983,6 +3992,23 @@ dependencies = [
  "thiserror",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "wardrobe-worker"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "sentry",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wardrobe-db",
+ "wardrobe-observability",
+ "wardrobe-storage",
 ]
 
 [[package]]

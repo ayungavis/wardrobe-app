@@ -25,6 +25,28 @@ pub async fn next_change_seq(conn: &mut PgConnection, account_id: Uuid) -> sqlx:
     .await
 }
 
+/// # Errors
+///
+/// Returns any database error unchanged.
+pub async fn reclaim_stalled(
+    conn: &mut PgConnection,
+    kind: &str,
+    older_than: chrono::Duration,
+) -> sqlx::Result<u64> {
+    sqlx::query(
+        "update job
+            set status = 'pending', updated_at = now()
+          where kind = $1
+            and status = 'running'
+            and started_at < now() - $2::interval",
+    )
+    .bind(kind)
+    .bind(older_than)
+    .execute(conn)
+    .await
+    .map(|done| done.rows_affected())
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ClaimedJob {
     pub id: Uuid,
