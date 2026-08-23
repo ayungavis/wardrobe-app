@@ -95,9 +95,15 @@ pub async fn sync(
     for mutation in request.mutations {
         let MutationRequest { id, name, args } = mutation;
         let span = tracing::info_span!("mutation", name = name.as_str());
-        let outcome = sync::apply(&state.pool, session.account_id, &name, args)
-            .instrument(span)
-            .await;
+        let outcome = sync::apply(
+            &state.pool,
+            session.account_id,
+            session.device_id,
+            &name,
+            args,
+        )
+        .instrument(span)
+        .await;
         results.push(MutationResult {
             id,
             name,

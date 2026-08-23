@@ -17,14 +17,7 @@ pub(super) struct ItemArgs {
     garment_type: Option<String>,
     description: Option<String>,
     source_photo_id: Option<Uuid>,
-    cutout: Option<CutoutArgs>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CutoutArgs {
-    id: Uuid,
-    media_object_id: Uuid,
+    cutout: Option<crate::sync::mutations::CutoutArgs>,
 }
 
 fn revisions(item: &ItemArgs) -> Value {
@@ -56,7 +49,7 @@ pub(super) async fn confirm(
 ) -> Result<Vec<Uuid>, Error> {
     let mut created = Vec::new();
     for item in items {
-        let seq = super::next(tx, account_id).await?;
+        let seq = crate::sync::mutations::next(tx, account_id).await?;
         let written = sqlx::query(
             "insert into wardrobe_item
                  (id, account_id, category, name, color, garment_type, description,
@@ -79,36 +72,18 @@ pub(super) async fn confirm(
         if written.rows_affected() > 0 {
             created.push(item.id);
         }
-        write_cutout(tx, account_id, item).await?;
+        if let Some(cutout) = item.cutout.as_ref() {
+            crate::sync::mutations::write_cutout(
+                tx,
+                account_id,
+                item.id,
+                cutout,
+                item.source_photo_id,
+            )
+            .await?;
+        }
     }
     Ok(created)
-}
-
-async fn write_cutout(
-    tx: &mut Transaction<'_, Postgres>,
-    account_id: Uuid,
-    item: &ItemArgs,
-) -> Result<(), Error> {
-    let Some(cutout) = item.cutout.as_ref() else {
-        return Ok(());
-    };
-
-    let seq = super::next(tx, account_id).await?;
-    sqlx::query(
-        "insert into item_cutout
-             (id, account_id, item_id, media_object_id, source_photo_id, change_seq)
-         values ($1, $2, $3, $4, $5, $6)
-         on conflict (id) do nothing",
-    )
-    .bind(cutout.id)
-    .bind(account_id)
-    .bind(item.id)
-    .bind(cutout.media_object_id)
-    .bind(item.source_photo_id)
-    .bind(seq)
-    .execute(&mut **tx)
-    .await?;
-    Ok(())
 }
 
 pub(super) async fn record_wears(
@@ -119,7 +94,7 @@ pub(super) async fn record_wears(
     worn_on: NaiveDate,
 ) -> Result<(), Error> {
     for item in items {
-        let seq = super::next(tx, account_id).await?;
+        let seq = crate::sync::mutations::next(tx, account_id).await?;
         sqlx::query(
             "insert into wear_record
                  (id, account_id, item_id, completion_id, source_photo_id, worn_on, change_seq)

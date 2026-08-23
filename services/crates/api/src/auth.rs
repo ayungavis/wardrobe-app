@@ -14,6 +14,7 @@ use crate::state::AppState;
 pub struct Session {
     pub account_id: Uuid,
     pub session_id: Uuid,
+    pub device_id: Option<Uuid>,
 }
 
 impl FromRequestParts<AppState> for Session {
@@ -34,8 +35,8 @@ impl FromRequestParts<AppState> for Session {
 ///
 /// Returns any database error unchanged.
 pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Error> {
-    let row: Option<(Uuid, Uuid)> = sqlx::query_as(
-        "select id, account_id
+    let row: Option<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
+        "select id, account_id, device_id
            from session
           where token_hash = $1
             and revoked_at is null
@@ -45,9 +46,10 @@ pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Erro
     .fetch_optional(pool)
     .await?;
 
-    Ok(row.map(|(session_id, account_id)| Session {
+    Ok(row.map(|(session_id, account_id, device_id)| Session {
         account_id,
         session_id,
+        device_id,
     }))
 }
 

@@ -16,12 +16,14 @@ pub const MAX_BODY_BYTES: usize = 1024 * 1024;
 pub async fn apply(
     pool: &PgPool,
     account_id: Uuid,
+    device: Option<Uuid>,
     name: &str,
     args: Value,
 ) -> Result<Value, Error> {
     match name {
         "completeChallenge" => mutations::complete_challenge::apply(pool, account_id, args).await,
         "deleteItem" => mutations::delete_item::apply(pool, account_id, args).await,
+        "upsertItem" => mutations::upsert_item::apply_as(pool, account_id, device, args).await,
         "upsertPreferences" => mutations::upsert_preferences::apply(pool, account_id, args).await,
         _ => Err(Error::BadRequest),
     }

@@ -84,6 +84,10 @@ pub async fn apply(pool: &PgPool, account_id: Uuid, args: Value) -> Result<Value
     serialize(&completion)
 }
 
+fn serialize(completion: &Completion) -> Result<Value, Error> {
+    serde_json::to_value(completion).map_err(|_| Error::BadRequest)
+}
+
 fn from_the_client(error: Error) -> Error {
     let Error::Internal(source) = &error else {
         return error;
@@ -93,16 +97,6 @@ fn from_the_client(error: Error) -> Error {
         Some("23505") => Error::Conflict,
         _ => error,
     }
-}
-
-fn serialize(completion: &Completion) -> Result<Value, Error> {
-    serde_json::to_value(completion).map_err(|_| Error::BadRequest)
-}
-
-pub(super) async fn next(tx: &mut Tx<'_>, account_id: Uuid) -> Result<i64, Error> {
-    wardrobe_db::next_change_seq(tx, account_id)
-        .await
-        .map_err(Error::from)
 }
 
 async fn stored(
@@ -155,7 +149,7 @@ async fn canonical_status(
 async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Completion, Error> {
     let status = canonical_status(tx, account_id, args.local_date).await?;
 
-    let photo_seq = next(tx, account_id).await?;
+    let photo_seq = super::next(tx, account_id).await?;
     sqlx::query(
         "insert into photo (id, account_id, media_object_id, source, captured_at, change_seq)
          values ($1, $2, $3, $4, $5, $6)",
@@ -169,7 +163,7 @@ async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Com
     .execute(&mut **tx)
     .await?;
 
-    let derivative_seq = next(tx, account_id).await?;
+    let derivative_seq = super::next(tx, account_id).await?;
     sqlx::query(
         "insert into photo_derivative (id, account_id, photo_id, media_object_id, change_seq)
          values ($1, $2, $3, $4, $5)",
@@ -182,7 +176,7 @@ async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Com
     .execute(&mut **tx)
     .await?;
 
-    let completion_seq = next(tx, account_id).await?;
+    let completion_seq = super::next(tx, account_id).await?;
     let completion: Completion = sqlx::query_as(
         "insert into challenge_completion
              (id, account_id, card_id, local_date, time_zone, completed_at, status,
@@ -214,7 +208,7 @@ async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Com
         args.local_date,
     )
     .await?;
-    enqueue_illustrations(tx, account_id, &created).await?;
+    super::enqueue_illustrations(tx, account_id, &created).await?;
     close_active_challenge(tx, account_id).await?;
 
     Ok(completion)
@@ -244,7 +238,7 @@ async fn link_photos(tx: &mut Tx<'_>, args: &Args) -> Result<(), Error> {
 }
 
 async fn write_document(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<(), Error> {
-    let seq = next(tx, account_id).await?;
+    let seq = super::next(tx, account_id).await?;
     sqlx::query(
         "insert into canvas_document
              (id, account_id, completion_id, derivative_id, schema_version, media_object_id,
@@ -265,37 +259,6 @@ async fn write_document(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Resul
     Ok(())
 }
 
-async fn enqueue_illustrations(
-    tx: &mut Tx<'_>,
-    account_id: Uuid,
-    items: &[Uuid],
-) -> Result<(), Error> {
-    for item in items {
-        sqlx::query(
-            "insert into job (id, account_id, kind, dedupe_key, payload)
-             values ($1, $2, $3, $4, jsonb_build_object('itemId', $5::text))
-             on conflict (kind, dedupe_key) do nothing",
-        )
-        .bind(Uuid::now_v7())
-        .bind(account_id)
-        .bind(wardrobe_db::ILLUSTRATION)
-        .bind(format!("{item}:{}", wardrobe_db::STYLE_VERSION))
-        .bind(item.to_string())
-        .execute(&mut **tx)
-        .await?;
-
-        let seq = next(tx, account_id).await?;
-        sqlx::query(
-            "update wardrobe_item set illustration_state = 'queued', change_seq = $2 where id = $1",
-        )
-        .bind(item)
-        .bind(seq)
-        .execute(&mut **tx)
-        .await?;
-    }
-    Ok(())
-}
-
 async fn close_active_challenge(tx: &mut Tx<'_>, account_id: Uuid) -> Result<(), Error> {
     let live: Option<(Uuid,)> = sqlx::query_as(
         "select id from active_challenge where account_id = $1 and deleted_at is null",
@@ -308,7 +271,7 @@ async fn close_active_challenge(tx: &mut Tx<'_>, account_id: Uuid) -> Result<(),
         return Ok(());
     };
 
-    let seq = next(tx, account_id).await?;
+    let seq = super::next(tx, account_id).await?;
     sqlx::query("update active_challenge set deleted_at = now(), change_seq = $2 where id = $1")
         .bind(id)
         .bind(seq)
