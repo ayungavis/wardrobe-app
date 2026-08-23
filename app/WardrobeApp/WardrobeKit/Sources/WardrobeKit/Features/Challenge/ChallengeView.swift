@@ -23,7 +23,7 @@ public struct ChallengeView: View {
                 Group {
                     if viewModel.hasCompletedToday {
                         //Text("Completed Today")
-                        CompletedTodayView()
+                        CompletedTodayView(onAccept: viewModel.accept)
                     } else if let active = viewModel.activeChallenge {
                         ActiveChallengeStateView(
                             challenge: active,
@@ -70,7 +70,7 @@ public struct ChallengeView: View {
                 including: DevMode.isEnabled ? .all : .none
             )
             .overlay(alignment: .topTrailing) {
-                    if DevMode.isEnabled {
+                    if DevMode.isXcodeDebugBuild {
                         Button {
                             isDevMenuPresented = true
                         } label: {

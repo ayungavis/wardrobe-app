@@ -67,18 +67,26 @@ struct ScanReviewView: View {
             }
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.xl) {
-                    ForEach(review.garments) { garment in
-                        GarmentScanSectionView(garment: garment, review: review)
-                    }
-                }
-                .padding(Spacing.lg)
+                GarmentScanReviewList(review: review)
+                    .padding(Spacing.lg)
             }
         }
     }
 }
 
-private struct GarmentScanSectionView: View {
+struct GarmentScanReviewList: View {
+    let review: GarmentReviewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
+            ForEach(review.garments) { garment in
+                GarmentScanSectionView(garment: garment, review: review)
+            }
+        }
+    }
+}
+
+struct GarmentScanSectionView: View {
     let garment: ScannedGarment
     let review: GarmentReviewModel
 

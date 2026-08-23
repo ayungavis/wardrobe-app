@@ -154,4 +154,8 @@ public final class GarmentReviewModel {
     public func wardrobeItems(in category: GarmentCategory) -> [WardrobeItem] {
         (try? wardrobeRepository.items().filter { $0.category == category }) ?? []
     }
+    
+    public var activeGarments: [ScannedGarment] {
+        garments.filter { $0.decision != .discard }
+    }
 }

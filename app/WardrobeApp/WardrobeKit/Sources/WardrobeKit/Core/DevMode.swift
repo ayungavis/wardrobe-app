@@ -18,4 +18,11 @@ public enum DevMode {
             false
         #endif
     }()
+    public static let isXcodeDebugBuild: Bool = {
+            #if DEBUG
+                true
+            #else
+                false
+            #endif
+        }()
 }

@@ -12,6 +12,7 @@ public enum AppFont {
     public static let customSmallTitle = Font.custom("SeymourOne", size: 20)
     public static let roundedLargeTitle = Font.system(size: 36, weight: .bold, design: .rounded)
     public static let roundedTitle = Font.system(size: 24, weight: .bold, design: .rounded)
+    public static let roundedTitle2 = Font.system(size: 20, weight: .bold, design: .rounded)
     public static let roundedCaption = Font.system(size: 12, weight: .bold, design: .rounded)
 
 }

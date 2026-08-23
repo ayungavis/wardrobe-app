@@ -25,10 +25,15 @@ struct ChallengeDeckView: View {
     
     var body: some View {
         ZStack {
-            FreestyleOutfitView(onAccept: { onAccept(Self.freestyleCard) })
-                .aspectRatio(346 / 617, contentMode: .fit)
-                .zIndex(-Double(cards.count) - 1)
-                .allowsHitTesting(isDeckCleared)
+            FreestyleOutfitView(
+                titleKey:"challenge.freestyle.title",
+                messageKey: "challenge.freestyle.text",
+                buttonKey: "challenge.accept",
+                onAccept: { onAccept(Self.freestyleCard) }
+            )
+            .aspectRatio(346 / 617, contentMode: .fit)
+            .zIndex(-Double(cards.count) - 1)
+            .allowsHitTesting(isDeckCleared)
             
             ForEach(cards.indices, id: \.self) { index in
                 cardView(for: index)

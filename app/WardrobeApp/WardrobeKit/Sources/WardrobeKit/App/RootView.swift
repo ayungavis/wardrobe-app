@@ -19,6 +19,7 @@ public struct RootView: View {
             } else {
                 OnboardingView(viewModel: container.makeOnboardingViewModel())
             }
+            
         }
         .preferredColorScheme(.light)
     }
