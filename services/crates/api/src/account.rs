@@ -1,3 +1,5 @@
+pub mod merge;
+
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
@@ -25,8 +27,7 @@ pub async fn anonymous_account(
 
 /// # Errors
 ///
-/// Returns [`Error::Conflict`] when this device already holds data for a
-/// different account, which needs a merge rather than a link.
+/// Returns any database error unchanged.
 pub async fn link_apple(
     tx: &mut Transaction<'_, Postgres>,
     subject: &str,
@@ -43,14 +44,8 @@ pub async fn link_apple(
         (Some((account_id,)), Some(device)) if device == account_id => Ok(account_id),
 
         (Some((account_id,)), Some(device)) => {
-            if holds_data(tx, device).await? {
-                return Err(Error::Conflict);
-            }
+            merge::into(tx, account_id, device).await?;
             register_device(tx, device_id, account_id).await?;
-            sqlx::query("delete from account where id = $1")
-                .bind(device)
-                .execute(&mut **tx)
-                .await?;
             Ok(account_id)
         }
         (Some((account_id,)), None) => {
@@ -106,19 +101,4 @@ async fn register_device(
     .execute(&mut **tx)
     .await?;
     Ok(())
-}
-
-async fn holds_data(tx: &mut Transaction<'_, Postgres>, account_id: Uuid) -> Result<bool, Error> {
-    let (any,): (bool,) = sqlx::query_as(
-        "select exists (select 1 from wardrobe_item where account_id = $1)
-             or exists (select 1 from photo           where account_id = $1)
-             or exists (select 1 from challenge_completion where account_id = $1)
-             or exists (select 1 from wear_record     where account_id = $1)
-             or exists (select 1 from active_challenge where account_id = $1)
-             or exists (select 1 from account_preference where account_id = $1)",
-    )
-    .bind(account_id)
-    .fetch_one(&mut **tx)
-    .await?;
-    Ok(any)
 }

@@ -161,3 +161,218 @@ pub fn recorded(needle: &str) -> bool {
         .iter()
         .any(|line| line.contains(needle))
 }
+
+// ------------------------------------------------------- one row of every kind
+
+pub struct Seeded {
+    pub item: Uuid,
+    pub completion: Uuid,
+    pub challenge: Uuid,
+}
+
+pub struct Base {
+    pub media: Uuid,
+    pub card: Uuid,
+    pub item: Uuid,
+    pub photo: Uuid,
+    pub derivative: Uuid,
+}
+
+pub async fn seed_base(pool: &PgPool, account: Uuid) -> sqlx::Result<Base> {
+    let media = Uuid::now_v7();
+    sqlx::query(
+        "insert into media_object (id, account_id, kind, storage_key, content_type)
+         values ($1, $2, 'original', $3, 'image/jpeg')",
+    )
+    .bind(media)
+    .bind(account)
+    .bind(format!("k/{media}"))
+    .execute(pool)
+    .await?;
+
+    let card = Uuid::now_v7();
+    sqlx::query(
+        "insert into challenge_card (id, source, prompt_text, locale)
+         values ($1, 'curated', 'Wear something blue', 'en')",
+    )
+    .bind(card)
+    .execute(pool)
+    .await?;
+
+    let item = Uuid::now_v7();
+    sqlx::query(
+        "insert into wardrobe_item (id, account_id, category, change_seq)
+         values ($1, $2, 'top', 1)",
+    )
+    .bind(item)
+    .bind(account)
+    .execute(pool)
+    .await?;
+
+    let photo = Uuid::now_v7();
+    sqlx::query(
+        "insert into photo (id, account_id, media_object_id, source, change_seq)
+         values ($1, $2, $3, 'capture', 2)",
+    )
+    .bind(photo)
+    .bind(account)
+    .bind(media)
+    .execute(pool)
+    .await?;
+
+    let derivative = Uuid::now_v7();
+    sqlx::query(
+        "insert into photo_derivative (id, account_id, photo_id, media_object_id, change_seq)
+         values ($1, $2, $3, $4, 3)",
+    )
+    .bind(derivative)
+    .bind(account)
+    .bind(photo)
+    .bind(media)
+    .execute(pool)
+    .await?;
+
+    Ok(Base {
+        media,
+        card,
+        item,
+        photo,
+        derivative,
+    })
+}
+
+pub async fn seed_item_details(pool: &PgPool, account: Uuid, base: &Base) -> sqlx::Result<()> {
+    sqlx::query(
+        "insert into item_fingerprint
+             (id, account_id, item_id, version, color_lab, aspect_ratio, feature_print,
+              mask_quality, source_photo_id, change_seq)
+         values ($1, $2, $3, 'v1', $4, 0.75, $5, 0.9, $6, 4)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(base.item)
+    .bind(vec![50.0_f32, 10.0, -20.0])
+    .bind(vec![1_u8, 2, 3, 4])
+    .bind(base.photo)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "insert into item_cutout
+             (id, account_id, item_id, media_object_id, source_photo_id, change_seq)
+         values ($1, $2, $3, $4, $5, 5)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(base.item)
+    .bind(base.media)
+    .bind(base.photo)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "insert into item_illustration
+             (id, account_id, item_id, media_object_id, style_version, model,
+              prompt_version, change_seq)
+         values ($1, $2, $3, $4, 's1', 'a-model', 'p1', 6)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(base.item)
+    .bind(base.media)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "insert into wardrobe_item_conflict
+             (id, account_id, item_id, field, value, revision, change_seq)
+         values ($1, $2, $3, 'name', 'Blue shirt', 2, 11)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(base.item)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn seed_loop(pool: &PgPool, account: Uuid, base: &Base) -> sqlx::Result<(Uuid, Uuid)> {
+    let completion = Uuid::now_v7();
+    let challenge = Uuid::now_v7();
+    sqlx::query(
+        "insert into challenge_completion
+             (id, account_id, card_id, local_date, time_zone, completed_at, status,
+              photo_id, current_derivative_id, change_seq)
+         values ($1, $2, $3, current_date, 'Asia/Jakarta', now(), 'canonical', $4, $5, 7)",
+    )
+    .bind(completion)
+    .bind(account)
+    .bind(base.card)
+    .bind(base.photo)
+    .bind(base.derivative)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "insert into active_challenge
+             (id, account_id, card_id, accepted_at, local_date, time_zone, photo_id, change_seq)
+         values ($1, $2, $3, now(), current_date, 'Asia/Jakarta', $4, 8)",
+    )
+    .bind(challenge)
+    .bind(account)
+    .bind(base.card)
+    .bind(base.photo)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "insert into wear_record
+             (id, account_id, item_id, completion_id, source_photo_id, worn_on, change_seq)
+         values ($1, $2, $3, $4, $5, current_date, 9)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(base.item)
+    .bind(completion)
+    .bind(base.photo)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "insert into canvas_document
+             (id, account_id, completion_id, derivative_id, schema_version,
+              media_object_id, change_seq)
+         values ($1, $2, $3, $4, 1, $5, 10)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(completion)
+    .bind(base.derivative)
+    .bind(base.media)
+    .execute(pool)
+    .await?;
+
+    sqlx::query("insert into account_preference (account_id, change_seq) values ($1, 12)")
+        .bind(account)
+        .execute(pool)
+        .await?;
+
+    sqlx::query("update account set change_seq = 12 where id = $1")
+        .bind(account)
+        .execute(pool)
+        .await?;
+
+    Ok((completion, challenge))
+}
+
+pub async fn seed_every_kind(pool: &PgPool, account: Uuid) -> sqlx::Result<Seeded> {
+    let base = seed_base(pool, account).await?;
+    seed_item_details(pool, account, &base).await?;
+    let (completion, challenge) = seed_loop(pool, account, &base).await?;
+    Ok(Seeded {
+        item: base.item,
+        completion,
+        challenge,
+    })
+}

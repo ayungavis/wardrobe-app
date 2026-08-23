@@ -102,7 +102,6 @@ pub async fn anonymous(
     responses(
         (status = 200, description = "A session for the Apple-backed account", body = SessionResponse),
         (status = 401, description = "The identity token did not verify", body = crate::error::ErrorBody),
-        (status = 409, description = "This device holds data for another account", body = crate::error::ErrorBody),
         (status = 503, description = "Apple sign-in is not configured or Apple is unreachable", body = crate::error::ErrorBody),
     )
 )]

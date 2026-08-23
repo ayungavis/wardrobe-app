@@ -226,7 +226,7 @@ async fn a_second_empty_device_joins_the_existing_account(pool: PgPool) -> sqlx:
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_second_device_holding_data_is_a_conflict_and_neither_side_is_touched(
+async fn a_second_device_holding_data_merges_into_the_apple_account(
     pool: PgPool,
 ) -> sqlx::Result<()> {
     let first_device = Uuid::now_v7();
@@ -248,15 +248,25 @@ async fn a_second_device_holding_data_is_a_conflict_and_neither_side_is_touched(
 
     assert_eq!(
         link(&pool, "001234.apple.subject", second_device).await,
-        Err(StatusCode::CONFLICT)
+        Ok(account_id),
+        "FR-053 links the anonymous identity rather than refusing it"
     );
 
-    assert_eq!(account_of(&pool, second_device).await, Some(local_id));
+    assert_ne!(local_id, account_id);
+    assert_eq!(account_of(&pool, second_device).await, Some(account_id));
     let (accounts,): (i64,) = sqlx::query_as("select count(*) from account")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(accounts, 2, "both accounts survive an unresolved link");
-    assert_ne!(local_id, account_id);
+    assert_eq!(accounts, 1, "the absorbed anonymous account is gone");
+
+    let owner: Option<Uuid> = sqlx::query_scalar("select account_id from wardrobe_item limit 1")
+        .fetch_optional(&pool)
+        .await?;
+    assert_eq!(
+        owner,
+        Some(account_id),
+        "the item came across with the link"
+    );
     Ok(())
 }
 

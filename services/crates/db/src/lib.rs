@@ -31,6 +31,27 @@ pub async fn next_change_seq(conn: &mut PgConnection, account_id: Uuid) -> sqlx:
 
 /// # Errors
 ///
+/// Returns [`sqlx::Error::RowNotFound`] when the account does not exist.
+pub async fn reserve_change_seq(
+    conn: &mut PgConnection,
+    account_id: Uuid,
+    count: i64,
+) -> sqlx::Result<i64> {
+    sqlx::query_scalar::<_, i64>(
+        "update account
+            set change_seq = change_seq + $2,
+                updated_at = now()
+          where id = $1
+      returning change_seq",
+    )
+    .bind(account_id)
+    .bind(count)
+    .fetch_one(conn)
+    .await
+}
+
+/// # Errors
+///
 /// Returns any database error unchanged.
 pub async fn reclaim_stalled(
     conn: &mut PgConnection,

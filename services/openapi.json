@@ -321,16 +321,6 @@
               }
             }
           },
-          "409": {
-            "description": "This device holds data for another account",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
           "503": {
             "description": "Apple sign-in is not configured or Apple is unreachable",
             "content": {

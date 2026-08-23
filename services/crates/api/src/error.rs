@@ -20,6 +20,8 @@ pub enum Error {
     Unavailable,
     #[error("internal error")]
     Internal(#[from] sqlx::Error),
+    #[error("the merge left rows behind")]
+    MergeIncomplete,
 }
 
 impl Error {
@@ -31,7 +33,7 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
-            Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Internal(_) | Self::MergeIncomplete => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -43,7 +45,7 @@ impl Error {
             Self::NotFound => "not_found",
             Self::TooLarge => "payload_too_large",
             Self::Unavailable => "unavailable",
-            Self::Internal(_) => "internal",
+            Self::Internal(_) | Self::MergeIncomplete => "internal",
         }
     }
 
@@ -51,15 +53,13 @@ impl Error {
         match self {
             Self::BadRequest => "The request could not be understood.",
             Self::Unauthenticated => "Authentication is required for this request.",
-            Self::Conflict => {
-                "This device already holds data for a different account. Sign in on a fresh install, or contact support to merge them."
-            }
+            Self::Conflict => "That change conflicts with data already stored for this account.",
             Self::NotFound => "That record does not exist.",
             Self::TooLarge => {
                 "The request is larger than this endpoint accepts. Send fewer changes at a time."
             }
             Self::Unavailable => "The service is temporarily unavailable. Try again shortly.",
-            Self::Internal(_) => "Something went wrong on our side.",
+            Self::Internal(_) | Self::MergeIncomplete => "Something went wrong on our side.",
         }
     }
 }
