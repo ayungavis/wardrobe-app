@@ -8,6 +8,7 @@ S3_BUCKET ?= wardrobe
 S3_ACCESS_KEY_ID ?= wardrobe
 S3_SECRET_ACCESS_KEY ?= wardrobe-dev-secret
 S3_FORCE_PATH_STYLE ?= true
+OPENROUTER_BASE_URL ?= https://openrouter.ai/api/v1
 
 .PHONY: up down migrate reset run openapi test fmt lint validate
 

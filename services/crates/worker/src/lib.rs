@@ -1,3 +1,5 @@
+pub mod illustration;
+
 use std::future::Future;
 
 use chrono::{DateTime, Duration, Utc};
@@ -7,7 +9,15 @@ use wardrobe_db::ClaimedJob;
 use wardrobe_storage::Storage;
 
 pub const SWEEP_MEDIA: &str = "sweepMedia";
-pub const KINDS: &[&str] = &[SWEEP_MEDIA];
+
+#[must_use]
+pub fn kinds(illustration: bool) -> Vec<&'static str> {
+    let mut kinds = vec![SWEEP_MEDIA];
+    if illustration {
+        kinds.push(wardrobe_db::ILLUSTRATION);
+    }
+    kinds
+}
 
 // ponytail: a job still running when this elapses is handed to a second worker
 // and runs twice. Raise it above the slowest handler, or move to a heartbeat

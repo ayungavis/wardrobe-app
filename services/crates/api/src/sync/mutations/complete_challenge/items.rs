@@ -17,6 +17,14 @@ pub(super) struct ItemArgs {
     garment_type: Option<String>,
     description: Option<String>,
     source_photo_id: Option<Uuid>,
+    cutout: Option<CutoutArgs>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct CutoutArgs {
+    id: Uuid,
+    media_object_id: Uuid,
 }
 
 fn revisions(item: &ItemArgs) -> Value {
@@ -34,14 +42,22 @@ fn revisions(item: &ItemArgs) -> Value {
     Value::Object(seeded)
 }
 
+/// # Errors
+///
+/// Returns any database error unchanged.
+///
+/// Returns the ids of the items this call actually created. An item confirmed
+/// again on a later checkmark is not among them, which is what FR-070 means by
+/// genuinely new.
 pub(super) async fn confirm(
     tx: &mut Transaction<'_, Postgres>,
     account_id: Uuid,
     items: &[ItemArgs],
-) -> Result<(), Error> {
+) -> Result<Vec<Uuid>, Error> {
+    let mut created = Vec::new();
     for item in items {
         let seq = super::next(tx, account_id).await?;
-        sqlx::query(
+        let written = sqlx::query(
             "insert into wardrobe_item
                  (id, account_id, category, name, color, garment_type, description,
                   attribute_revisions, change_seq)
@@ -59,7 +75,39 @@ pub(super) async fn confirm(
         .bind(seq)
         .execute(&mut **tx)
         .await?;
+
+        if written.rows_affected() > 0 {
+            created.push(item.id);
+        }
+        write_cutout(tx, account_id, item).await?;
     }
+    Ok(created)
+}
+
+async fn write_cutout(
+    tx: &mut Transaction<'_, Postgres>,
+    account_id: Uuid,
+    item: &ItemArgs,
+) -> Result<(), Error> {
+    let Some(cutout) = item.cutout.as_ref() else {
+        return Ok(());
+    };
+
+    let seq = super::next(tx, account_id).await?;
+    sqlx::query(
+        "insert into item_cutout
+             (id, account_id, item_id, media_object_id, source_photo_id, change_seq)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (id) do nothing",
+    )
+    .bind(cutout.id)
+    .bind(account_id)
+    .bind(item.id)
+    .bind(cutout.media_object_id)
+    .bind(item.source_photo_id)
+    .bind(seq)
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 

@@ -269,3 +269,60 @@ async fn a_media_row_something_still_points_at_is_never_swept(pool: PgPool) -> s
     );
     Ok(())
 }
+
+// -------------------------------------------------------- kinds not yet handled
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_illustration_job_waits_because_no_registered_kind_claims_it(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let owner = account(&pool).await?;
+    let id = Uuid::now_v7();
+    sqlx::query("insert into job (id, account_id, kind, dedupe_key) values ($1, $2, $3, $1::text)")
+        .bind(id)
+        .bind(owner)
+        .bind(wardrobe_db::ILLUSTRATION)
+        .execute(&pool)
+        .await?;
+
+    for kind in wardrobe_worker::kinds(false) {
+        assert_eq!(
+            run_one(&pool, kind, |_| async { Ok(()) }).await?,
+            None,
+            "{kind} must not reach across into work it does not know how to do"
+        );
+    }
+
+    let (status, attempts, _) = state(&pool, id).await;
+    assert_eq!(
+        (status.as_str(), attempts),
+        ("pending", 0),
+        "claiming a job with no handler would mark it failed three times before T15b even exists"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_styling_job_waits_because_no_registered_kind_claims_it(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let owner = account(&pool).await?;
+    let id = Uuid::now_v7();
+    sqlx::query("insert into job (id, account_id, kind, dedupe_key) values ($1, $2, $3, $1::text)")
+        .bind(id)
+        .bind(owner)
+        .bind(wardrobe_db::STYLISE_ILLUSTRATION)
+        .execute(&pool)
+        .await?;
+
+    for kind in wardrobe_worker::kinds(true) {
+        assert_eq!(run_one(&pool, kind, |_| async { Ok(()) }).await?, None);
+    }
+
+    assert_eq!(
+        state(&pool, id).await.0,
+        "pending",
+        "a generated image waits for its sticker treatment rather than being marked done"
+    );
+    Ok(())
+}

@@ -1,0 +1,551 @@
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use serde_json::{Value, json};
+use sqlx::PgPool;
+use uuid::Uuid;
+use wardrobe_storage::{Settings, Storage};
+use wardrobe_worker::illustration::{self, Provider};
+use wardrobe_worker::{Outcome, run_one};
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+// ------------------------------------------------------------------- fixtures
+
+const CUTOUT_BYTES: &[u8] = b"the confirmed normalised cut-out";
+const ITEM_NAME: &str = "Ayung's favourite blue shirt";
+
+fn store() -> Storage {
+    fn env(name: &str, fallback: &str) -> String {
+        std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
+    }
+    Storage::new(&Settings {
+        endpoint: env("S3_ENDPOINT", "http://localhost:9100"),
+        region: env("S3_REGION", "us-east-1"),
+        bucket: env("S3_BUCKET", "wardrobe"),
+        access_key_id: env("S3_ACCESS_KEY_ID", "wardrobe"),
+        secret_access_key: env("S3_SECRET_ACCESS_KEY", "wardrobe-dev-secret"),
+        path_style: true,
+        presign_ttl: std::time::Duration::from_secs(300),
+    })
+}
+
+fn provider(server: &MockServer) -> Provider {
+    Provider {
+        client: reqwest::Client::new(),
+        base_url: server.uri(),
+        api_key: "test-key".to_owned(),
+    }
+}
+
+const ONE_PIXEL_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk\
+                             +M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+fn png_bytes() -> Vec<u8> {
+    STANDARD.decode(ONE_PIXEL_PNG).expect("a png")
+}
+
+fn rendered_image() -> Value {
+    json!({
+        "provider": "a-provider",
+        "usage": { "prompt_tokens": 11, "completion_tokens": 22 },
+        "data": [{ "b64_json": ONE_PIXEL_PNG.replace(char::is_whitespace, ""),
+                   "media_type": "image/png" }]
+    })
+}
+
+async fn answer(server: &MockServer, template: ResponseTemplate) {
+    Mock::given(method("POST"))
+        .and(path("/images"))
+        .respond_with(template)
+        .mount(server)
+        .await;
+}
+
+async fn sent_body(server: &MockServer) -> Value {
+    let requests = server.received_requests().await.expect("recording");
+    serde_json::from_slice(&requests.first().expect("one request").body).expect("json body")
+}
+
+struct Scene {
+    item: Uuid,
+    job: Uuid,
+}
+
+async fn configure(pool: &PgPool, alternate: Option<&str>) -> sqlx::Result<()> {
+    sqlx::query(
+        "insert into ai_provider_allowlist (provider_slug, forbids_training, retention_policy, approved_by)
+         values ('a-provider', true, 'zero', 'the test')",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "insert into ai_model_config
+             (capability, model_class, active_model, alternate_model, prompt_version, updated_by)
+         values ('illustration', 'image', 'primary/model', $1, 'p1', 'the test')",
+    )
+    .bind(alternate)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn scene(pool: &PgPool, with_cutout: bool) -> sqlx::Result<Scene> {
+    let account = Uuid::now_v7();
+    sqlx::query("insert into account (id) values ($1)")
+        .bind(account)
+        .execute(pool)
+        .await?;
+
+    let item = Uuid::now_v7();
+    sqlx::query(
+        "insert into wardrobe_item (id, account_id, category, name, change_seq, illustration_state)
+         values ($1, $2, 'top', $3, 1, 'queued')",
+    )
+    .bind(item)
+    .bind(account)
+    .bind(ITEM_NAME)
+    .execute(pool)
+    .await?;
+
+    if with_cutout {
+        let media = Uuid::now_v7();
+        let key = format!("{account}/cutout/{media}");
+        store()
+            .put(&key, CUTOUT_BYTES.to_vec(), "image/png")
+            .await
+            .expect("the cut-out lands");
+        sqlx::query(
+            "insert into media_object (id, account_id, kind, storage_key, content_type)
+             values ($1, $2, 'cutout', $3, 'image/png')",
+        )
+        .bind(media)
+        .bind(account)
+        .bind(&key)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "insert into item_cutout (id, account_id, item_id, media_object_id, change_seq)
+             values ($1, $2, $3, $4, 2)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(account)
+        .bind(item)
+        .bind(media)
+        .execute(pool)
+        .await?;
+    }
+
+    let job = Uuid::now_v7();
+    sqlx::query(
+        "insert into job (id, account_id, kind, dedupe_key, payload, max_attempts)
+         values ($1, $2, $3, $4, jsonb_build_object('itemId', $4), 2)",
+    )
+    .bind(job)
+    .bind(account)
+    .bind(wardrobe_db::ILLUSTRATION)
+    .bind(item.to_string())
+    .execute(pool)
+    .await?;
+
+    Ok(Scene { item, job })
+}
+
+async fn run(pool: &PgPool, server: &MockServer, final_attempt: bool) -> Outcome {
+    let provider = provider(server);
+    let storage = store();
+    run_one(pool, wardrobe_db::ILLUSTRATION, |job| async move {
+        illustration::render_for(pool, &storage, &provider, &job, final_attempt).await
+    })
+    .await
+    .expect("the claim itself works")
+    .expect("a job was waiting")
+}
+
+async fn state_of(pool: &PgPool, item: Uuid) -> (String, Option<Uuid>) {
+    sqlx::query_as(
+        "select illustration_state, current_illustration_id from wardrobe_item where id = $1",
+    )
+    .bind(item)
+    .fetch_one(pool)
+    .await
+    .expect("the item row")
+}
+
+async fn attempts(pool: &PgPool, job: Uuid) -> Vec<(i32, String, String)> {
+    sqlx::query_as(
+        "select attempt_no, model, status from ai_inference_attempt
+          where job_id = $1 order by attempt_no",
+    )
+    .bind(job)
+    .fetch_all(pool)
+    .await
+    .expect("attempt rows")
+}
+
+// -------------------------------------------------------------- happy path
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_valid_render_is_handed_to_styling_rather_than_shown(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Succeeded);
+
+    let (state, current) = state_of(&pool, scene.item).await;
+    assert_eq!(
+        (state.as_str(), current),
+        ("rendering", None),
+        "a generation without its sticker treatment is not a finished illustration"
+    );
+    let versions: i64 =
+        sqlx::query_scalar("select count(*) from item_illustration where item_id = $1")
+            .bind(scene.item)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(versions, 0);
+
+    let queued: i64 = sqlx::query_scalar("select count(*) from job where kind = $1")
+        .bind(wardrobe_db::STYLISE_ILLUSTRATION)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(queued, 1, "the generated image waits for post-processing");
+
+    let stored: i64 =
+        sqlx::query_scalar("select count(*) from media_object where kind = 'illustration'")
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(stored, 1, "the render is paid for once, so it is kept");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_request_carries_every_parameter_the_specification_names(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    run(&pool, &server, false).await;
+
+    let body = sent_body(&server).await;
+    assert_eq!(body["resolution"], "1K");
+    assert_eq!(body["aspect_ratio"], "1:1");
+    assert_eq!(body["n"], 1);
+    assert!(body["seed"].is_i64());
+    assert_eq!(
+        body["provider"]["zdr"], true,
+        "zero data retention is the routing policy, not a preference"
+    );
+    assert_eq!(body["input_references"].as_array().expect("array").len(), 1);
+    assert!(
+        body["input_references"][0]["image_url"]["url"]
+            .as_str()
+            .expect("a data url")
+            .starts_with("data:image/"),
+        "the provider must never receive an object url"
+    );
+    for unsupported in ["background", "output_format", "quality", "negative_prompt"] {
+        assert!(
+            body.get(unsupported).is_none(),
+            "{unsupported} is not advertised by this model, so sending it is a guess"
+        );
+    }
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_transient_failure_retries_the_same_pinned_seed(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, Some("alternate/model")).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(&server, ResponseTemplate::new(503)).await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Retrying);
+    sqlx::query("update job set status = 'pending', run_after = now() where id = $1")
+        .bind(scene.job)
+        .execute(&pool)
+        .await?;
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    let pinned: Vec<(String, Option<i64>)> = sqlx::query_as(
+        "select model, seed from ai_inference_attempt where job_id = $1 order by attempt_no",
+    )
+    .bind(scene.job)
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(pinned.len(), 2);
+    assert_eq!(
+        pinned[0], pinned[1],
+        "a timeout is not a reason to change the request; the attempt stays pinned"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_attempt_row_carries_no_user_content(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Succeeded);
+
+    let row: Value =
+        sqlx::query_scalar("select to_jsonb(a) from ai_inference_attempt a where job_id = $1")
+            .bind(scene.job)
+            .fetch_one(&pool)
+            .await?;
+    let printed = row.to_string();
+
+    for forbidden in [ITEM_NAME, "cut-out", "styled garment", "Redraw"] {
+        assert!(
+            !printed.contains(forbidden),
+            "an accounting row that quotes {forbidden} is a log carrying user content: {printed}"
+        );
+    }
+    assert_eq!(row["status"], "succeeded");
+    assert_eq!(row["provider_route"], "a-provider");
+    Ok(())
+}
+
+// ---------------------------------------------------------------- pinning
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refusal_moves_to_the_alternate_as_its_own_pinned_attempt(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    configure(&pool, Some("alternate/model")).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(&server, ResponseTemplate::new(400)).await;
+
+    assert_eq!(
+        run(&pool, &server, false).await,
+        Outcome::Retrying,
+        "a refusal with an alternate configured is not the end of the chain"
+    );
+    sqlx::query("update job set status = 'pending', run_after = now() where id = $1")
+        .bind(scene.job)
+        .execute(&pool)
+        .await?;
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    let rows = attempts(&pool, scene.job).await;
+    assert_eq!(rows.len(), 2, "each pinned model gets its own row");
+    assert_eq!(rows[0].1, "primary/model");
+    assert_eq!(
+        rows[1].1, "alternate/model",
+        "moving to the alternate is a distinct pinned attempt, never a silent swap"
+    );
+    assert_eq!(state_of(&pool, scene.item).await.0, "failed");
+    Ok(())
+}
+
+// ----------------------------------------------------------------- limits
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_limit_hit_records_it_and_calls_nobody(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    sqlx::query(
+        "insert into ai_usage_limit (id, scope, capability, window_seconds, max_requests, updated_by)
+         values ($1, 'global', 'illustration', 3600, 1, 'the test')",
+    )
+    .bind(Uuid::now_v7())
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "insert into ai_inference_attempt
+             (id, capability, attempt_no, model, prompt_version, status)
+         values ($1, 'illustration', 1, 'primary/model', 'p1', 'succeeded')",
+    )
+    .bind(Uuid::now_v7())
+    .execute(&pool)
+    .await?;
+
+    let server = MockServer::start().await;
+    assert_eq!(run(&pool, &server, false).await, Outcome::Succeeded);
+
+    assert_eq!(attempts(&pool, scene.job).await[0].2, "skipped_limit");
+    assert_eq!(state_of(&pool, scene.item).await.0, "failed");
+    assert!(
+        server
+            .received_requests()
+            .await
+            .expect("recording")
+            .is_empty(),
+        "a limit that still spends money is not a limit"
+    );
+    Ok(())
+}
+
+// --------------------------------------------------------------- fallbacks
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refusal_leaves_the_item_usable_from_its_cutout(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(&server, ResponseTemplate::new(400)).await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Succeeded);
+
+    assert_eq!(attempts(&pool, scene.job).await[0].2, "refused");
+    let (state, current) = state_of(&pool, scene.item).await;
+    assert_eq!(state, "failed");
+    assert_eq!(current, None);
+
+    let versions: i64 =
+        sqlx::query_scalar("select count(*) from item_illustration where item_id = $1")
+            .bind(scene.item)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(versions, 0, "nothing refused ever becomes a stored version");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_malformed_reply_is_invalid_output_not_a_version(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200)
+            .set_body_json(json!({ "data": [{ "b64_json": "bm90IGFuIGltYWdl" }] })),
+    )
+    .await;
+
+    assert_eq!(
+        run(&pool, &server, false).await,
+        Outcome::Retrying,
+        "a malformed reply is worth asking again within the quality budget"
+    );
+    sqlx::query("update job set status = 'pending', run_after = now() where id = $1")
+        .bind(scene.job)
+        .execute(&pool)
+        .await?;
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    let rows = attempts(&pool, scene.job).await;
+    assert!(rows.iter().all(|(_, _, status)| status == "invalid_output"));
+    assert_eq!(state_of(&pool, scene.item).await.0, "failed");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_item_without_a_cutout_never_reaches_the_provider(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, false).await?;
+    let server = MockServer::start().await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Succeeded);
+
+    assert_eq!(state_of(&pool, scene.item).await.0, "failed");
+    assert!(
+        server
+            .received_requests()
+            .await
+            .expect("recording")
+            .is_empty(),
+        "the cut-out is the only thing section 18.16 ever permits to be sent"
+    );
+    assert!(attempts(&pool, scene.job).await.is_empty());
+    Ok(())
+}
+
+// ------------------------------------------------------- readiness gating
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    assert!(!illustration::ready(&pool).await?);
+
+    sqlx::query(
+        "insert into ai_model_config
+             (capability, model_class, active_model, prompt_version, updated_by)
+         values ('illustration', 'image', 'primary/model', 'p1', 'the test')",
+    )
+    .execute(&pool)
+    .await?;
+    assert!(
+        !illustration::ready(&pool).await?,
+        "an empty allowlist means off, never open"
+    );
+
+    sqlx::query(
+        "insert into ai_provider_allowlist (provider_slug, forbids_training, retention_policy, approved_by)
+         values ('a-provider', true, 'zero', 'the test')",
+    )
+    .execute(&pool)
+    .await?;
+    assert!(illustration::ready(&pool).await?);
+    Ok(())
+}
+
+// --------------------------------------------------- the shape, for real
+
+#[tokio::test]
+#[ignore = "needs OPENROUTER_API_KEY and OPENROUTER_TEST_MODEL in services/.env"]
+async fn the_live_provider_answers_in_the_shape_this_client_parses() {
+    let api_key = std::env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY");
+    let model = std::env::var("OPENROUTER_TEST_MODEL").expect("OPENROUTER_TEST_MODEL");
+    let cutout = png_bytes();
+
+    let advertised: Value = reqwest::Client::new()
+        .get(format!(
+            "{}/images/models",
+            illustration::openrouter::DEFAULT_BASE_URL
+        ))
+        .bearer_auth(&api_key)
+        .send()
+        .await
+        .expect("the capability descriptor is reachable")
+        .json()
+        .await
+        .expect("json");
+    let descriptor = advertised.to_string();
+    for parameter in ["resolution", "aspect_ratio", "seed", "input_references"] {
+        assert!(
+            descriptor.contains(parameter),
+            "we send {parameter}, so the live endpoint must advertise it: {descriptor}"
+        );
+    }
+
+    let rendered = illustration::openrouter::render(
+        &reqwest::Client::new(),
+        illustration::openrouter::DEFAULT_BASE_URL,
+        &api_key,
+        &illustration::openrouter::Ask {
+            model: &model,
+            prompt: "Redraw this as a flat-lay product illustration. Garment only, no person.",
+            cutout: &cutout,
+            content_type: "image/png",
+            resolution: illustration::openrouter::DEFAULT_RESOLUTION,
+            aspect_ratio: illustration::openrouter::DEFAULT_ASPECT_RATIO,
+            seed: 184_726,
+        },
+    )
+    .await
+    .expect("the live provider answers in the shape this client parses");
+
+    assert!(!rendered.image.is_empty());
+    assert!(rendered.content_type.starts_with("image/"));
+}

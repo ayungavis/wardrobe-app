@@ -205,7 +205,7 @@ async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Com
 
     link_photos(tx, args).await?;
     write_document(tx, account_id, args).await?;
-    items::confirm(tx, account_id, &args.items).await?;
+    let created = items::confirm(tx, account_id, &args.items).await?;
     items::record_wears(
         tx,
         account_id,
@@ -214,6 +214,7 @@ async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Com
         args.local_date,
     )
     .await?;
+    enqueue_illustrations(tx, account_id, &created).await?;
     close_active_challenge(tx, account_id).await?;
 
     Ok(completion)
@@ -261,6 +262,37 @@ async fn write_document(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Resul
     .bind(seq)
     .execute(&mut **tx)
     .await?;
+    Ok(())
+}
+
+async fn enqueue_illustrations(
+    tx: &mut Tx<'_>,
+    account_id: Uuid,
+    items: &[Uuid],
+) -> Result<(), Error> {
+    for item in items {
+        sqlx::query(
+            "insert into job (id, account_id, kind, dedupe_key, payload)
+             values ($1, $2, $3, $4, jsonb_build_object('itemId', $5::text))
+             on conflict (kind, dedupe_key) do nothing",
+        )
+        .bind(Uuid::now_v7())
+        .bind(account_id)
+        .bind(wardrobe_db::ILLUSTRATION)
+        .bind(format!("{item}:{}", wardrobe_db::STYLE_VERSION))
+        .bind(item.to_string())
+        .execute(&mut **tx)
+        .await?;
+
+        let seq = next(tx, account_id).await?;
+        sqlx::query(
+            "update wardrobe_item set illustration_state = 'queued', change_seq = $2 where id = $1",
+        )
+        .bind(item)
+        .bind(seq)
+        .execute(&mut **tx)
+        .await?;
+    }
     Ok(())
 }
 

@@ -394,3 +394,182 @@ async fn another_accounts_completion_id_is_a_conflict(pool: PgPool) -> sqlx::Res
     assert_eq!(result["error"]["code"], "conflict");
     Ok(())
 }
+
+// --------------------------------------------------------- cut-outs and jobs
+
+fn with_cutout(body: &mut Value, stage: &Stage) -> Uuid {
+    let cutout = Uuid::now_v7();
+    body["items"][0]["cutout"] = json!({ "id": cutout, "mediaObjectId": stage.media });
+    cutout
+}
+
+async fn jobs_for(pool: &PgPool, item: Uuid) -> i64 {
+    sqlx::query_scalar("select count(*) from job where kind = 'illustration' and dedupe_key = $1")
+        .bind(format!("{item}:{}", wardrobe_db::STYLE_VERSION))
+        .fetch_one(pool)
+        .await
+        .expect("count")
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_confirmed_cutout_is_stored_and_reaches_the_feed(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    let mut body = args(&stage, &ticket, "2026-08-21");
+    let cutout = with_cutout(&mut body, &stage);
+
+    complete(&pool, &stage, &body).await;
+
+    let stored: Uuid = sqlx::query_scalar("select item_id from item_cutout where id = $1")
+        .bind(cutout)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(stored, ticket.item);
+
+    let response = call(
+        pool.clone(),
+        Request::builder()
+            .uri("/v1/changes?since=0")
+            .header("authorization", format!("Bearer {}", stage.token))
+            .body(Body::empty())
+            .expect("request"),
+    )
+    .await;
+    let feed = body_json(response).await;
+    let kinds: Vec<&str> = feed["changes"]
+        .as_array()
+        .expect("changes")
+        .iter()
+        .map(|change| change["kind"].as_str().expect("kind"))
+        .collect();
+    assert!(
+        kinds.contains(&"itemCutout"),
+        "the cut-out is the one thing the provider may ever see, so a device that never learns of it \
+         cannot show what was sent: {kinds:?}"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_genuinely_new_item_gets_exactly_one_illustration_job(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+
+    complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+    assert_eq!(jobs_for(&pool, ticket.item).await, 1);
+
+    let payload: Value = sqlx::query_scalar("select payload from job where dedupe_key = $1")
+        .bind(format!("{}:{}", ticket.item, wardrobe_db::STYLE_VERSION))
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(payload["itemId"], ticket.item.to_string());
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn confirming_an_item_that_already_exists_enqueues_nothing(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    sqlx::query(
+        "insert into wardrobe_item (id, account_id, category, change_seq)
+         values ($1, $2, 'top', 0)",
+    )
+    .bind(ticket.item)
+    .bind(stage.account)
+    .execute(&pool)
+    .await?;
+
+    complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+
+    assert_eq!(
+        jobs_for(&pool, ticket.item).await,
+        0,
+        "rendering an illustration for an item that already had one is money spent twice"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn replaying_a_checkmark_enqueues_nothing_new(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    let body = args(&stage, &ticket, "2026-08-21");
+
+    complete(&pool, &stage, &body).await;
+    complete(&pool, &stage, &body).await;
+
+    assert_eq!(jobs_for(&pool, ticket.item).await, 1);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_checkmark_without_a_cutout_still_lands_and_still_enqueues(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+
+    let result = complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+    assert_eq!(result["status"], "applied");
+
+    assert_eq!(count(&pool, "item_cutout", stage.account).await, 0);
+    assert_eq!(
+        jobs_for(&pool, ticket.item).await,
+        1,
+        "the illustration waits for its cut-out; it must not hold up the checkmark"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_failed_checkmark_leaves_no_cutout_and_no_job(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    let mut body = args(&stage, &ticket, "2026-08-21");
+    with_cutout(&mut body, &stage);
+    body["cardId"] = json!(Uuid::now_v7());
+
+    let result = complete(&pool, &stage, &body).await;
+    assert_eq!(result["status"], "failed");
+
+    assert_eq!(count(&pool, "item_cutout", stage.account).await, 0);
+    assert_eq!(jobs_for(&pool, ticket.item).await, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_queued_illustration_is_visible_as_a_pending_state(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+
+    complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+
+    let state: String =
+        sqlx::query_scalar("select illustration_state from wardrobe_item where id = $1")
+            .bind(ticket.item)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(
+        state, "queued",
+        "leaving it at 'none' tells the app no illustration is coming while a job waits for one"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_job_key_carries_the_style_version(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+
+    complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+
+    let key: String = sqlx::query_scalar("select dedupe_key from job where kind = 'illustration'")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(
+        key,
+        format!("{}:{}", ticket.item, wardrobe_db::STYLE_VERSION),
+        "keying on the item alone would make a future style change unrenderable"
+    );
+    Ok(())
+}

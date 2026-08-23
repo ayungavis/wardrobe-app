@@ -9,6 +9,10 @@ use uuid::Uuid;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
+pub const ILLUSTRATION: &str = "illustration";
+pub const STYLISE_ILLUSTRATION: &str = "styliseIllustration";
+pub const STYLE_VERSION: &str = "v1";
+
 /// # Errors
 ///
 /// Returns [`sqlx::Error::RowNotFound`] when the account does not exist.
