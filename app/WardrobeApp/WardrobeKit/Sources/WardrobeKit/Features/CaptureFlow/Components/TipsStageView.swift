@@ -1,9 +1,3 @@
-//
-//  TipsStageView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 20/08/26.
-//
 import DesignSystem
 import SwiftUI
 
@@ -14,7 +8,7 @@ struct TipsStageView: View {
 
     var body: some View {
         ZStack(alignment: .center) {
-            Color.black.opacity(0.3).ignoresSafeArea()
+            AppColor.mediaBackground.opacity(0.3).ignoresSafeArea()
 
             VStack {
                 Spacer()
@@ -71,19 +65,12 @@ struct TipsStageView: View {
 
                 Spacer()
             }
-
-//            Button(action: onClose) {
-//                Image(systemName: "chevron.left")
-//                    .font(.system(size: 20, weight: .semibold))
-//                    .foregroundStyle(.white)
-//                    .padding()
-//            }
         }
     }
 
     private func bullet(_ key: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: Spacing.xs) {
-            Text("•")
+            Text(verbatim: "•")
             Text(key, bundle: .module)
         }
         .font(AppFont.body)

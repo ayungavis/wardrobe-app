@@ -31,17 +31,17 @@ struct DevMenuView: View {
     var body: some View {
         NavigationStack {
             List {
-                DevStateSection(summary: viewModel.summary)
-                DevTodaySection(lastAction: viewModel.lastAction) {
+                DevStateSectionView(summary: viewModel.summary)
+                DevTodaySectionView(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
                 }
-                DevHistorySection {
+                DevHistorySectionView {
                     isHistoryResetConfirmationPresented = true
                 }
-                DevOnboardingSection {
+                DevOnboardingSectionView {
                     isOnboardingResetConfirmationPresented = true
                 }
-                DevWardrobeSection(
+                DevWardrobeSectionView(
                     onScan: { isBulkScanPresented = true },
                     onBenchmark: { isBenchmarkPresented = true },
                     onReset: { isWardrobeResetConfirmationPresented = true }
@@ -141,7 +141,7 @@ struct DevMenuView: View {
     }
 }
 
-private struct DevStateSection: View {
+private struct DevStateSectionView: View {
     let summary: DevStateSummary
 
     var body: some View {
@@ -192,7 +192,7 @@ private struct DevStateSection: View {
     }
 }
 
-private struct DevTodaySection: View {
+private struct DevTodaySectionView: View {
     let lastAction: String?
     let onReset: () -> Void
 
@@ -209,7 +209,7 @@ private struct DevTodaySection: View {
     }
 }
 
-private struct DevHistorySection: View {
+private struct DevHistorySectionView: View {
     let onReset: () -> Void
 
     var body: some View {
@@ -226,7 +226,7 @@ private struct DevHistorySection: View {
     }
 }
 
-private struct DevOnboardingSection: View {
+private struct DevOnboardingSectionView: View {
     let onReset: () -> Void
 
     var body: some View {
@@ -243,7 +243,7 @@ private struct DevOnboardingSection: View {
     }
 }
 
-private struct DevWardrobeSection: View {
+private struct DevWardrobeSectionView: View {
     let onScan: () -> Void
     let onBenchmark: () -> Void
     let onReset: () -> Void

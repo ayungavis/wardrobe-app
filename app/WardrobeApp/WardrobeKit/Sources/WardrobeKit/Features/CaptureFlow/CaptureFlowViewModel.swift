@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -20,7 +21,7 @@ public final class CaptureFlowViewModel {
     public private(set) var isTipsPresented = false
     public var isGalleryPresented = false
 
-    public let library: PhotoLibraryService
+    private let library: PhotoLibraryService
 
     public internal(set) var isCompleted = false
     public internal(set) var isCompleting = false
@@ -92,6 +93,10 @@ public final class CaptureFlowViewModel {
     }
 
     // MARK: Consent / permission (FR-013, FR-014)
+
+    public func thumbnail(forAsset assetID: String) async -> CGImage? {
+        await library.thumbnail(for: assetID, maxPixel: 200)
+    }
 
     public func consentContinue() {
         consentTask = Task {

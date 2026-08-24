@@ -21,7 +21,6 @@ public struct ChallengeView: View {
             ZStack {
                 Group {
                     if viewModel.hasCompletedToday {
-                        // Text("Completed Today")
                         CompletedTodayView(onAccept: viewModel.accept)
                     } else if let active = viewModel.activeChallenge {
                         ActiveChallengeStateView(
@@ -41,7 +40,6 @@ public struct ChallengeView: View {
                             .playbackMode(.playing(.fromFrame(40, toFrame: 120, loopMode: .autoReverse)))
                             .resizable()
                             .frame(width: 300, height: 300)
-                            // .allowsHitTesting(false)
                             .offset(y: 280) // position over cards
                             .transition(.opacity)
                     }
@@ -49,7 +47,6 @@ public struct ChallengeView: View {
                 }
             }
             .appBackgroundStickers()
-            // interaction listener
             .simultaneousGesture(
                 DragGesture().onChanged { _ in
                     if !hasSwiped {
@@ -61,7 +58,6 @@ public struct ChallengeView: View {
             )
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 1).onEnded { _ in
-                    print("long press")
                     isDevMenuPresented = true
 
                 },
@@ -73,9 +69,9 @@ public struct ChallengeView: View {
                         isDevMenuPresented = true
                     } label: {
                         Image(systemName: "hammer.fill")
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColor.onMedia)
                             .padding(Spacing.sm)
-                            .background(Circle().fill(.black.opacity(0.4)))
+                            .background(Circle().fill(AppColor.mediaBackground.opacity(0.4)))
                     }
                     .padding(Spacing.md)
                 }

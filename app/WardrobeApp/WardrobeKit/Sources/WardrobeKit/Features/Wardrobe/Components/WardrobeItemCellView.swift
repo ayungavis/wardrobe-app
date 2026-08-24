@@ -23,9 +23,9 @@ struct WardrobeItemCellView: View {
 
                 Text("wardrobe.wearCount \(wearCount)", bundle: .module)
                     .font(AppFont.roundedTitle)
-                    .stroke(color: .white, width: 3)
+                    .stroke(color: AppColor.onMedia, width: 3)
                     .padding(.horizontal, Spacing.sm)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Spacing.xs)
                     .padding(Spacing.sm)
             }
 

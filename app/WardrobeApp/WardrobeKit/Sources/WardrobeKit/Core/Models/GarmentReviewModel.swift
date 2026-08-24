@@ -82,6 +82,17 @@ public final class GarmentReviewModel {
         self.garments.append(contentsOf: garments)
     }
 
+    // ponytail: a no-op against today's scanner, which already applies
+    // defaultDecision when it mints a garment. It is the net for any future
+    // staging path that does not; delete it if none appears.
+    public func promoteConfidentMatches() {
+        for index in garments.indices where garments[index].decision == .new {
+            garments[index].decision = ScannedGarment.defaultDecision(
+                for: garments[index].matches
+            )
+        }
+    }
+
     public func choose(_ decision: ScannedGarment.Decision, for garmentID: UUID) {
         guard let index = garments.firstIndex(where: { $0.id == garmentID }) else { return }
         garments[index].decision = decision

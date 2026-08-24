@@ -9,19 +9,12 @@ struct CategoryGridView: View {
     let namespace: Namespace.ID
     let onClose: () -> Void
     let onSelect: (WardrobeItem) -> Void
-    @Binding var sortOrder: WardrobeView.SortOrder
+    @Binding var sortOrder: WardrobeViewModel.SortOrder
 
     private let columns = [
         GridItem(.flexible(), spacing: Spacing.md),
         GridItem(.flexible(), spacing: Spacing.md),
     ]
-
-    private var sortedItems: [WardrobeItem] {
-        switch sortOrder {
-        case .mostUsed: items.sorted { wearCount($0) > wearCount($1) }
-        case .leastUsed: items.sorted { wearCount($0) < wearCount($1) }
-        }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,8 +30,8 @@ struct CategoryGridView: View {
                 }
                 Spacer()
                 Menu {
-                    Picker("", selection: $sortOrder) {
-                        ForEach(WardrobeView.SortOrder.allCases, id: \.self) { order in
+                    Picker(String(), selection: $sortOrder) {
+                        ForEach(WardrobeViewModel.SortOrder.allCases, id: \.self) { order in
                             Text(order.title, bundle: .module).tag(order)
                         }
                     }
@@ -62,7 +55,7 @@ struct CategoryGridView: View {
 
             ScrollView {
                 LazyVGrid(columns: columns, spacing: Spacing.md) {
-                    ForEach(sortedItems) { item in
+                    ForEach(items) { item in
                         Button {
                             onSelect(item)
                         } label: {

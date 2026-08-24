@@ -81,11 +81,10 @@ struct AddByPhotosView: View {
     private var picker: some View {
         PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 20, matching: .images) {
             Image(systemName: "plus")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
+                .font(AppFont.title.weight(.bold))
+                .foregroundStyle(AppColor.onMedia)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                // .padding(.vertical, Spacing.md)
                 .background(Capsule().fill(AppColor.accent))
         }
         .disabled(review.isScanning)
@@ -155,13 +154,13 @@ struct AddByPhotosView: View {
                 }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .font(AppFont.caption.weight(.bold))
+                    .foregroundStyle(AppColor.onMedia)
                     .padding(6)
-                    .background(Circle().fill(.black.opacity(0.6)))
+                    .background(Circle().fill(AppColor.mediaBackground.opacity(0.6)))
             }
             .buttonStyle(.plain)
-            .padding(4)
+            .padding(Spacing.xs)
         }
     }
 

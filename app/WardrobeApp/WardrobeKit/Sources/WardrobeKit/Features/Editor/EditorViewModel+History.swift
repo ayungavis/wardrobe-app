@@ -7,6 +7,10 @@ public extension EditorViewModel {
         activeRepository.didFailToPersist
     }
 
+    func viewDisappeared() {
+        flushTask = Task { await flush() }
+    }
+
     func flush() async {
         await activeRepository.flush()
     }

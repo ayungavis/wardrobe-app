@@ -16,10 +16,6 @@ public struct WardrobeItemDetailView: View {
 
     public var body: some View {
         ZStack {
-//            Image("appBG", bundle: .module)
-//                .resizable()
-//                .ignoresSafeArea()
-
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     if let item = viewModel.item {
@@ -33,7 +29,7 @@ public struct WardrobeItemDetailView: View {
                         Text("wardrobe.wearCount.used \(viewModel.wearCount)", bundle: .module)
                             .font(AppFont.title)
                             .fontWeight(.black)
-                            .stroke(color: .white, width: 3)
+                            .stroke(color: AppColor.onMedia, width: 3)
                             .padding(.top, Spacing.lg)
                             .zIndex(2)
 
@@ -65,26 +61,6 @@ public struct WardrobeItemDetailView: View {
                         }
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
-
-//                        if isEditing {
-//                            Button(role: .destructive) {
-//                                isDeleteConfirmationPresented = true
-//                            } label: {
-//                                Image(systemName: "trash.circle")
-//                                    .font(.system(size: 32, weight: .light))
-//                                    .foregroundColor(.black)
-//                            }
-//                            .padding(.top, Spacing.lg)
-//                        }
-
-//                        if !isEditing {
-//                            VStack(spacing: Spacing.xl) {
-//                                timeline
-//                                similar
-//                            }
-//                            .padding(.horizontal, Spacing.lg)
-//                            .padding(.top, Spacing.xl)
-//                        }
                     }
                 }
                 .padding(.bottom, 100)
@@ -106,7 +82,6 @@ public struct WardrobeItemDetailView: View {
                             .foregroundStyle(AppColor.destructive)
                             .frame(width: 32, height: 32)
                             .background(Circle()
-                                // .fill(Color.white)
                                 .fill(.clear)
                                 .glassEffect())
                             .appShadow(.card)
@@ -206,13 +181,13 @@ public struct WardrobeItemDetailView: View {
                 Image("ShortPaper", bundle: .module)
                     .resizable()
 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
                     HStack {
                         label("wardrobe.detail.name")
                         if isEditing {
                             TextField(String(localized: "wardrobe.detail.name", bundle: .module), text: $name)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, Spacing.sm)
+                                .padding(.vertical, Spacing.xs)
                                 .background(Color.gray.opacity(0.2))
                                 .cornerRadius(4)
                                 .onSubmit {}
@@ -243,12 +218,12 @@ public struct WardrobeItemDetailView: View {
 
                     Divider()
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
                         label("wardrobe.detail.description")
                         if isEditing {
                             TextEditor(text: $description)
                                 .frame(minHeight: 60)
-                                .padding(4)
+                                .padding(Spacing.xs)
                                 .scrollContentBackground(.hidden)
                                 .background(Color.gray.opacity(0.2))
                                 .cornerRadius(4)
@@ -261,7 +236,7 @@ public struct WardrobeItemDetailView: View {
                 .font(AppFont.body)
                 .foregroundColor(.black)
                 .padding(.top, 40)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, Spacing.xxl)
                 .padding(.bottom, 40)
             }
         }
@@ -276,45 +251,6 @@ public struct WardrobeItemDetailView: View {
             formatter.unitsStyle = .full
             return formatter.localizedString(for: date, relativeTo: Date())
         }
-    }
-}
-
-private struct SimilarItemCellView: View {
-    let entry: SimilarItem
-    let data: Data?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            Group {
-                if let data {
-                    DownsampledPhotoView(data: data)
-                } else {
-                    RoundedRectangle(cornerRadius: 12).fill(AppColor.surface)
-                }
-            }
-            .frame(width: 110, height: 110)
-            .background(AppColor.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            Text(entry.match.confidence.title, bundle: .module)
-                .font(AppFont.caption)
-                .foregroundStyle(AppColor.textSecondary)
-        }
-    }
-}
-
-private struct SectionView<Content: View>: View {
-    let title: LocalizedStringKey
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            Text(title, bundle: .module)
-                .font(AppFont.title)
-                .foregroundStyle(AppColor.textPrimary)
-            content
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

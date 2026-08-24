@@ -1,10 +1,3 @@
-//
-//  GarmentDiscardGridView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 23/08/26.
-//
-
 import DesignSystem
 import SwiftUI
 
@@ -61,31 +54,13 @@ struct GarmentDiscardGridView: View {
                 }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .font(AppFont.caption.weight(.bold))
+                    .foregroundStyle(AppColor.onMedia)
                     .padding(6)
-                    .background(Circle().fill(.black.opacity(0.6)))
+                    .background(Circle().fill(AppColor.mediaBackground.opacity(0.6)))
             }
             .buttonStyle(.plain)
-            .padding(4)
+            .padding(Spacing.xs)
         }
-    }
-}
-
-struct GarmentDiscardHeaderView: View {
-    let titleKey: LocalizedStringKey
-    let messageKey: LocalizedStringKey
-
-    var body: some View {
-        VStack(spacing: Spacing.sm) {
-            Text(titleKey, bundle: .module)
-                .font(AppFont.title.weight(.bold))
-                .foregroundStyle(AppColor.textPrimary)
-            Text(messageKey, bundle: .module)
-                .font(AppFont.body)
-                .foregroundStyle(AppColor.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
     }
 }

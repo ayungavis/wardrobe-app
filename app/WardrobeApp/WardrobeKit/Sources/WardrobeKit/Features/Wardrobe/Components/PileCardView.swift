@@ -16,7 +16,7 @@ struct PileCardView: View {
             HStack {
                 Text(category.title, bundle: .module)
                     .font(AppFont.roundedTitle)
-                Text("\(items.count)")
+                Text(items.count, format: .number)
                     .font(AppFont.roundedCaption)
                     .foregroundStyle(AppColor.accent)
                     .padding(.horizontal, Spacing.sm)

@@ -35,20 +35,22 @@ public extension EditorViewModel {
     }
 
     func saveDirectly() {
-        guard case let .loaded(originals) = originals, !isSaving, !didSaveToPhotos else { return }
-        isSaving = true
+        guard case let .loaded(originals) = originals, saveState == .idle else { return }
+        saveTask?.cancel()
+        saveState = .saving
 
         let document = document
         saveTask = Task {
-            defer { isSaving = false }
             do {
                 let photo = try await ExportService.render(originals: originals, document: document)
                 try Task.checkCancellation()
                 try await librarySaver.save(photo)
-                didSaveToPhotos = true
+                saveState = .saved
             } catch is CancellationError {
+                saveState = .idle
             } catch {
                 Log.report(error)
+                saveState = .idle
                 alertError = error as? AppError ?? .photoSaveFailed
             }
         }

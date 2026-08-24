@@ -4,10 +4,15 @@ import Observation
 @MainActor
 @Observable
 public final class WardrobeItemDetailViewModel {
-    public private(set) var item: WardrobeItem?
-    private(set) var wears: [WearRecord] = []
-    private(set) var similar: [SimilarItem] = []
+    struct Detail: Equatable, Sendable {
+        let item: WardrobeItem?
+        let wears: [WearRecord]
+        let similar: [SimilarItem]
+    }
+
     public private(set) var isDeleted = false
+    private(set) var state: Loadable<Detail> = .idle
+    private(set) var loadTask: Task<Void, Never>?
 
     private let itemID: UUID
     private let repository: WardrobeItemRepository
@@ -25,6 +30,23 @@ public final class WardrobeItemDetailViewModel {
 
     // MARK: Derived from the wear records
 
+    public var item: WardrobeItem? {
+        detail?.item
+    }
+
+    var wears: [WearRecord] {
+        detail?.wears ?? []
+    }
+
+    var similar: [SimilarItem] {
+        detail?.similar ?? []
+    }
+
+    private var detail: Detail? {
+        guard case let .loaded(detail) = state else { return nil }
+        return detail
+    }
+
     var wearCount: Int {
         wears.count
     }
@@ -40,12 +62,25 @@ public final class WardrobeItemDetailViewModel {
     // MARK: Loading
 
     public func load() {
-        do {
-            item = try repository.items().first { $0.id == itemID }
-            wears = try repository.wears(for: itemID).sorted { $0.wornAt > $1.wornAt }
-            similar = try loadSimilar()
-        } catch {
-            Log.report(error)
+        loadTask?.cancel()
+        if case .loaded = state {} else {
+            state = .loading
+        }
+
+        loadTask = Task {
+            do {
+                let item = try repository.items().first { $0.id == itemID }
+                try Task.checkCancellation()
+                let wears = try repository.wears(for: itemID).sorted { $0.wornAt > $1.wornAt }
+                try Task.checkCancellation()
+                let similar = try loadSimilar()
+                try Task.checkCancellation()
+                state = .loaded(Detail(item: item, wears: wears, similar: similar))
+            } catch is CancellationError {
+            } catch {
+                Log.report(error)
+                state = .failed(AppError(wrapping: error))
+            }
         }
     }
 
@@ -98,7 +133,9 @@ public final class WardrobeItemDetailViewModel {
 
         do {
             try repository.update(updated)
-            item = updated
+            if let detail {
+                state = .loaded(Detail(item: updated, wears: detail.wears, similar: detail.similar))
+            }
             Log.ui.info("Wardrobe: item updated")
         } catch {
             Log.report(error)

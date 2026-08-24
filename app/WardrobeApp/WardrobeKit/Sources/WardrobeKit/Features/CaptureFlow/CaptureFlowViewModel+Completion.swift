@@ -38,8 +38,8 @@ public extension CaptureFlowViewModel {
         Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
     }
 
-    /// ponytail: stored at full export size, roughly 300 KB a completion.
-    /// Downscale, or keep a second smaller rendition, when storage complains.
+    // ponytail: stored at full export size, roughly 300 KB a completion.
+    // Downscale, or keep a second smaller rendition, when storage complains.
     func renderPreview(of completion: CompletedChallenge) async -> String? {
         var originals: [UUID: Data] = [:]
         for id in Set(completion.document.photoIDs) {

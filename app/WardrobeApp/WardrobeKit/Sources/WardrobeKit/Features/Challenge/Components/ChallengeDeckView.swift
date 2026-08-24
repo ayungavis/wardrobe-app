@@ -17,8 +17,6 @@ struct ChallengeDeckView: View {
     private let swipeThreshold: CGFloat = 120
     private let hapticStepDistance: CGFloat = 12
 
-    private static let freestyleCard = ChallengeCard(id: UUID(), prompt: "Freestyle")
-
     private var isDeckCleared: Bool {
         currentIndex >= cards.count
     }
@@ -29,7 +27,7 @@ struct ChallengeDeckView: View {
                 titleKey: "challenge.freestyle.title",
                 messageKey: "challenge.freestyle.text",
                 buttonKey: "challenge.accept",
-                onAccept: { onAccept(Self.freestyleCard) }
+                onAccept: { onAccept(ChallengeCard.freestyle) }
             )
             .aspectRatio(346 / 617, contentMode: .fit)
             .zIndex(-Double(cards.count) - 1)

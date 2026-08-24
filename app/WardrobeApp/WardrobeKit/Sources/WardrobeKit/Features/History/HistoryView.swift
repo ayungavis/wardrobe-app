@@ -21,7 +21,9 @@ public struct HistoryView: View {
             ZStack {
                 VStack {
                     header
-                    if viewModel.completions.isEmpty {
+                    if case .idle = viewModel.state {
+                        ProgressView()
+                    } else if viewModel.completions.isEmpty {
                         emptyState
                     } else {
                         ScrollView {
@@ -46,9 +48,8 @@ public struct HistoryView: View {
                 }
             }
             .appBackgroundStickers()
-            // .navigationTitle(Text("tab.history", bundle: .module))
             .navigationDestination(for: UUID.self) { completionID in
-                if let completion = viewModel.completions.first(where: { $0.id == completionID }) {
+                if let completion = viewModel.completion(id: completionID) {
                     HistoryDetailView(
                         completion: completion,
                         previewData: viewModel.previewData(for: completion),

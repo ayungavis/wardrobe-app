@@ -15,7 +15,6 @@ public struct EditorView: View {
     private let makeCropViewModel: (UUID) -> CropViewModel
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
-    // private let reviewDrawer: ReviewDrawer
 
     public init(
         viewModel: EditorViewModel,
@@ -24,7 +23,6 @@ public struct EditorView: View {
         makeCropViewModel: @escaping (UUID) -> CropViewModel,
         onDiscard: @escaping () -> Void,
         onComplete: @escaping () -> Void
-        // @ViewBuilder reviewDrawer: () -> ReviewDrawer
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
@@ -32,7 +30,6 @@ public struct EditorView: View {
         self.makeCropViewModel = makeCropViewModel
         self.onDiscard = onDiscard
         self.onComplete = onComplete
-        // self.reviewDrawer = reviewDrawer()
     }
 
     public var body: some View {
@@ -47,7 +44,7 @@ public struct EditorView: View {
         .sensoryFeedback(.success, trigger: viewModel.didSaveToPhotos) { $1 }
         .sensoryFeedback(.error, trigger: viewModel.alertError) { $1 != nil }
         .task(id: didResumeDraft) { await showRestoredNotice() }
-        .onDisappear { Task { await viewModel.flush() } }
+        .onDisappear { viewModel.viewDisappeared() }
         .sheet(isPresented: $viewModel.isExportPresented) {
             ExportSheetView(viewModel: viewModel)
         }
@@ -156,12 +153,6 @@ public struct EditorView: View {
                 .ignoresSafeArea(.keyboard)
 
             if viewModel.activeTool == nil {
-//                VStack {
-//                    Spacer()
-//                    reviewDrawer
-//                        .padding(.bottom, 96)
-//                }
-
                 if let banner = draftBannerKind {
                     VStack {
                         HStack {

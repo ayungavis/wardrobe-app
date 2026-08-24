@@ -18,9 +18,9 @@ public final class EditorViewModel {
         case drawing(DrawingContent)
     }
 
-    /// ponytail: every photo's bytes live here at once. Two or three is fine;
-    /// if a document ever holds many, read them back from the repository at
-    /// export time instead.
+    // ponytail: every photo's bytes live here at once. Two or three is fine;
+    // if a document ever holds many, read them back from the repository at
+    // export time instead.
     public internal(set) var originals: Loadable<[UUID: Data]> = .idle
     public internal(set) var previewImages: [UUID: CGImage] = [:]
     public internal(set) var croppedPreviews: [UUID: CGImage] = [:]
@@ -34,8 +34,15 @@ public final class EditorViewModel {
     public var isBackgroundPickerPresented = false
     public var isLayerPanelPresented = false
     public var alertError: AppError?
-    public internal(set) var didSaveToPhotos = false
-    public internal(set) var isSaving = false
+    public internal(set) var saveState: PhotoSaveState = .idle
+
+    public var didSaveToPhotos: Bool {
+        saveState == .saved
+    }
+
+    public var isSaving: Bool {
+        saveState == .saving
+    }
 
     var challenge: ActiveChallenge
     let activeRepository: ActiveChallengeRepository
@@ -45,6 +52,7 @@ public final class EditorViewModel {
     var loadTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
     var saveTask: Task<Void, Never>?
+    var flushTask: Task<Void, Never>?
 
     public init(
         challenge: ActiveChallenge,
@@ -228,7 +236,7 @@ public final class EditorViewModel {
     func write(_ document: EditorDocument) {
         challenge.document = document
         activeRepository.save(challenge)
-        didSaveToPhotos = false
+        saveState = .idle
     }
 
     // MARK: Canvas layers (FR-085 select/transform, FR-087 delete)

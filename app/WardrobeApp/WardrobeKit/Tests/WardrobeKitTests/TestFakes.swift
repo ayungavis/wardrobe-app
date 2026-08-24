@@ -57,9 +57,13 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
     var storedItems: [WardrobeItem] = []
     var storedFingerprints: [ItemFingerprint] = []
     var storedWears: [WearRecord] = []
+    var itemsError: Error?
 
     func items() throws -> [WardrobeItem] {
-        storedItems.sorted { $0.createdAt > $1.createdAt }
+        if let itemsError {
+            throw itemsError
+        }
+        return storedItems.sorted { $0.createdAt > $1.createdAt }
     }
 
     func fingerprints() throws -> [ItemFingerprint] {

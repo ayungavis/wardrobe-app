@@ -7,7 +7,7 @@ struct PhotoLibraryGridView: View {
 
     let access: PhotoLibraryAccess
     let assets: [PhotoAsset]
-    let library: PhotoLibraryService
+    let thumbnail: @Sendable (String) async -> CGImage?
     let onPick: (String) -> Void
     let onPickData: (Data) -> Void
 
@@ -46,7 +46,7 @@ struct PhotoLibraryGridView: View {
                     Button {
                         onPick(asset.id)
                     } label: {
-                        PhotoGridCell(assetID: asset.id, library: library)
+                        PhotoGridCellView(assetID: asset.id, thumbnail: thumbnail)
                     }
                     .buttonStyle(.plain)
                 }
@@ -55,9 +55,9 @@ struct PhotoLibraryGridView: View {
     }
 }
 
-private struct PhotoGridCell: View {
+private struct PhotoGridCellView: View {
     let assetID: String
-    let library: PhotoLibraryService
+    let thumbnail: @Sendable (String) async -> CGImage?
 
     @State private var image: CGImage?
 
@@ -75,7 +75,7 @@ private struct PhotoGridCell: View {
             }
             .clipped()
             .task(id: assetID) {
-                image = await library.thumbnail(for: assetID, maxPixel: 200)
+                image = await thumbnail(assetID)
             }
     }
 }

@@ -15,6 +15,8 @@ public extension CompletedChallengeRepository {
 
 // ponytail: UserDefaults JSON array; move to SwiftData when History needs
 // querying and paging.
+// Type safety: @unchecked because UserDefaults and Calendar are both immutable
+// here and UserDefaults is itself thread-safe; the type holds no mutable state.
 public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeRepository, @unchecked Sendable {
     private let defaults: UserDefaults
     private let calendar: Calendar
@@ -25,10 +27,10 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         self.calendar = calendar
     }
 
-    /// ponytail: a skipped entry is dropped rather than preserved verbatim.
-    /// Keeping its raw JSON needs a passthrough type; it comes back from the
-    /// server once sync exists, and the server is the system of record for
-    /// confirmed documents (FR-096).
+    // ponytail: a skipped entry is dropped rather than preserved verbatim.
+    // Keeping its raw JSON needs a passthrough type; it comes back from the
+    // server once sync exists, and the server is the system of record for
+    // confirmed documents (FR-096).
     public func load() -> [CompletedChallenge] {
         guard let data = defaults.data(forKey: Self.key) else { return [] }
         guard let entries = try? JSONDecoder().decode([LenientEntry<CompletedChallenge>].self, from: data) else {
@@ -45,11 +47,6 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
 
     public func append(_ completion: CompletedChallenge) {
         var completions = load()
-//        guard !completions.contains(where: {
-//            calendar.isDate($0.completedAt, inSameDayAs: completion.completedAt)
-//        }) else {
-//            return
-//        }
         completions.append(completion)
         save(completions)
     }

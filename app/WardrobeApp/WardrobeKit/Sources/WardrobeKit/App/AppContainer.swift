@@ -141,6 +141,10 @@ public final class AppContainer {
         )
     }
 
+    public func makeAddByCameraViewModel() -> AddByCameraViewModel {
+        AddByCameraViewModel(camera: makeCameraService(), review: makeGarmentReviewModel())
+    }
+
     public func makeGarmentReviewModel() -> GarmentReviewModel {
         GarmentReviewModel(
             scanner: makeGarmentScanService(allowsMatching: false),

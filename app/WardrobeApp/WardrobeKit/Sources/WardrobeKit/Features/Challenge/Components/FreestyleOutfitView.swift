@@ -1,10 +1,3 @@
-//
-//  FreestyleOutfitView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 22/08/26.
-//
-
 import DesignSystem
 import SwiftUI
 

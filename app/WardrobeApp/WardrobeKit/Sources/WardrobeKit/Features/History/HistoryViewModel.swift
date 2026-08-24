@@ -4,7 +4,7 @@ import Observation
 @MainActor
 @Observable
 public final class HistoryViewModel {
-    public private(set) var completions: [CompletedChallenge] = []
+    public private(set) var state: Loadable<[CompletedChallenge]> = .idle
 
     private let completedRepository: CompletedChallengeRepository
     private let photoRepository: PhotoRepository
@@ -28,8 +28,17 @@ public final class HistoryViewModel {
     }
 
     public func load() {
-        completions = completedRepository.load().sorted { $0.completedAt > $1.completedAt }
+        state = .loaded(completedRepository.load().sorted { $0.completedAt > $1.completedAt })
         renderedPreviews = [:]
+    }
+
+    public var completions: [CompletedChallenge] {
+        guard case let .loaded(completions) = state else { return [] }
+        return completions
+    }
+
+    public func completion(id: UUID) -> CompletedChallenge? {
+        completions.first { $0.id == id }
     }
 
     public func previewData(for completion: CompletedChallenge) -> Data? {

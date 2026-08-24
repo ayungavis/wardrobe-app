@@ -55,12 +55,14 @@ struct WardrobeItemDetailViewModelTests {
 
     /// Deliberately unsorted input: the summary computes its own extremes rather
     /// than trusting whatever order a repository happens to return.
-    @Test func usageIsDerivedFromTheWearRecords() {
+    @Test func usageIsDerivedFromTheWearRecords() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository, wornAt: [date(3), date(1), date(7)])
         let sut = makeSUT(itemID: item.id, repository: repository)
 
         sut.load()
+
+        await sut.loadTask?.value
 
         #expect(sut.wearCount == 3)
         #expect(sut.firstWornAt == date(1))
@@ -68,12 +70,14 @@ struct WardrobeItemDetailViewModelTests {
     }
 
     /// FR-023: missing history is stated, never filled with an invented date.
-    @Test func anItemNeverWornHasNoDates() {
+    @Test func anItemNeverWornHasNoDates() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository)
         let sut = makeSUT(itemID: item.id, repository: repository)
 
         sut.load()
+
+        await sut.loadTask?.value
 
         #expect(sut.wearCount == 0)
         #expect(sut.firstWornAt == nil)
@@ -82,7 +86,7 @@ struct WardrobeItemDetailViewModelTests {
 
     // MARK: Similar items
 
-    @Test func aLookalikeInTheSameCategoryIsOffered() {
+    @Test func aLookalikeInTheSameCategoryIsOffered() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository)
         let twin = makeItem(in: repository)
@@ -90,23 +94,27 @@ struct WardrobeItemDetailViewModelTests {
 
         sut.load()
 
+        await sut.loadTask?.value
+
         #expect(sut.similar.map(\.item.id) == [twin.id])
     }
 
     /// The item is never its own lookalike, however identical its fingerprints.
-    @Test func theItemIsNeverSimilarToItself() {
+    @Test func theItemIsNeverSimilarToItself() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository)
         let sut = makeSUT(itemID: item.id, repository: repository)
 
         sut.load()
 
+        await sut.loadTask?.value
+
         #expect(sut.similar.isEmpty)
     }
 
     /// A top is never a bottom, which is the matcher's hard filter and must hold
     /// here too rather than being re-decided per screen.
-    @Test func similarityNeverCrossesCategories() {
+    @Test func similarityNeverCrossesCategories() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository, category: .top)
         makeItem(in: repository, category: .bottom)
@@ -114,10 +122,12 @@ struct WardrobeItemDetailViewModelTests {
 
         sut.load()
 
+        await sut.loadTask?.value
+
         #expect(sut.similar.isEmpty)
     }
 
-    @Test func aVeryDifferentGarmentIsNotOffered() {
+    @Test func aVeryDifferentGarmentIsNotOffered() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository, color: [70, 5, 15], print: [1, 0, 0, 0])
         makeItem(in: repository, color: [20, -30, -30], print: [0, 1, 0, 0])
@@ -125,18 +135,21 @@ struct WardrobeItemDetailViewModelTests {
 
         sut.load()
 
+        await sut.loadTask?.value
+
         #expect(sut.similar.isEmpty)
     }
 
     // MARK: Deleting
 
-    @Test func deletingRemovesTheItemItsHistoryAndItsImage() {
+    @Test func deletingRemovesTheItemItsHistoryAndItsImage() async {
         let repository = InMemoryWardrobeItemRepository()
         let thumbnails = InMemoryGarmentThumbnailRepository()
         let item = makeItem(in: repository, wornAt: [date(1), date(2)])
         thumbnails.files[item.cutoutFile] = Data([0x01])
         let sut = makeSUT(itemID: item.id, repository: repository, thumbnails: thumbnails)
         sut.load()
+        await sut.loadTask?.value
 
         sut.delete()
 
@@ -149,11 +162,12 @@ struct WardrobeItemDetailViewModelTests {
 
     /// A cut-out that already vanished must not strand the row that points at
     /// it — that is exactly how an undeletable item would be born.
-    @Test func deletingSucceedsWhenTheImageIsAlreadyGone() {
+    @Test func deletingSucceedsWhenTheImageIsAlreadyGone() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository)
         let sut = makeSUT(itemID: item.id, repository: repository)
         sut.load()
+        await sut.loadTask?.value
 
         sut.delete()
 
@@ -161,13 +175,14 @@ struct WardrobeItemDetailViewModelTests {
         #expect(repository.storedItems.isEmpty)
     }
 
-    @Test func deletingLeavesEveryOtherItemAlone() {
+    @Test func deletingLeavesEveryOtherItemAlone() async {
         let repository = InMemoryWardrobeItemRepository()
         let item = makeItem(in: repository, wornAt: [date(1)])
         let survivor = makeItem(in: repository, color: [20, -30, -30], print: [0, 1, 0, 0],
                                 wornAt: [date(2), date(3)])
         let sut = makeSUT(itemID: item.id, repository: repository)
         sut.load()
+        await sut.loadTask?.value
 
         sut.delete()
 

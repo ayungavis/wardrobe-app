@@ -263,4 +263,41 @@ struct GarmentReviewModelTests {
             "adding to the wardrobe outside a completion is not a wear"
         )
     }
+
+    @Test func aLikelyMatchBecomesTheDefaultMergeTarget() {
+        let sut = makeSUT()
+        let itemID = UUID()
+        sut.stage([makeGarment(
+            decision: .new,
+            matches: [ItemMatch(itemID: itemID, score: 0.9, confidence: .likely)]
+        )])
+
+        sut.promoteConfidentMatches()
+
+        #expect(sut.garments.first?.decision == .existing(itemID))
+    }
+
+    @Test func anUncertainMatchIsNeverMergedWithoutTheUserSayingSo() {
+        let sut = makeSUT()
+        sut.stage([makeGarment(
+            decision: .new,
+            matches: [ItemMatch(itemID: UUID(), score: 0.4, confidence: .uncertain)]
+        )])
+
+        sut.promoteConfidentMatches()
+
+        #expect(sut.garments.first?.decision == .new)
+    }
+
+    @Test func aDecisionTheUserAlreadyMadeSurvivesPromotion() {
+        let sut = makeSUT()
+        sut.stage([makeGarment(
+            decision: .discard,
+            matches: [ItemMatch(itemID: UUID(), score: 0.9, confidence: .likely)]
+        )])
+
+        sut.promoteConfidentMatches()
+
+        #expect(sut.garments.first?.decision == .discard)
+    }
 }
