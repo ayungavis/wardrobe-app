@@ -874,4 +874,43 @@ async fn the_live_provider_answers_in_the_shape_this_client_parses() {
         "live accounting — route: {:?}, prompt tokens: {:?}, completion tokens: {:?}",
         rendered.provider_route, rendered.input_tokens, rendered.output_tokens
     );
+
+    let canvas = image::load_from_memory(&rendered.image)
+        .expect("the generation decodes")
+        .to_rgba8();
+    let mask =
+        illustration::sticker::separate(&canvas, illustration::sticker::Style::default().tolerance);
+    let report = mask.report();
+    let verdict =
+        illustration::sticker::inspect(&mask, illustration::sticker::MaskBounds::default());
+
+    eprintln!(
+        "live mask — corner spread: {}, coverage: {}permille, components: {}, dominant: {}permille, \
+         touches edge: {}, verdict: {verdict:?}",
+        corner_spread(&canvas),
+        report.coverage_permille,
+        report.components,
+        report.dominant_share_permille,
+        report.touches_edge
+    );
+}
+
+fn corner_spread(canvas: &image::RgbaImage) -> u32 {
+    let (width, height) = canvas.dimensions();
+    let corners = [
+        canvas.get_pixel(0, 0),
+        canvas.get_pixel(width - 1, 0),
+        canvas.get_pixel(0, height - 1),
+        canvas.get_pixel(width - 1, height - 1),
+    ];
+    (0..3)
+        .map(|channel| {
+            let values: Vec<u32> = corners
+                .iter()
+                .map(|pixel| u32::from(pixel[channel]))
+                .collect();
+            values.iter().max().copied().unwrap_or(0) - values.iter().min().copied().unwrap_or(0)
+        })
+        .max()
+        .unwrap_or(0)
 }

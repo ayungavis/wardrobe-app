@@ -11,10 +11,13 @@ use wardrobe_storage::Storage;
 pub const SWEEP_MEDIA: &str = "sweepMedia";
 
 #[must_use]
-pub fn kinds(illustration: bool) -> Vec<&'static str> {
+pub fn kinds(illustration: bool, storage: bool) -> Vec<&'static str> {
     let mut kinds = vec![SWEEP_MEDIA];
     if illustration {
         kinds.push(wardrobe_db::ILLUSTRATION);
+    }
+    if storage {
+        kinds.push(wardrobe_db::STYLISE_ILLUSTRATION);
     }
     kinds
 }

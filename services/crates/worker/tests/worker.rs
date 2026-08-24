@@ -285,7 +285,7 @@ async fn an_illustration_job_waits_because_no_registered_kind_claims_it(
         .execute(&pool)
         .await?;
 
-    for kind in wardrobe_worker::kinds(false) {
+    for kind in wardrobe_worker::kinds(false, false) {
         assert_eq!(
             run_one(&pool, kind, |_| async { Ok(()) }).await?,
             None,
@@ -303,9 +303,7 @@ async fn an_illustration_job_waits_because_no_registered_kind_claims_it(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_styling_job_waits_because_no_registered_kind_claims_it(
-    pool: PgPool,
-) -> sqlx::Result<()> {
+async fn a_styling_job_waits_until_an_object_store_is_configured(pool: PgPool) -> sqlx::Result<()> {
     let owner = account(&pool).await?;
     let id = Uuid::now_v7();
     sqlx::query("insert into job (id, account_id, kind, dedupe_key) values ($1, $2, $3, $1::text)")
@@ -315,14 +313,22 @@ async fn a_styling_job_waits_because_no_registered_kind_claims_it(
         .execute(&pool)
         .await?;
 
-    for kind in wardrobe_worker::kinds(true) {
+    for kind in wardrobe_worker::kinds(true, false) {
         assert_eq!(run_one(&pool, kind, |_| async { Ok(()) }).await?, None);
     }
-
     assert_eq!(
         state(&pool, id).await.0,
         "pending",
-        "a generated image waits for its sticker treatment rather than being marked done"
+        "with nowhere to read the generation from, the job waits rather than failing"
+    );
+
+    for kind in wardrobe_worker::kinds(true, true) {
+        run_one(&pool, kind, |_| async { Ok(()) }).await?;
+    }
+    assert_eq!(
+        state(&pool, id).await.0,
+        "succeeded",
+        "and a configured store is what lets the sticker treatment claim it"
     );
     Ok(())
 }

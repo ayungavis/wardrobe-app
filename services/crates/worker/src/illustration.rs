@@ -1,5 +1,6 @@
 pub mod image;
 pub mod openrouter;
+pub mod sticker;
 
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -524,6 +525,144 @@ async fn hand_off(work: &Work<'_>, rendered: &openrouter::Rendered) -> Result<()
     .bind(&work.pinned.model)
     .bind(&work.settings.prompt_version)
     .bind(wardrobe_db::STYLE_VERSION)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| "database")?;
+
+    tx.commit().await.map_err(|_| "database")
+}
+
+// ---------------------------------------------------------------- stylising
+
+struct Stylise {
+    item: Uuid,
+    media: Uuid,
+    model: String,
+    prompt_version: String,
+    style_version: String,
+}
+
+fn stylise_payload(job: &ClaimedJob) -> Result<Stylise, &'static str> {
+    let text = |key: &str| {
+        job.payload
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .ok_or("payload")
+    };
+    let id = |key: &str| Uuid::parse_str(text(key)?).map_err(|_| "payload");
+
+    Ok(Stylise {
+        item: id("itemId")?,
+        media: id("mediaId")?,
+        model: text("model")?.to_owned(),
+        prompt_version: text("promptVersion")?.to_owned(),
+        style_version: text("styleVersion")?.to_owned(),
+    })
+}
+
+/// # Errors
+///
+/// Returns a classified code when the generation cannot be loaded, separated
+/// from its background, or stored.
+pub async fn stylise_for(
+    pool: &PgPool,
+    storage: &Storage,
+    job: &ClaimedJob,
+) -> Result<(), &'static str> {
+    let work = stylise_payload(job)?;
+    let Some((account, key)) = generation(pool, work.media).await? else {
+        return Ok(());
+    };
+
+    let bytes = storage.get(&key).await.map_err(|_| "object_store")?;
+    let styled = match sticker::stylise(
+        &bytes,
+        sticker::Style::default(),
+        sticker::MaskBounds::default(),
+    ) {
+        Ok(styled) => styled,
+        Err(rejection) => {
+            tracing::warn!(
+                job.id = %job.id,
+                rejection = rejection,
+                "the generation could not become a sticker, so the cut-out stays"
+            );
+            return set_state(pool, account, work.item, "failed").await;
+        }
+    };
+
+    publish(pool, storage, account, &work, styled).await
+}
+
+async fn generation(pool: &PgPool, media: Uuid) -> Result<Option<(Uuid, String)>, &'static str> {
+    sqlx::query_as("select account_id, storage_key from media_object where id = $1")
+        .bind(media)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| "database")
+}
+
+async fn publish(
+    pool: &PgPool,
+    storage: &Storage,
+    account: Uuid,
+    work: &Stylise,
+    styled: Vec<u8>,
+) -> Result<(), &'static str> {
+    let media = Uuid::now_v7();
+    let key = format!("{account}/illustration/{media}");
+    storage
+        .put(&key, styled.clone(), "image/png")
+        .await
+        .map_err(|_| "object_store")?;
+
+    let mut conn = pool.acquire().await.map_err(|_| "database")?;
+    let seq = wardrobe_db::next_change_seq(&mut conn, account)
+        .await
+        .map_err(|_| "database")?;
+    drop(conn);
+
+    let mut tx = pool.begin().await.map_err(|_| "database")?;
+    sqlx::query(
+        "insert into media_object
+             (id, account_id, kind, storage_key, content_type, byte_size, uploaded_at)
+         values ($1, $2, 'illustration', $3, 'image/png', $4, now())",
+    )
+    .bind(media)
+    .bind(account)
+    .bind(&key)
+    .bind(i64::try_from(styled.len()).unwrap_or(i64::MAX))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| "database")?;
+
+    let version = Uuid::now_v7();
+    sqlx::query(
+        "insert into item_illustration
+             (id, account_id, item_id, media_object_id, style_version, model, prompt_version,
+              change_seq)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)",
+    )
+    .bind(version)
+    .bind(account)
+    .bind(work.item)
+    .bind(media)
+    .bind(&work.style_version)
+    .bind(&work.model)
+    .bind(&work.prompt_version)
+    .bind(seq)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| "database")?;
+
+    sqlx::query(
+        "update wardrobe_item
+            set illustration_state = 'ready', current_illustration_id = $2, change_seq = $3
+          where id = $1",
+    )
+    .bind(work.item)
+    .bind(version)
+    .bind(seq)
     .execute(&mut *tx)
     .await
     .map_err(|_| "database")?;

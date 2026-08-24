@@ -101,7 +101,7 @@ async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provid
     let illustration_ready =
         provider.is_some() && storage.is_some() && illustration::ready(pool).await.unwrap_or(false);
 
-    for kind in kinds(illustration_ready) {
+    for kind in kinds(illustration_ready, storage.is_some()) {
         let outcome =
             wardrobe_worker::run_one(pool, kind, |job| handle(pool, storage, provider, job)).await;
         match outcome {
@@ -120,7 +120,7 @@ async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provid
 
 async fn prepare(pool: &PgPool) -> sqlx::Result<()> {
     let mut conn = pool.acquire().await?;
-    for kind in kinds(true) {
+    for kind in kinds(true, true) {
         let reclaimed = wardrobe_db::reclaim_stalled(
             &mut conn,
             kind,
@@ -159,6 +159,10 @@ async fn handle(
                     .map_err(|_| "database")?;
             illustration::render_for(pool, storage, provider, &job, job.attempts >= max_attempts)
                 .await
+        }
+        wardrobe_db::STYLISE_ILLUSTRATION => {
+            let storage = storage.ok_or("object_store_unconfigured")?;
+            illustration::stylise_for(pool, storage, &job).await
         }
         SWEEP_MEDIA => {
             let storage = storage.ok_or("object_store_unconfigured")?;
