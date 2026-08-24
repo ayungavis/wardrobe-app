@@ -60,11 +60,10 @@ public struct HistoryView: View {
                 }
             }
             .navigationDestination(for: GarmentRoute.self) { route in
-                    // Assuming your HistoryView has access to `container` like your WardrobeView does
-                    WardrobeItemDetailView(
-                        viewModel: container.makeWardrobeItemDetailViewModel(itemID: route.id)
-                    )
-                }
+                WardrobeItemDetailView(
+                    viewModel: container.makeWardrobeItemDetailViewModel(itemID: route.id)
+                )
+            }
         }
         .task { viewModel.load() }
     }
@@ -86,8 +85,4 @@ public struct HistoryView: View {
                 .multilineTextAlignment(.center)
         }
     }
-}
-
-struct GarmentRoute: Hashable {
-    let id: UUID
 }

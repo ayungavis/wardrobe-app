@@ -4,7 +4,7 @@ import SwiftUI
 public struct WardrobeView: View {
     @State private var isBulkScanPresented = false
     @State private var isCameraScanPresented = false
-    
+
     @State private var viewModel: WardrobeViewModel
     @State private var expandedCategory: GarmentCategory?
     @State private var navigationPath = NavigationPath()
@@ -12,30 +12,30 @@ public struct WardrobeView: View {
     @State private var searchQuery = ""
     @State private var isSearching = false
     @Namespace private var pileNamespace
-    
+
     private let container: AppContainer
-    
+
     public init(viewModel: WardrobeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
     }
-    
+
     private var searchResults: [WardrobeItem] {
         WardrobeSearch.results(in: viewModel.items, matching: searchQuery)
     }
-    
+
     private var isShowingSearchResults: Bool {
         isSearching && !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
     }
-    
+
     private var topItems: [WardrobeItem] {
         viewModel.items.filter { $0.category == .top }
     }
-    
+
     private var bottomItems: [WardrobeItem] {
         viewModel.items.filter { $0.category == .bottom }
     }
-    
+
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
@@ -45,7 +45,7 @@ public struct WardrobeView: View {
                 
                 VStack(spacing: 0) {
                     topBar
-                    
+
                     ZStack {
                         Group {
                             if isShowingSearchResults {
@@ -64,7 +64,7 @@ public struct WardrobeView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        
+
                         if let category = expandedCategory, !isShowingSearchResults {
                             CategoryGridView(
                                 category: category,
@@ -90,15 +90,15 @@ public struct WardrobeView: View {
         }
         .task { viewModel.load() }
     }
-    
+
     private var topBar: some View {
         HStack {
             WardrobeSearchBarView(query: $searchQuery, isActive: $isSearching)
-            
+
             if !isSearching {
                 Spacer()
             }
-            
+
             Menu {
                 Button {
                     isCameraScanPresented = true
@@ -154,13 +154,13 @@ public struct WardrobeView: View {
             }
         )
     }
-    
+
     private func close() {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
             expandedCategory = nil
         }
     }
-    
+
     private var emptyState: some View {
         ContentUnavailableView {
             Label {
@@ -172,7 +172,7 @@ public struct WardrobeView: View {
             Text("wardrobe.empty.message", bundle: .module)
         }
     }
-    
+
     private var pilesContent: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
@@ -208,7 +208,7 @@ extension WardrobeView {
     enum SortOrder: String, CaseIterable {
         case mostUsed
         case leastUsed
-        
+
         var title: LocalizedStringKey {
             switch self {
             case .mostUsed: "wardrobe.sort.mostUsed"

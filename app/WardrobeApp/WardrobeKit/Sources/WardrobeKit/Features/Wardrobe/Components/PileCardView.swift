@@ -7,7 +7,7 @@ struct PileCardView: View {
     let thumbnailData: (WardrobeItem) -> Data?
     let namespace: Namespace.ID
     let onTap: () -> Void
-    
+
     @State private var isFannedOut = false
     @State private var isPulsing = false
 
@@ -37,7 +37,7 @@ struct PileCardView: View {
                             .zIndex(Double(index))
                             .animation(
                                 .spring(response: 0.4, dampingFraction: 0.6)
-                                .delay(Double(index) * 0.08),
+                                    .delay(Double(index) * 0.08),
                                 value: isFannedOut
                             )
                     }
@@ -68,7 +68,6 @@ struct PileCardView: View {
             isPulsing = false
             isFannedOut = false
         }
-        
     }
 
     private func pileRotation(for index: Int) -> Double {

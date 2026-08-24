@@ -13,28 +13,32 @@ public struct OnboardingView: View {
         @Bindable var viewModel = viewModel
 
         VStack(spacing: Spacing.xl) {
-            
+            Spacer(minLength: 0)
 
-            Spacer()
-
-            OnboardingStepView(step: viewModel.step){
+            OnboardingStepView(step: viewModel.step) {
                 actions
             }
-                .id(viewModel.step)
-                .transition(.opacity)
-
-            //Spacer()
+            .id(viewModel.step)
+            .transition(.opacity)
+            .animation(.snappy, value: viewModel.step)
 
             progress
-            
-            Spacer()
         }
         .padding(Spacing.xl)
-        .animation(.snappy, value: viewModel.step)
-        .confirmationDialog(
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(.rect)
+        .gesture(
+            DragGesture(minimumDistance: 20).onEnded { value in
+                switch OnboardingSwipe.direction(for: value.translation) {
+                case .next: viewModel.next()
+                case .back: viewModel.back()
+                case nil: break
+                }
+            }
+        )
+        .alert(
             Text("onboarding.skip.title", bundle: .module),
-            isPresented: $viewModel.isSkipConfirmationPresented,
-            titleVisibility: .visible
+            isPresented: $viewModel.isSkipConfirmationPresented
         ) {
             Button(role: .destructive) {
                 viewModel.confirmSkip()
@@ -114,10 +118,10 @@ public struct OnboardingView: View {
                         }
                         .accessibilityIdentifier("onboarding.back")
                     } else {
-                        Spacer().frame(width: 1) // keeps Next right-aligned on step 1
+                        Spacer().frame(width: 1)
                     }
                     Spacer()
-                    PrimaryButtonView(Text("onboarding.next", bundle: .module), minHeight: 28, action: viewModel.next)
+                    PrimaryButtonView(Text("onboarding.next", bundle: .module), action: viewModel.next)
                         .fixedSize()
                         .accessibilityIdentifier("onboarding.next")
                 }
