@@ -105,7 +105,12 @@ public struct WardrobeItemDetailView: View {
                         .font(AppFont.caption.weight(.bold))
                         .foregroundStyle(AppColor.destructive)
                         .frame(width: 32, height: 32)
-                        .background(Circle().fill(AppColor.background))
+                        .background(Circle()
+                            //.fill(Color.white)
+                            .fill(.clear)
+                            .glassEffect()
+
+                        )
                         .appShadow(.card)
                 }
             }
