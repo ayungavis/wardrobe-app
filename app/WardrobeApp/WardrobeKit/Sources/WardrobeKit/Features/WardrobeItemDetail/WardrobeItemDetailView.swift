@@ -41,7 +41,8 @@ public struct WardrobeItemDetailView: View {
                             isEditing: isEditing,
                             name: $editableName,
                             description: $editableDescription,
-                            lastWornAt: viewModel.lastWornAt
+                            lastWornAt: viewModel.lastWornAt,
+                            wears: viewModel.wears
                         )
                         .overlay(alignment: .topTrailing) {
                             Button {
@@ -65,14 +66,25 @@ public struct WardrobeItemDetailView: View {
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
 
-                        if !isEditing {
-                            VStack(spacing: Spacing.xl) {
-                                timeline
-                                similar
-                            }
-                            .padding(.horizontal, Spacing.lg)
-                            .padding(.top, Spacing.xl)
-                        }
+//                        if isEditing {
+//                            Button(role: .destructive) {
+//                                isDeleteConfirmationPresented = true
+//                            } label: {
+//                                Image(systemName: "trash.circle")
+//                                    .font(.system(size: 32, weight: .light))
+//                                    .foregroundColor(.black)
+//                            }
+//                            .padding(.top, Spacing.lg)
+//                        }
+
+//                        if !isEditing {
+//                            VStack(spacing: Spacing.xl) {
+//                                timeline
+//                                similar
+//                            }
+//                            .padding(.horizontal, Spacing.lg)
+//                            .padding(.top, Spacing.xl)
+//                        }
                     }
                 }
                 .padding(.bottom, 100)
@@ -181,6 +193,9 @@ public struct WardrobeItemDetailView: View {
         @Binding var name: String
         @Binding var description: String
         let lastWornAt: Date?
+        let wears: [WearRecord]
+        
+        @State private var isWearHistoryPresented = false
 
         var body: some View {
             ZStack(alignment: .top) {
@@ -207,10 +222,23 @@ public struct WardrobeItemDetailView: View {
                     HStack {
                         label("wardrobe.detail.lastWorn")
                         Text(lastWornText(lastWornAt))
+                        Spacer()
+                        
+                        Button {
+                            isWearHistoryPresented = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(AppColor.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $isWearHistoryPresented) {
+                            WearHistoryPopoverView(wears: wears)
+                                .presentationCompactAdaptation(.popover)
+                        }
                     }
-
+                    
                     Divider()
-
+                    
                     VStack(alignment: .leading, spacing: 8) {
                         label("wardrobe.detail.description")
                         if isEditing {

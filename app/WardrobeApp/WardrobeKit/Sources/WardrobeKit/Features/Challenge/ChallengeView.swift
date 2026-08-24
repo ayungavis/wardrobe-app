@@ -8,7 +8,7 @@ public struct ChallengeView: View {
     @State private var hasSwiped = false
 
     private let container: AppContainer
-
+    
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
@@ -22,7 +22,8 @@ public struct ChallengeView: View {
                 
                 Group {
                     if viewModel.hasCompletedToday {
-                        CompletedTodayView()
+                        //Text("Completed Today")
+                        CompletedTodayView(onAccept: viewModel.accept)
                     } else if let active = viewModel.activeChallenge {
                         ActiveChallengeStateView(
                             challenge: active,
@@ -41,10 +42,11 @@ public struct ChallengeView: View {
                             .playbackMode(.playing(.fromFrame(40, toFrame: 120, loopMode: .autoReverse)))
                             .resizable()
                             .frame(width: 300, height: 300)
-                            .allowsHitTesting(false)
-                            .offset(y: 280)
+                        //.allowsHitTesting(false)
+                            .offset(y: 280) // position over cards
                             .transition(.opacity)
                     }
+                    .allowsHitTesting(false)
                 }
             }
             .appBackgroundStickers()
@@ -60,18 +62,25 @@ public struct ChallengeView: View {
             )
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 1).onEnded { _ in
+                    print("long press")
                     isDevMenuPresented = true
+                    
                 },
                 including: DevMode.isEnabled ? .all : .none
             )
-            
-            
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 1).onEnded { _ in
-                    isDevMenuPresented = true
-                },
-                including: DevMode.isEnabled ? .all : .none
-            )
+            .overlay(alignment: .topTrailing) {
+                    if DevMode.isXcodeDebugBuild {
+                        Button {
+                            isDevMenuPresented = true
+                        } label: {
+                            Image(systemName: "hammer.fill")
+                                .foregroundStyle(.white)
+                                .padding(Spacing.sm)
+                                .background(Circle().fill(.black.opacity(0.4)))
+                        }
+                        .padding(Spacing.md)
+                    }
+                }
             .sheet(
                 isPresented: $isDevMenuPresented,
                 onDismiss: { viewModel.refreshActiveChallenge() },

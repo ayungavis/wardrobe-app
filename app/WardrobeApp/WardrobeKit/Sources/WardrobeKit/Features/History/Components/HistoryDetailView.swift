@@ -45,6 +45,7 @@ public struct HistoryDetailView: View {
                             .zIndex(1)
                             .frame(width: 345, height: 465)
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
         }

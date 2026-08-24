@@ -1,7 +1,7 @@
 import DesignSystem
 import SwiftUI
 
-public struct EditorView<ReviewDrawer: View>: View {
+public struct EditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
@@ -9,14 +9,14 @@ public struct EditorView<ReviewDrawer: View>: View {
     @State private var canvasSize: CGSize = .zero
     @State private var isDiscardConfirmPresented = false
     @State private var isRestoredNoticeVisible = false
-
+    
     private let isCompleting: Bool
     private let didResumeDraft: Bool
     private let makeCropViewModel: (String) -> CropViewModel
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
-    private let reviewDrawer: ReviewDrawer
-
+    //private let reviewDrawer: ReviewDrawer
+    
     public init(
         viewModel: EditorViewModel,
         isCompleting: Bool,
@@ -24,7 +24,7 @@ public struct EditorView<ReviewDrawer: View>: View {
         makeCropViewModel: @escaping (String) -> CropViewModel,
         onDiscard: @escaping () -> Void,
         onComplete: @escaping () -> Void,
-        @ViewBuilder reviewDrawer: () -> ReviewDrawer
+        //@ViewBuilder reviewDrawer: () -> ReviewDrawer
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
@@ -32,12 +32,12 @@ public struct EditorView<ReviewDrawer: View>: View {
         self.makeCropViewModel = makeCropViewModel
         self.onDiscard = onDiscard
         self.onComplete = onComplete
-        self.reviewDrawer = reviewDrawer()
+        //self.reviewDrawer = reviewDrawer()
     }
-
+    
     public var body: some View {
         @Bindable var viewModel = viewModel
-
+        
         ZStack {
             AppColor.mediaBackground.ignoresSafeArea()
             content
@@ -108,7 +108,7 @@ public struct EditorView<ReviewDrawer: View>: View {
             Text(viewModel.alertError?.userMessage ?? "")
         }
     }
-
+    
     @ViewBuilder
     private var content: some View {
         switch viewModel.originals {
@@ -132,36 +132,36 @@ public struct EditorView<ReviewDrawer: View>: View {
             }
         }
     }
-
+    
     private func showRestoredNotice() async {
         guard didResumeDraft else { return }
         withAnimation(reduceMotion ? nil : .snappy) { isRestoredNoticeVisible = true }
         guard !voiceOverEnabled else { return }
-
+        
         try? await Task.sleep(for: .seconds(4))
         guard !Task.isCancelled else { return }
         withAnimation(reduceMotion ? nil : .snappy) { isRestoredNoticeVisible = false }
     }
-
+    
     private var draftBannerKind: DraftBannerView.Kind? {
         if viewModel.didFailToPersistDraft {
             return .writeFailed
         }
         return isRestoredNoticeVisible ? .restored : nil
     }
-
+    
     private var canvasStage: some View {
         ZStack {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
                 .ignoresSafeArea(.keyboard)
-
+            
             if viewModel.activeTool == nil {
-                VStack {
-                    Spacer()
-                    reviewDrawer
-                        .padding(.bottom, 96)
-                }
-
+//                VStack {
+//                    Spacer()
+//                    reviewDrawer
+//                        .padding(.bottom, 96)
+//                }
+                
                 if let banner = draftBannerKind {
                     VStack {
                         HStack {
@@ -174,7 +174,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                     }
                     .padding(Spacing.lg)
                 }
-
+                
                 EditorControlsView(
                     isSaving: viewModel.isSaving,
                     didSave: viewModel.didSaveToPhotos,
@@ -196,7 +196,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                     onComplete: onComplete
                 )
             }
-
+            
             if case let .drawing(session) = viewModel.activeTool {
                 VStack {
                     Spacer()
@@ -213,7 +213,7 @@ public struct EditorView<ReviewDrawer: View>: View {
                     .padding(.bottom, Spacing.lg)
                 }
             }
-
+            
             if case let .text(working, isNew) = viewModel.activeTool {
                 TextComposerView(
                     working: working,

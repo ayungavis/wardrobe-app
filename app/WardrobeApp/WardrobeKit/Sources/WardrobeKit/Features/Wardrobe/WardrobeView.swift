@@ -155,7 +155,7 @@ public struct WardrobeView: View {
             Label {
                 Text("wardrobe.empty.title", bundle: .module)
             } icon: {
-                Image(systemName: "tshirt")
+                Image(systemName: "WardrobeEmpty")
             }
         } description: {
             Text("wardrobe.empty.message", bundle: .module)
@@ -188,7 +188,7 @@ public struct WardrobeView: View {
                     }
                 )
             }
-            .padding(Spacing.lg)
+            .padding(Spacing.md)
         }
     }
 }

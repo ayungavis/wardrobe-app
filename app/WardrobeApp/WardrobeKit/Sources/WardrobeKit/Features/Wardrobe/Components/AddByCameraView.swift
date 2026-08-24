@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 #if os(iOS)
-    @preconcurrency import AVFoundation
+@preconcurrency import AVFoundation
 #endif
 
 struct AddByCameraView: View {
@@ -10,11 +10,11 @@ struct AddByCameraView: View {
         case capturing
         case reviewing
     }
-
+    
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     let camera: CameraService
-
+    
     @State private var review: GarmentReviewModel
     @State private var phase: Phase = .capturing
     @State private var permission: CameraPermission = .notDetermined
@@ -22,12 +22,12 @@ struct AddByCameraView: View {
     @State private var capturedCount = 0
     @State private var alertError: AppError?
     @State private var sessionTask: Task<Void, Never>?
-
+    
     init(camera: CameraService, review: GarmentReviewModel) {
         self.camera = camera
         _review = State(wrappedValue: review)
     }
-
+    
     var body: some View {
         NavigationStack {
             Group {
@@ -36,44 +36,44 @@ struct AddByCameraView: View {
                 case .reviewing: reviewPhase
                 }
             }
-            .navigationTitle(Text(title, bundle: .module))
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-            #endif
-                .toolbar { toolbar }
-                .alert(
-                    Text("common.errorTitle", bundle: .module),
-                    isPresented: Binding(
-                        get: { alertError != nil },
-                        set: {
-                            if !$0 {
-                                alertError = nil
-                            }
+//            .navigationTitle(Text(title, bundle: .module))
+//#if os(iOS)
+//            .navigationBarTitleDisplayMode(.inline)
+//#endif
+            .toolbar { toolbar }
+            .alert(
+                Text("common.errorTitle", bundle: .module),
+                isPresented: Binding(
+                    get: { alertError != nil },
+                    set: {
+                        if !$0 {
+                            alertError = nil
                         }
-                    )
-                ) {
-                    Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
-                } message: {
-                    Text(alertError?.userMessage ?? "")
-                }
-                .task { await requestPermissionIfNeeded() }
-                .onDisappear {
-                    sessionTask?.cancel()
-                    camera.stopSession()
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active, phase == .capturing, permission != .granted {
-                        permission = camera.permission
-                        startSessionIfNeeded()
                     }
+                )
+            ) {
+                Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
+            } message: {
+                Text(alertError?.userMessage ?? "")
+            }
+            .task { await requestPermissionIfNeeded() }
+            .onDisappear {
+                sessionTask?.cancel()
+                camera.stopSession()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active, phase == .capturing, permission != .granted {
+                    permission = camera.permission
+                    startSessionIfNeeded()
                 }
+            }
         }
     }
-
+    
     private var title: LocalizedStringKey {
         phase == .capturing ? "wardrobe.add.camera.title" : "wardrobe.review.title"
     }
-
+    
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .confirmationAction) {
@@ -104,11 +104,11 @@ struct AddByCameraView: View {
             }
         }
     }
-
+    
     private var capturePhase: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-
+            
             switch permission {
             case .granted:
                 cameraContent
@@ -119,41 +119,61 @@ struct AddByCameraView: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private var reviewPhase: some View {
         if review.isScanning {
             ProgressView {
                 Text("wardrobe.scan.processing", bundle: .module)
             }
-        } else if review.garments.isEmpty {
-            ContentUnavailableView {
-                Label { Text("wardrobe.scan.empty", bundle: .module) } icon: {
-                    Image(systemName: "tshirt")
-                }
-            } actions: {
-                Button {
-                    resumeCapturing()
-                } label: {
-                    Text("wardrobe.scan.retake", bundle: .module)
+        } else if review.activeGarments.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    retakeButton
+                    
+                    GarmentDiscardHeaderView(
+                        titleKey: "wardrobe.add.camera.empty.title",
+                        messageKey: "wardrobe.add.camera.empty.message"
+                    )
+                    .padding(.top, Spacing.xxl)
                 }
             }
+            .padding(Spacing.lg)
         } else {
-            List {
-                GarmentReviewListView(review: review, allowsMatching: false)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    GarmentDiscardHeaderView(
+                        titleKey: "wardrobe.review.title",
+                        messageKey: "wardrobe.add.photos.review.message"
+                    )
+                    GarmentDiscardGridView(review: review)
+                }
+                .padding(Spacing.lg)
             }
         }
     }
-
+    private var retakeButton: some View {
+        Button {
+            resumeCapturing()
+        } label: {
+            Image(systemName: "camera.fill")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                //.padding(.vertical, Spacing.md)
+                .background(Capsule().fill(AppColor.accent))
+        }
+    }
     private var cameraContent: some View {
         ZStack(alignment: .bottom) {
-            #if os(iOS)
-                if let session = camera.previewSession {
-                    CameraPreviewView(session: session)
-                        .ignoresSafeArea()
-                }
-            #endif
-
+#if os(iOS)
+            if let session = camera.previewSession {
+                CameraPreviewView(session: session)
+                    .ignoresSafeArea()
+            }
+#endif
+            
             VStack(spacing: Spacing.md) {
                 if capturedCount > 0 {
                     Text("bulkScan.captured \(capturedCount)", bundle: .module)
@@ -163,7 +183,7 @@ struct AddByCameraView: View {
                         .padding(.vertical, Spacing.sm)
                         .background(Capsule().fill(.ultraThinMaterial))
                 }
-
+                
                 Button {
                     capture()
                 } label: {
@@ -177,7 +197,7 @@ struct AddByCameraView: View {
             }
         }
     }
-
+    
     private var deniedState: some View {
         ContentUnavailableView {
             Label { Text("camera.permission.denied.title", bundle: .module) } icon: { Image(systemName: "camera") }
@@ -185,20 +205,21 @@ struct AddByCameraView: View {
             Text("camera.permission.denied.wardrobe", bundle: .module)
         }
     }
-
+    
+    
     private func beginReview() async {
         sessionTask?.cancel()
         camera.stopSession()
         phase = .reviewing
         await review.finishScanning()
     }
-
+    
     private func resumeCapturing() {
         capturedCount = 0
         phase = .capturing
         startSessionIfNeeded()
     }
-
+    
     private func requestPermissionIfNeeded() async {
         permission = camera.permission
         if permission == .notDetermined {
@@ -206,7 +227,7 @@ struct AddByCameraView: View {
         }
         startSessionIfNeeded()
     }
-
+    
     private func startSessionIfNeeded() {
         guard permission == .granted else { return }
         sessionTask?.cancel()
@@ -219,7 +240,7 @@ struct AddByCameraView: View {
             }
         }
     }
-
+    
     private func capture() {
         guard !isCapturing else { return }
         isCapturing = true
@@ -235,4 +256,5 @@ struct AddByCameraView: View {
             }
         }
     }
+    
 }
