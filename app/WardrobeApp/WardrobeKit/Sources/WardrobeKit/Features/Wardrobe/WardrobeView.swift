@@ -111,12 +111,23 @@ public struct WardrobeView: View {
                     Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
                 }
             } label: {
-                Image(systemName: "plus")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 20, height: 20)
-                    .padding(Spacing.md)
-                    .background(Capsule().fill(.ultraThinMaterial))
+                HStack{
+                    Text("wardrobe.add.title", bundle: .module)
+                    Image(systemName: "plus.app")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 20, height: 20)
+                }
+                .font(AppFont.roundedTitle2)
+                .fontWeight(.semibold)
+                .foregroundStyle(AppColor.textPrimary)
+                .padding(.vertical, Spacing.sm)
+                .padding(.horizontal, Spacing.md)
+                .background(Capsule()
+                    //.fill(AppColor.surface)
+                    .fill(.clear)
+                    .glassEffect(.clear)
+                )
             }
         }
         .padding(.horizontal, Spacing.md)

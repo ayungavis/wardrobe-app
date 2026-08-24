@@ -106,7 +106,12 @@ public struct WardrobeItemDetailView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.red) // Styled red to indicate destructive action
                         .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.white))
+                        .background(Circle()
+                            //.fill(Color.white)
+                            .fill(.clear)
+                            .glassEffect()
+
+                        )
                         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                 }
             }
