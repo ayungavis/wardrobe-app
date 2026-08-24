@@ -30,8 +30,10 @@ struct CategoryGridView: View {
                     HStack(spacing: Spacing.sm) {
                         Image(systemName: "chevron.left")
                         Text(category.title, bundle: .module)
-                            .font(AppFont.title)
                     }
+                    .foregroundStyle(AppColor.textPrimary)
+                    .font(AppFont.roundedTitle)
+                    .fontWeight(.semibold)
                 }
                 Spacer()
                 Menu {
@@ -41,12 +43,19 @@ struct CategoryGridView: View {
                         }
                     }
                 } label: {
-                    Label { Text("wardrobe.filter", bundle: .module) } icon: {
+                    Label {
+                        Text("wardrobe.filter", bundle: .module)
+                    } icon: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
-                    .padding(.horizontal, Spacing.md)
+                    .font(AppFont.roundedTitle2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(AppColor.textPrimary)
                     .padding(.vertical, Spacing.sm)
-                    .background(Capsule().fill(.ultraThinMaterial))
+                    .padding(.horizontal, Spacing.md)
+                    .background(Capsule()
+                        .fill(.clear)
+                        .glassEffect(.clear))
                 }
             }
             .padding(Spacing.lg)

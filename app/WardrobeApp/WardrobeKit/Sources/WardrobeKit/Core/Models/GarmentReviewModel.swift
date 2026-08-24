@@ -100,7 +100,7 @@ public final class GarmentReviewModel {
 
     public func commit(completionID: UUID?, at date: Date) {
         for garment in garments {
-            record(garment, completionID: completionID, at: date)
+            record(garment, wornAt: completionID.map { _ in date }, completionID: completionID, at: date)
         }
         garments = []
     }
@@ -109,14 +109,14 @@ public final class GarmentReviewModel {
         var undated: [ScannedGarment] = []
         for garment in garments {
             if garment.decision == .discard {
-                record(garment, completionID: nil, at: .now)
+                record(garment, wornAt: nil, completionID: nil, at: .now)
                 continue
             }
             guard let wornAt = garment.wornAt else {
                 undated.append(garment)
                 continue
             }
-            record(garment, completionID: nil, at: wornAt)
+            record(garment, wornAt: wornAt, completionID: nil, at: wornAt)
         }
         garments = undated
     }
@@ -130,13 +130,18 @@ public final class GarmentReviewModel {
         garments.contains { $0.wornAt == nil && $0.decision != .discard }
     }
 
-    private func record(_ garment: ScannedGarment, completionID: UUID?, at date: Date) {
+    private func record(
+        _ garment: ScannedGarment,
+        wornAt: Date?,
+        completionID: UUID?,
+        at date: Date
+    ) {
         do {
             switch garment.decision {
             case .new:
-                try insert(garment, completionID: completionID, at: date)
+                try insert(garment, wornAt: wornAt, completionID: completionID, at: date)
             case let .existing(itemID):
-                try merge(garment, into: itemID, completionID: completionID, at: date)
+                try merge(garment, into: itemID, wornAt: wornAt, completionID: completionID, at: date)
             case .discard:
                 try thumbnails.delete(file: garment.cutoutFile)
             }
@@ -145,7 +150,13 @@ public final class GarmentReviewModel {
         }
     }
 
-    private func insert(_ garment: ScannedGarment, completionID: UUID?, at date: Date) throws {
+    private func insert(
+        _ garment: ScannedGarment,
+        wornAt: Date?,
+        completionID: UUID?,
+        at date: Date
+    ) throws {
+        let wear = wornAt.map { WearRecord(itemID: garment.id, completionID: completionID, wornAt: $0) }
         try wardrobeRepository.insert(
             WardrobeItem(
                 id: garment.id,
@@ -157,18 +168,20 @@ public final class GarmentReviewModel {
                 updatedAt: date
             ),
             fingerprint: garment.fingerprint,
-            wear: WearRecord(itemID: garment.id, completionID: completionID, wornAt: date)
+            wear: wear
         )
     }
 
     private func merge(
         _ garment: ScannedGarment,
         into itemID: UUID,
+        wornAt: Date?,
         completionID: UUID?,
         at date: Date
     ) throws {
+        let wear = wornAt.map { WearRecord(itemID: itemID, completionID: completionID, wornAt: $0) }
         try wardrobeRepository.recordWear(
-            WearRecord(itemID: itemID, completionID: completionID, wornAt: date),
+            wear,
             fingerprint: ItemFingerprint(
                 itemID: itemID,
                 version: garment.fingerprint.version,
@@ -180,5 +193,13 @@ public final class GarmentReviewModel {
             )
         )
         try thumbnails.delete(file: garment.cutoutFile)
+    }
+
+    public func wardrobeItems(in category: GarmentCategory) -> [WardrobeItem] {
+        (try? wardrobeRepository.items().filter { $0.category == category }) ?? []
+    }
+
+    public var activeGarments: [ScannedGarment] {
+        garments.filter { $0.decision != .discard }
     }
 }

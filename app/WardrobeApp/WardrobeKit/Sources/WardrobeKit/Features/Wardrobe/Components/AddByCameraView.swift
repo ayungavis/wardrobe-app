@@ -36,37 +36,37 @@ struct AddByCameraView: View {
                 case .reviewing: reviewPhase
                 }
             }
-            .navigationTitle(Text(title, bundle: .module))
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-            #endif
-                .toolbar { toolbar }
-                .alert(
-                    Text("common.errorTitle", bundle: .module),
-                    isPresented: Binding(
-                        get: { alertError != nil },
-                        set: {
-                            if !$0 {
-                                alertError = nil
-                            }
+//            .navigationTitle(Text(title, bundle: .module))
+            // #if os(iOS)
+//            .navigationBarTitleDisplayMode(.inline)
+            // #endif
+            .toolbar { toolbar }
+            .alert(
+                Text("common.errorTitle", bundle: .module),
+                isPresented: Binding(
+                    get: { alertError != nil },
+                    set: {
+                        if !$0 {
+                            alertError = nil
                         }
-                    )
-                ) {
-                    Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
-                } message: {
-                    Text(alertError?.userMessage ?? "")
-                }
-                .task { await requestPermissionIfNeeded() }
-                .onDisappear {
-                    sessionTask?.cancel()
-                    camera.stopSession()
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active, phase == .capturing, permission != .granted {
-                        permission = camera.permission
-                        startSessionIfNeeded()
                     }
+                )
+            ) {
+                Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
+            } message: {
+                Text(alertError?.userMessage ?? "")
+            }
+            .task { await requestPermissionIfNeeded() }
+            .onDisappear {
+                sessionTask?.cancel()
+                camera.stopSession()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active, phase == .capturing, permission != .granted {
+                    permission = camera.permission
+                    startSessionIfNeeded()
                 }
+            }
         }
     }
 
@@ -126,22 +126,44 @@ struct AddByCameraView: View {
             ProgressView {
                 Text("wardrobe.scan.processing", bundle: .module)
             }
-        } else if review.garments.isEmpty {
-            ContentUnavailableView {
-                Label { Text("wardrobe.scan.empty", bundle: .module) } icon: {
-                    Image(systemName: "tshirt")
-                }
-            } actions: {
-                Button {
-                    resumeCapturing()
-                } label: {
-                    Text("wardrobe.scan.retake", bundle: .module)
+        } else if review.activeGarments.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    retakeButton
+
+                    GarmentDiscardHeaderView(
+                        titleKey: "wardrobe.add.camera.empty.title",
+                        messageKey: "wardrobe.add.camera.empty.message"
+                    )
+                    .padding(.top, Spacing.xxl)
                 }
             }
+            .padding(Spacing.lg)
         } else {
-            List {
-                GarmentReviewListView(review: review)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    GarmentDiscardHeaderView(
+                        titleKey: "wardrobe.review.title",
+                        messageKey: "wardrobe.add.photos.review.message"
+                    )
+                    GarmentDiscardGridView(review: review)
+                }
+                .padding(Spacing.lg)
             }
+        }
+    }
+
+    private var retakeButton: some View {
+        Button {
+            resumeCapturing()
+        } label: {
+            Image(systemName: "camera.fill")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                // .padding(.vertical, Spacing.md)
+                .background(Capsule().fill(AppColor.accent))
         }
     }
 

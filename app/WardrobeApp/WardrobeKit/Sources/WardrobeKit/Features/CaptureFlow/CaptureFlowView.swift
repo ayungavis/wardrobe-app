@@ -32,9 +32,26 @@ public struct CaptureFlowView: View {
             case .denied:
                 DeniedStageView(onClose: { dismiss() })
             case .camera:
-                CameraStageView(viewModel: viewModel, onClose: { dismiss() })
+                ZStack {
+                    CameraStageView(viewModel: viewModel, onClose: { dismiss() })
+
+                    if viewModel.isTipsPresented {
+                        TipsStageView(
+                            onContinue: { dontShowAgain in viewModel.tipsContinue(dontShowAgain: dontShowAgain) },
+                            onClose: { dismiss() }
+                        )
+                        .transition(.opacity)
+                    }
+                }
+                .animation(.default, value: viewModel.isTipsPresented)
             case .crop:
                 cropStage
+            case .scanReview:
+                ScanReviewView(
+                    review: viewModel.review,
+                    onRetake: { viewModel.discardPhoto() },
+                    onContinue: { viewModel.continueToEditor() }
+                )
             case .editor:
                 EditorView(
                     viewModel: makeEditorViewModel(viewModel.challenge),
@@ -42,16 +59,16 @@ public struct CaptureFlowView: View {
                     didResumeDraft: viewModel.didResumeDraft,
                     makeCropViewModel: makeCropViewModel,
                     onDiscard: { viewModel.discardPhoto() },
-                    onComplete: { viewModel.completeChallenge() },
-                    reviewDrawer: {
-                        ItemReviewDrawerView(
-                            garments: viewModel.review.garments,
-                            isScanning: viewModel.review.isScanning,
-                            thumbnail: { viewModel.review.thumbnailData(forFile: $0) },
-                            itemThumbnail: { viewModel.review.thumbnailData(forItemID: $0) },
-                            onChoose: { viewModel.review.choose($1, for: $0) }
-                        )
-                    }
+                    onComplete: { viewModel.completeChallenge() }
+//                    reviewDrawer: {
+//                        ItemReviewDrawerView(
+//                            garments: viewModel.review.garments,
+//                            isScanning: viewModel.review.isScanning,
+//                            thumbnail: { viewModel.review.thumbnailData(forFile: $0) },
+//                            itemThumbnail: { viewModel.review.thumbnailData(forItemID: $0) },
+//                            onChoose: { viewModel.review.choose($1, for: $0) }
+//                        )
+//                    }
                 )
                 .task { viewModel.review.scanIfNeeded(photoID: viewModel.challenge.photoID) }
             }

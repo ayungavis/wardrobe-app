@@ -70,7 +70,7 @@ struct GarmentReviewModelTests {
         let garment = makeGarment(decision: .new)
         sut.stage([garment])
 
-        sut.commit(completionID: nil, at: Date())
+        sut.commit(completionID: UUID(), at: Date())
 
         #expect(try repository.items().map(\.id) == [garment.id])
         #expect(try repository.fingerprints().count == 1)
@@ -89,7 +89,7 @@ struct GarmentReviewModelTests {
         thumbnails.files["scanned.png"] = Data([0x01])
         sut.stage([garment])
 
-        sut.commit(completionID: nil, at: Date())
+        sut.commit(completionID: UUID(), at: Date())
 
         #expect(try repository.items().count == 1)
         #expect(try repository.wears(for: existing.id).count == 2)
@@ -234,7 +234,7 @@ struct GarmentReviewModelTests {
         #expect(sut.garments.count == 1)
     }
 
-    @Test func theCameraAndCompletionPathsStillWriteNow() async throws {
+    @Test func theCompletionPathWritesTheCompletionsDate() async throws {
         let repository = InMemoryWardrobeItemRepository()
         let scanner = FakeGarmentScanService()
         let sut = makeSUT(repository: repository, scanner: scanner)
@@ -242,9 +242,25 @@ struct GarmentReviewModelTests {
         let now = Date()
         let garmentID = try #require(sut.garments.first).id
 
-        sut.commit(completionID: nil, at: now)
+        sut.commit(completionID: UUID(), at: now)
 
         #expect(try repository.wears(for: garmentID).map(\.wornAt) == [now])
         #expect(sut.garments.isEmpty)
+    }
+
+    @Test func aCommitWithNoCompletionRecordsTheItemButNoWear() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let scanner = FakeGarmentScanService()
+        let sut = makeSUT(repository: repository, scanner: scanner)
+        await stage(sut, [makeGarment(decision: .new)], scanner: scanner)
+        let garmentID = try #require(sut.garments.first).id
+
+        sut.commit(completionID: nil, at: Date())
+
+        #expect(try repository.items().count == 1)
+        #expect(
+            try repository.wears(for: garmentID).isEmpty,
+            "adding to the wardrobe outside a completion is not a wear"
+        )
     }
 }

@@ -6,8 +6,8 @@ public protocol WardrobeItemRepository: AnyObject {
     func items() throws -> [WardrobeItem]
     func fingerprints() throws -> [ItemFingerprint]
     func wears(for itemID: UUID) throws -> [WearRecord]
-    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws
-    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws
+    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
+    func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
     func update(_ item: WardrobeItem) throws
     func delete(itemID: UUID) throws
     func deleteAll() throws
@@ -46,17 +46,21 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         return try context.fetch(descriptor).map(\.domain)
     }
 
-    public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
+    public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {
         context.insert(WardrobeItemEntity(item))
         if let fingerprint {
             context.insert(ItemFingerprintEntity(fingerprint))
         }
-        context.insert(WearRecordEntity(wear))
+        if let wear {
+            context.insert(WearRecordEntity(wear))
+        }
         try context.save()
     }
 
-    public func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
-        context.insert(WearRecordEntity(wear))
+    public func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws {
+        if let wear {
+            context.insert(WearRecordEntity(wear))
+        }
         context.insert(ItemFingerprintEntity(fingerprint))
         try context.save()
     }

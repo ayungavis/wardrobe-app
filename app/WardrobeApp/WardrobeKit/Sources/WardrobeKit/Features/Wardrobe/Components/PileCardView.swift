@@ -9,17 +9,19 @@ struct PileCardView: View {
     let onTap: () -> Void
 
     @State private var isFannedOut = false
+    @State private var isPulsing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
                 Text(category.title, bundle: .module)
-                    .font(AppFont.title)
+                    .font(AppFont.roundedTitle)
                 Text("\(items.count)")
-                    .font(.caption)
+                    .font(AppFont.roundedCaption)
+                    .foregroundStyle(AppColor.accent)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(AppColor.accent.opacity(0.15)))
+                    .background(Capsule().fill(AppColor.surface))
             }
             .padding(.vertical, Spacing.md)
 
@@ -43,15 +45,27 @@ struct PileCardView: View {
             }
             .frame(height: 130)
             .frame(maxWidth: .infinity)
+            .compositingGroup()
+            .scaleEffect(isPulsing ? 1.05 : 1.0)
+            .animation(
+                .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
+                value: isPulsing
+            )
         }
         .padding(Spacing.lg)
         .onTapGesture { onTap() }
-        .task {
+        .onAppear {
+            isPulsing = false
             isFannedOut = false
-            try? await Task.sleep(for: .seconds(0.3))
-            isFannedOut = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isFannedOut = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                isPulsing = true
+            }
         }
         .onDisappear {
+            isPulsing = false
             isFannedOut = false
         }
     }

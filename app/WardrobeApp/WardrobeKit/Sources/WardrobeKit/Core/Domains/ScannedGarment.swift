@@ -39,8 +39,8 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
         case discard
     }
 
-    public static func defaultDecision(for matches: [ItemMatch]) -> Decision {
-        guard let best = matches.first, best.confidence == .likely else { return .new }
+    public static func defaultDecision(for matches: [ItemMatch], allowsMatching: Bool = true) -> Decision {
+        guard allowsMatching, let best = matches.first, best.confidence == .likely else { return .new }
         return .existing(best.itemID)
     }
 }

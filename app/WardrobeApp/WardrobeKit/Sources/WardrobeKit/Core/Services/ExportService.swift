@@ -55,6 +55,7 @@ public enum ExportService {
             content: DocumentCanvasView(document: document, photo: { photos[$0] }, size: size)
         )
         renderer.proposedSize = ProposedViewSize(size)
+        renderer.isOpaque = true
         guard let rendered = renderer.cgImage else { throw AppError.exportFailed }
         return rendered
     }

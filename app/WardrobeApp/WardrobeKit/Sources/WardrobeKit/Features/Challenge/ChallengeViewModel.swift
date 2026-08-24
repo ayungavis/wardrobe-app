@@ -58,7 +58,11 @@ public final class ChallengeViewModel {
     }
 
     public func accept(_ card: ChallengeCard) {
-        guard !hasCompletedToday else { return }
+        // guard !hasCompletedToday else { return }
+        let isFreestyle = card.prompt == "Freestyle" // Or check card.id if you have a specific identifier
+        if hasCompletedToday, !isFreestyle {
+            return
+        }
 
         if let active = activeChallenge {
             if active.card.id == card.id {

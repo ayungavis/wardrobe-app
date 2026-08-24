@@ -27,7 +27,8 @@ func makeCaptureFlowSUT(
         library: library,
         scanner: scanner,
         wardrobeRepository: wardrobeRepository,
-        thumbnails: thumbnails
+        thumbnails: thumbnails,
+        preferences: InMemoryAccountPreferencesRepository()
     )
 }
 

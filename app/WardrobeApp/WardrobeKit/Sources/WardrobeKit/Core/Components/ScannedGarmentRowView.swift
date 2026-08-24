@@ -5,6 +5,7 @@ struct ScannedGarmentRowView: View {
     let garment: ScannedGarment
     let scannedImage: Data?
     let candidateImage: (UUID) -> Data?
+    let allowsMatching: Bool
     let onChoose: (ScannedGarment.Decision) -> Void
 
     private static let thumbnailSize: CGFloat = 72
@@ -30,15 +31,15 @@ struct ScannedGarmentRowView: View {
                 label: Text("wardrobe.review.new", bundle: .module),
                 image: nil
             ) { onChoose(.new) }
-
-            ForEach(garment.matches) { match in
-                choice(
-                    isSelected: garment.decision == .existing(match.itemID),
-                    label: Text("wardrobe.review.existing", bundle: .module),
-                    image: candidateImage(match.itemID)
-                ) { onChoose(.existing(match.itemID)) }
+            if allowsMatching {
+                ForEach(garment.matches) { match in
+                    choice(
+                        isSelected: garment.decision == .existing(match.itemID),
+                        label: Text("wardrobe.review.existing", bundle: .module),
+                        image: candidateImage(match.itemID)
+                    ) { onChoose(.existing(match.itemID)) }
+                }
             }
-
             choice(
                 isSelected: garment.decision == .discard,
                 label: Text("wardrobe.review.skip", bundle: .module),

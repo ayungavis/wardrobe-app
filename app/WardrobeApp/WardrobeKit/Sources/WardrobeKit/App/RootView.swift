@@ -27,7 +27,9 @@ public struct RootView: View {
     private var tabs: some View {
         TabView {
             Tab {
+                ZStack {}
                 ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
+
             } label: {
                 Label {
                     Text("tab.challenge", bundle: .module)

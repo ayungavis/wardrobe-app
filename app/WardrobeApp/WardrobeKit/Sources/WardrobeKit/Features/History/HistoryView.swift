@@ -19,34 +19,34 @@ public struct HistoryView: View {
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                Image("appBG", bundle: .module)
-                    .resizable()
-                    .ignoresSafeArea()
-
-                if viewModel.completions.isEmpty {
-                    emptyState
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: Spacing.md) {
-                            ForEach(viewModel.completions) { completion in
-                                Button {
-                                    navigationPath.append(completion.id)
-                                } label: {
-                                    HistoryPolaroidCardView(
-                                        completion: completion,
-                                        previewData: viewModel.previewData(for: completion)
-                                    )
-                                    .task { await viewModel.renderMissingPreview(for: completion) }
+                VStack {
+                    header
+                    if viewModel.completions.isEmpty {
+                        emptyState
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: Spacing.md) {
+                                ForEach(viewModel.completions) { completion in
+                                    Button {
+                                        navigationPath.append(completion.id)
+                                    } label: {
+                                        HistoryPolaroidCardView(
+                                            completion: completion,
+                                            previewData: viewModel.previewData(for: completion)
+                                        )
+                                        .task { await viewModel.renderMissingPreview(for: completion) }
+                                    }
+                                    .rotationEffect(.degrees(-3))
+                                    .buttonStyle(.plain)
                                 }
-                                .rotationEffect(.degrees(-3))
-                                .buttonStyle(.plain)
                             }
+                            .padding(Spacing.lg)
                         }
-                        .padding(Spacing.lg)
                     }
                 }
             }
-            .navigationTitle(Text("tab.history", bundle: .module))
+            .appBackgroundStickers()
+            // .navigationTitle(Text("tab.history", bundle: .module))
             .navigationDestination(for: UUID.self) { completionID in
                 if let completion = viewModel.completions.first(where: { $0.id == completionID }) {
                     HistoryDetailView(
@@ -66,6 +66,16 @@ public struct HistoryView: View {
             }
         }
         .task { viewModel.load() }
+    }
+
+    private var header: some View {
+        Text("tab.history", bundle: .module)
+            .font(AppFont.roundedLargeTitle)
+            .foregroundStyle(AppColor.textPrimary)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, Spacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var emptyState: some View {

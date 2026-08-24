@@ -22,7 +22,7 @@ struct WardrobeItemCellView: View {
                 }
 
                 Text("wardrobe.wearCount \(wearCount)", bundle: .module)
-                    .font(AppFont.title.bold())
+                    .font(AppFont.roundedTitle)
                     .stroke(color: .white, width: 3)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, 4)

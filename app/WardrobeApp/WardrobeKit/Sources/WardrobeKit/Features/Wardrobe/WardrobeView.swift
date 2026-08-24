@@ -39,9 +39,9 @@ public struct WardrobeView: View {
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                Image("appBG", bundle: .module)
-                    .resizable()
-                    .ignoresSafeArea()
+//                Image("appBG", bundle: .module)
+//                    .resizable()
+//                    .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     topBar
@@ -80,6 +80,18 @@ public struct WardrobeView: View {
                     }
                 }
             }
+            .appBackgroundStickers()
+            .onTapGesture {
+                #if os(iOS)
+                    UIApplication.shared.sendAction(
+                        #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                    )
+                #endif
+
+                if searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                    isSearching = false
+                }
+            }
             .navigationDestination(for: UUID.self) { itemID in
                 WardrobeItemDetailView(
                     viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID)
@@ -110,12 +122,24 @@ public struct WardrobeView: View {
                     Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
                 }
             } label: {
-                Image(systemName: "plus")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 20, height: 20)
-                    .padding(Spacing.md)
-                    .background(Capsule().fill(.ultraThinMaterial))
+                HStack {
+                    if !isSearching {
+                        Text("wardrobe.add.title", bundle: .module)
+                    }
+                    Image(systemName: "plus.app")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 20, height: 20)
+                }
+                .font(AppFont.roundedTitle2)
+                .fontWeight(.semibold)
+                .foregroundStyle(AppColor.textPrimary)
+                .padding(.vertical, Spacing.sm)
+                .padding(.horizontal, isSearching ? Spacing.sm : Spacing.md)
+                .background(Capsule()
+                    // .fill(AppColor.surface)
+                    .fill(.clear)
+                    .glassEffect(.clear))
             }
         }
         .padding(.horizontal, Spacing.md)
@@ -154,7 +178,7 @@ public struct WardrobeView: View {
             Label {
                 Text("wardrobe.empty.title", bundle: .module)
             } icon: {
-                Image(systemName: "tshirt")
+                Image(systemName: "WardrobeEmpty")
             }
         } description: {
             Text("wardrobe.empty.message", bundle: .module)
@@ -187,7 +211,7 @@ public struct WardrobeView: View {
                     }
                 )
             }
-            .padding(Spacing.lg)
+            .padding(Spacing.md)
         }
     }
 }

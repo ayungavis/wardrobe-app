@@ -16,9 +16,9 @@ public struct WardrobeItemDetailView: View {
 
     public var body: some View {
         ZStack {
-            Image("appBG", bundle: .module)
-                .resizable()
-                .ignoresSafeArea()
+//            Image("appBG", bundle: .module)
+//                .resizable()
+//                .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -41,7 +41,8 @@ public struct WardrobeItemDetailView: View {
                             isEditing: isEditing,
                             name: $editableName,
                             description: $editableDescription,
-                            lastWornAt: viewModel.lastWornAt
+                            lastWornAt: viewModel.lastWornAt,
+                            wears: viewModel.wears
                         )
                         .overlay(alignment: .topTrailing) {
                             Button {
@@ -65,62 +66,78 @@ public struct WardrobeItemDetailView: View {
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
 
-                        if !isEditing {
-                            VStack(spacing: Spacing.xl) {
-                                timeline
-                                similar
-                            }
-                            .padding(.horizontal, Spacing.lg)
-                            .padding(.top, Spacing.xl)
-                        }
+//                        if isEditing {
+//                            Button(role: .destructive) {
+//                                isDeleteConfirmationPresented = true
+//                            } label: {
+//                                Image(systemName: "trash.circle")
+//                                    .font(.system(size: 32, weight: .light))
+//                                    .foregroundColor(.black)
+//                            }
+//                            .padding(.top, Spacing.lg)
+//                        }
+
+//                        if !isEditing {
+//                            VStack(spacing: Spacing.xl) {
+//                                timeline
+//                                similar
+//                            }
+//                            .padding(.horizontal, Spacing.lg)
+//                            .padding(.top, Spacing.xl)
+//                        }
                     }
                 }
                 .padding(.bottom, 100)
             }
         }
+        .appBackgroundOnly()
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.inline)
         #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(role: .destructive) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        isDeleteConfirmationPresented = true
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(role: .destructive) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isDeleteConfirmationPresented = true
+                        }
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(AppFont.caption.weight(.bold))
+                            .foregroundStyle(AppColor.destructive)
+                            .frame(width: 32, height: 32)
+                            .background(Circle()
+                                // .fill(Color.white)
+                                .fill(.clear)
+                                .glassEffect())
+                            .appShadow(.card)
                     }
-                } label: {
-                    Image(systemName: "trash")
-                        .font(AppFont.caption.weight(.bold))
-                        .foregroundStyle(AppColor.destructive)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(AppColor.background))
-                        .appShadow(.card)
                 }
             }
-        }
-        .task {
-            viewModel.load()
-        }
-        .onChange(of: viewModel.item) { _, newItem in
-            if let item = newItem {
-                editableName = item.name
-                editableDescription = item.description
+            .task {
+                viewModel.load()
             }
-        }
-        .onChange(of: viewModel.isDeleted) { _, deleted in
-            if deleted {
-                dismiss()
+            .onChange(of: viewModel.item) { _, newItem in
+                if let item = newItem {
+                    editableName = item.name
+                    editableDescription = item.description
+                }
             }
-        }
-        .confirmationDialog(
-            Text("wardrobe.detail.delete.title", bundle: .module),
-            isPresented: $isDeleteConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button(role: .destructive) { viewModel.delete() } label: { Text("wardrobe.detail.delete.action", bundle: .module) }
-            Button(role: .cancel) {} label: { Text("common.cancel", bundle: .module) }
-        } message: {
-            Text("wardrobe.detail.delete.message", bundle: .module)
-        }
+            .onChange(of: viewModel.isDeleted) { _, deleted in
+                if deleted {
+                    dismiss()
+                }
+            }
+            .confirmationDialog(
+                Text("wardrobe.detail.delete.title", bundle: .module),
+                isPresented: $isDeleteConfirmationPresented,
+                titleVisibility: .visible
+            ) {
+                Button(role: .destructive) { viewModel.delete() } label: { Text("wardrobe.detail.delete.action", bundle: .module)
+                }
+                Button(role: .cancel) {} label: { Text("common.cancel", bundle: .module) }
+            } message: {
+                Text("wardrobe.detail.delete.message", bundle: .module)
+            }
     }
 
     @ViewBuilder
@@ -180,6 +197,9 @@ public struct WardrobeItemDetailView: View {
         @Binding var name: String
         @Binding var description: String
         let lastWornAt: Date?
+        let wears: [WearRecord]
+
+        @State private var isWearHistoryPresented = false
 
         var body: some View {
             ZStack(alignment: .top) {
@@ -206,6 +226,19 @@ public struct WardrobeItemDetailView: View {
                     HStack {
                         label("wardrobe.detail.lastWorn")
                         Text(lastWornText(lastWornAt))
+                        Spacer()
+
+                        Button {
+                            isWearHistoryPresented = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(AppColor.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $isWearHistoryPresented) {
+                            WearHistoryPopoverView(wears: wears)
+                                .presentationCompactAdaptation(.popover)
+                        }
                     }
 
                     Divider()

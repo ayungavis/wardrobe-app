@@ -99,7 +99,8 @@ public final class AppContainer {
             library: Self.defaultPhotoLibrary(),
             scanner: makeGarmentScanService(),
             wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            preferences: preferencesRepository
         )
     }
 
@@ -142,7 +143,7 @@ public final class AppContainer {
 
     public func makeGarmentReviewModel() -> GarmentReviewModel {
         GarmentReviewModel(
-            scanner: makeGarmentScanService(),
+            scanner: makeGarmentScanService(allowsMatching: false),
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository
@@ -156,11 +157,12 @@ public final class AppContainer {
         )
     }
 
-    public func makeGarmentScanService() -> GarmentScanService {
+    public func makeGarmentScanService(allowsMatching: Bool = true) -> GarmentScanService {
         WardrobeGarmentScanService(
             segmentation: Self.defaultSegmentation(),
             thumbnails: garmentThumbnailRepository,
-            repository: makeWardrobeItemRepository()
+            repository: makeWardrobeItemRepository(),
+            allowsMatching: allowsMatching
         )
     }
 

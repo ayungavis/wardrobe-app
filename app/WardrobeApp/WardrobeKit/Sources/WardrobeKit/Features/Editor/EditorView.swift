@@ -1,7 +1,7 @@
 import DesignSystem
 import SwiftUI
 
-public struct EditorView<ReviewDrawer: View>: View {
+public struct EditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
@@ -15,7 +15,7 @@ public struct EditorView<ReviewDrawer: View>: View {
     private let makeCropViewModel: (UUID) -> CropViewModel
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
-    private let reviewDrawer: ReviewDrawer
+    // private let reviewDrawer: ReviewDrawer
 
     public init(
         viewModel: EditorViewModel,
@@ -23,8 +23,8 @@ public struct EditorView<ReviewDrawer: View>: View {
         didResumeDraft: Bool,
         makeCropViewModel: @escaping (UUID) -> CropViewModel,
         onDiscard: @escaping () -> Void,
-        onComplete: @escaping () -> Void,
-        @ViewBuilder reviewDrawer: () -> ReviewDrawer
+        onComplete: @escaping () -> Void
+        // @ViewBuilder reviewDrawer: () -> ReviewDrawer
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
@@ -32,7 +32,7 @@ public struct EditorView<ReviewDrawer: View>: View {
         self.makeCropViewModel = makeCropViewModel
         self.onDiscard = onDiscard
         self.onComplete = onComplete
-        self.reviewDrawer = reviewDrawer()
+        // self.reviewDrawer = reviewDrawer()
     }
 
     public var body: some View {
@@ -156,11 +156,11 @@ public struct EditorView<ReviewDrawer: View>: View {
                 .ignoresSafeArea(.keyboard)
 
             if viewModel.activeTool == nil {
-                VStack {
-                    Spacer()
-                    reviewDrawer
-                        .padding(.bottom, 96)
-                }
+//                VStack {
+//                    Spacer()
+//                    reviewDrawer
+//                        .padding(.bottom, 96)
+//                }
 
                 if let banner = draftBannerKind {
                     VStack {

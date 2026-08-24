@@ -11,17 +11,20 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     private let segmentation: GarmentSegmentationService
     private let thumbnails: GarmentThumbnailRepository
     private let repository: WardrobeItemRepository
+    private let allowsMatching: Bool
 
     private nonisolated static let maxPhotoPixel: CGFloat = 2048
 
     public init(
         segmentation: GarmentSegmentationService,
         thumbnails: GarmentThumbnailRepository,
-        repository: WardrobeItemRepository
+        repository: WardrobeItemRepository,
+        allowsMatching: Bool = true
     ) {
         self.segmentation = segmentation
         self.thumbnails = thumbnails
         self.repository = repository
+        self.allowsMatching = allowsMatching
     }
 
     public func scan(photo: Data) async throws -> [ScannedGarment] {
@@ -33,17 +36,20 @@ public struct WardrobeGarmentScanService: GarmentScanService {
 
         return try await Self.detect(
             photo: photo, known: known, categories: categories,
-            segmentation: segmentation, thumbnails: thumbnails
+            segmentation: segmentation, thumbnails: thumbnails,
+            allowsMatching: allowsMatching
         )
     }
 
     @concurrent
+    // swiftlint:disable:next function_parameter_count
     private static func detect(
         photo: Data,
         known: [ItemFingerprint],
         categories: [UUID: GarmentCategory],
         segmentation: any GarmentSegmentationService,
-        thumbnails: any GarmentThumbnailRepository
+        thumbnails: any GarmentThumbnailRepository,
+        allowsMatching: Bool
     ) async throws -> [ScannedGarment] {
         guard let image = ImageDecoding.downsampledImage(from: photo, maxPixel: maxPhotoPixel) else {
             Log.ui.error("Garment scan: undecodable photo")
@@ -54,17 +60,20 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         return try segmentation.cutouts(from: segments).map { category, cutout in
             try garment(
                 category: category, cutout: cutout,
-                known: known, categories: categories, thumbnails: thumbnails
+                known: known, categories: categories, thumbnails: thumbnails,
+                allowsMatching: allowsMatching
             )
         }
     }
 
+    // swiftlint:disable:next function_parameter_count
     private nonisolated static func garment(
         category: GarmentCategory,
         cutout: GarmentCutout,
         known: [ItemFingerprint],
         categories: [UUID: GarmentCategory],
-        thumbnails: any GarmentThumbnailRepository
+        thumbnails: any GarmentThumbnailRepository,
+        allowsMatching: Bool
     ) throws -> ScannedGarment {
         let id = UUID()
         let fingerprint = ItemFingerprint(
@@ -87,8 +96,8 @@ public struct WardrobeGarmentScanService: GarmentScanService {
             category: category,
             cutoutFile: thumbnails.save(cutout.image, id: id),
             fingerprint: fingerprint,
-            matches: matches,
-            decision: ScannedGarment.defaultDecision(for: matches)
+            matches: allowsMatching ? matches : [],
+            decision: ScannedGarment.defaultDecision(for: matches, allowsMatching: allowsMatching)
         )
     }
 

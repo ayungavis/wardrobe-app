@@ -75,16 +75,20 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedItems[index] = item
     }
 
-    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
+    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {
         storedItems.append(item)
         if let fingerprint {
             storedFingerprints.append(fingerprint)
         }
-        storedWears.append(wear)
+        if let wear {
+            storedWears.append(wear)
+        }
     }
 
-    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
-        storedWears.append(wear)
+    func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws {
+        if let wear {
+            storedWears.append(wear)
+        }
         storedFingerprints.append(fingerprint)
     }
 

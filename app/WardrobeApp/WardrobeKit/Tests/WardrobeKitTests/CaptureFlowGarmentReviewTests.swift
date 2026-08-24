@@ -25,7 +25,8 @@ struct CaptureFlowGarmentReviewTests {
             library: library,
             scanner: scanner,
             wardrobeRepository: wardrobeRepository,
-            thumbnails: thumbnails
+            thumbnails: thumbnails,
+            preferences: InMemoryAccountPreferencesRepository()
         )
     }
 

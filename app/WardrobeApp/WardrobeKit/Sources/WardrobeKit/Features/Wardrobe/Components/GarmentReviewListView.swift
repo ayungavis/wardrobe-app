@@ -3,6 +3,7 @@ import SwiftUI
 
 struct GarmentReviewListView: View {
     let review: GarmentReviewModel
+    var allowsMatching: Bool = true
     var showsWearDate = false
 
     var body: some View {
@@ -12,6 +13,7 @@ struct GarmentReviewListView: View {
                     garment: garment,
                     scannedImage: review.thumbnailData(forFile: garment.cutoutFile),
                     candidateImage: { review.thumbnailData(forItemID: $0) },
+                    allowsMatching: allowsMatching,
                     onChoose: { review.choose($0, for: garment.id) }
                 )
 

@@ -9,36 +9,6 @@ public struct ChallengeView: View {
 
     private let container: AppContainer
 
-    private let backgroundStickers: [StickerPlacement] = [
-        StickerPlacement(
-            "StampElement",
-            figmaX: 284,
-            figmaY: 56,
-            figmaWidth: 142,
-            figmaHeight: 162,
-            frameWidth: 375,
-            frameHeight: 812
-        ),
-        StickerPlacement(
-            "StampDetail",
-            figmaX: 38,
-            figmaY: 752,
-            figmaWidth: 104,
-            figmaHeight: 120,
-            frameWidth: 375,
-            frameHeight: 812
-        ),
-        StickerPlacement(
-            "Kancing2",
-            figmaX: -18,
-            figmaY: 257,
-            figmaWidth: 104,
-            figmaHeight: 120,
-            frameWidth: 375,
-            frameHeight: 812
-        ),
-    ]
-
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
@@ -49,27 +19,10 @@ public struct ChallengeView: View {
 
         NavigationStack {
             ZStack {
-                Image("appBG", bundle: .module)
-                    .resizable()
-                    .ignoresSafeArea()
-
-                GeometryReader { screenGeo in
-                    let sw = screenGeo.size.width
-                    let sh = screenGeo.size.height
-
-                    ForEach(backgroundStickers) { sticker in
-                        Image(sticker.imageName, bundle: .module)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: sw * sticker.widthFraction)
-                            .rotationEffect(.degrees(sticker.rotation))
-                            .position(x: sw * sticker.x, y: sh * sticker.y)
-                    }
-                }
-
                 Group {
                     if viewModel.hasCompletedToday {
-                        CompletedTodayView()
+                        // Text("Completed Today")
+                        CompletedTodayView(onAccept: viewModel.accept)
                     } else if let active = viewModel.activeChallenge {
                         ActiveChallengeStateView(
                             challenge: active,
@@ -88,12 +41,15 @@ public struct ChallengeView: View {
                             .playbackMode(.playing(.fromFrame(40, toFrame: 120, loopMode: .autoReverse)))
                             .resizable()
                             .frame(width: 300, height: 300)
-                            .allowsHitTesting(false)
-                            .offset(y: 280)
+                            // .allowsHitTesting(false)
+                            .offset(y: 280) // position over cards
                             .transition(.opacity)
                     }
+                    .allowsHitTesting(false)
                 }
             }
+            .appBackgroundStickers()
+            // interaction listener
             .simultaneousGesture(
                 DragGesture().onChanged { _ in
                     if !hasSwiped {
@@ -105,10 +61,25 @@ public struct ChallengeView: View {
             )
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 1).onEnded { _ in
+                    print("long press")
                     isDevMenuPresented = true
+
                 },
                 including: DevMode.isEnabled ? .all : .none
             )
+            .overlay(alignment: .topTrailing) {
+                if DevMode.isXcodeDebugBuild {
+                    Button {
+                        isDevMenuPresented = true
+                    } label: {
+                        Image(systemName: "hammer.fill")
+                            .foregroundStyle(.white)
+                            .padding(Spacing.sm)
+                            .background(Circle().fill(.black.opacity(0.4)))
+                    }
+                    .padding(Spacing.md)
+                }
+            }
             .sheet(
                 isPresented: $isDevMenuPresented,
                 onDismiss: { viewModel.refreshActiveChallenge() },

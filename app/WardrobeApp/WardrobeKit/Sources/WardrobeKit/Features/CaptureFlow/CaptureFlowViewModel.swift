@@ -17,6 +17,7 @@ public final class CaptureFlowViewModel {
     public private(set) var galleryThumbnail: CGImage?
     public private(set) var libraryAccess: PhotoLibraryAccess = .notDetermined
     public private(set) var recentAssets: [PhotoAsset] = []
+    public private(set) var isTipsPresented = false
     public var isGalleryPresented = false
 
     public let library: PhotoLibraryService
@@ -28,6 +29,7 @@ public final class CaptureFlowViewModel {
     public let review: GarmentReviewModel
 
     private let camera: CameraService
+    private let preferences: AccountPreferencesRepository
     let activeRepository: ActiveChallengeRepository
     let completedRepository: CompletedChallengeRepository
     let photoRepository: PhotoRepository
@@ -50,7 +52,8 @@ public final class CaptureFlowViewModel {
         library: PhotoLibraryService,
         scanner: GarmentScanService,
         wardrobeRepository: WardrobeItemRepository,
-        thumbnails: GarmentThumbnailRepository
+        thumbnails: GarmentThumbnailRepository,
+        preferences: AccountPreferencesRepository
     ) {
         self.challenge = challenge
         self.camera = camera
@@ -59,13 +62,18 @@ public final class CaptureFlowViewModel {
         self.photoRepository = photoRepository
         self.previews = previews
         self.library = library
+        self.preferences = preferences
         review = GarmentReviewModel(
             scanner: scanner,
             photoRepository: photoRepository,
             wardrobeRepository: wardrobeRepository,
             thumbnails: thumbnails
         )
-        stage = Self.initialStage(challenge: challenge, permission: camera.permission)
+        stage = Self.initialStage(
+            challenge: challenge,
+            permission: camera.permission
+        )
+        isTipsPresented = stage == .camera && !preferences.load().hasSeenCaptureTips
         didResumeDraft = stage == .editor
         syncCameraState()
     }
@@ -88,17 +96,34 @@ public final class CaptureFlowViewModel {
     public func consentContinue() {
         consentTask = Task {
             let result = await camera.requestPermission()
-            stage = result == .granted ? .camera : .denied
+            if result == .granted {
+                stage = .camera
+                isTipsPresented = !preferences.load().hasSeenCaptureTips
+            } else {
+                stage = .denied
+            }
         }
     }
 
     public func recheckPermission() {
         switch stage {
         case .consent, .denied, .camera:
-            stage = Self.initialStage(challenge: challenge, permission: camera.permission)
-        case .crop, .editor:
+            stage = Self.initialStage(
+                challenge: challenge,
+                permission: camera.permission
+            )
+        case .crop, .scanReview, .editor:
             break
         }
+    }
+
+    public func tipsContinue(dontShowAgain: Bool) {
+        if dontShowAgain {
+            var stored = preferences.load()
+            stored.hasSeenCaptureTips = true
+            preferences.save(stored)
+        }
+        isTipsPresented = false
     }
 
     // MARK: Camera session (FR-015)
@@ -206,13 +231,18 @@ public final class CaptureFlowViewModel {
         }
         challenge.document.setCrop(crop, ofLayer: layerID)
         activeRepository.save(challenge)
-        stage = .editor
+        stage = .scanReview
         review.scanIfNeeded(photoID: photoID)
+    }
+
+    public func continueToEditor() {
+        stage = .editor
     }
 
     // MARK: Gallery import (PRD open question #6; §18.2 allows a selected photo)
 
     public func discardPhoto() {
+        review.cancel()
         photoRepository.deleteOriginals(of: challenge.document, and: challenge.photoID)
         challenge.photoID = nil
         challenge.document = EditorDocument(layers: [])

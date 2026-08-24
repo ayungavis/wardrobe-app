@@ -199,7 +199,7 @@ struct CaptureFlowViewModelTests {
 
     /// Use Crop stores an instruction, not a second image: the original stays
     /// the only photo on disk, and the editor and exporter both read the document.
-    @Test func useCropStoresTheFramingAndOpensTheEditor() {
+    @Test func useCropStoresTheFramingAndOpensTheScanReview() {
         let photoID = UUID.v7()
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
@@ -215,7 +215,7 @@ struct CaptureFlowViewModelTests {
 
         sut.useCrop(crop)
 
-        #expect(sut.stage == .editor)
+        #expect(sut.stage == .scanReview, "main puts a scan review between crop and editor")
         #expect(activeRepository.stored?.document.firstPhotoCrop == crop)
         #expect(photoRepository.saved.isEmpty, "cropping must not write a second photo")
     }
