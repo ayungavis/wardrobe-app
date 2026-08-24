@@ -81,6 +81,13 @@ public struct WardrobeView: View {
                 }
             }
             .appBackgroundStickers()
+            .onTapGesture {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                
+                if searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                    isSearching = false
+                }
+            }
             .navigationDestination(for: UUID.self) { itemID in
                 WardrobeItemDetailView(
                     viewModel: container.makeWardrobeItemDetailViewModel(itemID: itemID)
@@ -112,7 +119,9 @@ public struct WardrobeView: View {
                 }
             } label: {
                 HStack{
-                    Text("wardrobe.add.title", bundle: .module)
+                    if !isSearching {
+                        Text("wardrobe.add.title", bundle: .module)
+                    }
                     Image(systemName: "plus.app")
                         .resizable()
                         .scaledToFill()
@@ -122,7 +131,7 @@ public struct WardrobeView: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(AppColor.textPrimary)
                 .padding(.vertical, Spacing.sm)
-                .padding(.horizontal, Spacing.md)
+                .padding(.horizontal, isSearching ? Spacing.sm : Spacing.md)
                 .background(Capsule()
                     //.fill(AppColor.surface)
                     .fill(.clear)

@@ -10,19 +10,19 @@ struct CategoryGridView: View {
     let onClose: () -> Void
     let onSelect: (WardrobeItem) -> Void
     @Binding var sortOrder: WardrobeView.SortOrder
-
+    
     private let columns = [
         GridItem(.flexible(), spacing: Spacing.md),
         GridItem(.flexible(), spacing: Spacing.md),
     ]
-
+    
     private var sortedItems: [WardrobeItem] {
         switch sortOrder {
         case .mostUsed: items.sorted { wearCount($0) > wearCount($1) }
         case .leastUsed: items.sorted { wearCount($0) < wearCount($1) }
         }
     }
-
+    
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -30,8 +30,11 @@ struct CategoryGridView: View {
                     HStack(spacing: Spacing.sm) {
                         Image(systemName: "chevron.left")
                         Text(category.title, bundle: .module)
-                            .font(AppFont.title)
+                            
                     }
+                    .foregroundStyle(AppColor.textPrimary)
+                    .font(AppFont.roundedTitle)
+                    .fontWeight(.semibold)
                 }
                 Spacer()
                 Menu {
@@ -41,16 +44,24 @@ struct CategoryGridView: View {
                         }
                     }
                 } label: {
-                    Label { Text("wardrobe.filter", bundle: .module) } icon: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
-                    .background(Capsule().fill(.ultraThinMaterial))
+                    Label {
+                        Text("wardrobe.filter", bundle: .module) } icon: {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                        }
+                        .font(AppFont.roundedTitle2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.textPrimary)
+                        .padding(.vertical, Spacing.sm)
+                        .padding(.horizontal, Spacing.md)
+                        .background(Capsule()
+                                    
+                            .fill(.clear)
+                            .glassEffect(.clear)
+                        )
                 }
             }
             .padding(Spacing.lg)
-
+            
             ScrollView {
                 LazyVGrid(columns: columns, spacing: Spacing.md) {
                     ForEach(sortedItems) { item in
