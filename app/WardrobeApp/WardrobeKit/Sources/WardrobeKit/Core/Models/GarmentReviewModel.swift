@@ -37,10 +37,10 @@ public final class GarmentReviewModel {
     }
 
     public func scan(photo: Data) {
-        scan { photo }
+        scan(wornAt: CaptureDate.original(in: photo)) { photo }
     }
 
-    private func scan(_ load: @escaping () throws -> Data) {
+    private func scan(wornAt: Date? = nil, _ load: @escaping () throws -> Data) {
         let previous = scanTask
         isScanning = true
 
@@ -51,7 +51,11 @@ public final class GarmentReviewModel {
                 let photo = try load()
                 guard !Task.isCancelled else { return }
                 let start = ContinuousClock.now
-                try await stage(scanner.scan(photo: photo))
+                try await stage(scanner.scan(photo: photo).map { garment in
+                    var dated = garment
+                    dated.wornAt = wornAt
+                    return dated
+                })
                 Log.ui.info(
                     "Garment scan finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
                 )
@@ -96,20 +100,49 @@ public final class GarmentReviewModel {
 
     public func commit(completionID: UUID?, at date: Date) {
         for garment in garments {
-            do {
-                switch garment.decision {
-                case .new:
-                    try insert(garment, completionID: completionID, at: date)
-                case let .existing(itemID):
-                    try merge(garment, into: itemID, completionID: completionID, at: date)
-                case .discard:
-                    try thumbnails.delete(file: garment.cutoutFile)
-                }
-            } catch {
-                Log.report(error)
-            }
+            record(garment, completionID: completionID, at: date)
         }
         garments = []
+    }
+
+    public func commitImported() {
+        var undated: [ScannedGarment] = []
+        for garment in garments {
+            if garment.decision == .discard {
+                record(garment, completionID: nil, at: .now)
+                continue
+            }
+            guard let wornAt = garment.wornAt else {
+                undated.append(garment)
+                continue
+            }
+            record(garment, completionID: nil, at: wornAt)
+        }
+        garments = undated
+    }
+
+    public func setWornAt(_ date: Date, for garmentID: UUID) {
+        guard let index = garments.firstIndex(where: { $0.id == garmentID }) else { return }
+        garments[index].wornAt = date
+    }
+
+    public var isMissingAWearDate: Bool {
+        garments.contains { $0.wornAt == nil && $0.decision != .discard }
+    }
+
+    private func record(_ garment: ScannedGarment, completionID: UUID?, at date: Date) {
+        do {
+            switch garment.decision {
+            case .new:
+                try insert(garment, completionID: completionID, at: date)
+            case let .existing(itemID):
+                try merge(garment, into: itemID, completionID: completionID, at: date)
+            case .discard:
+                try thumbnails.delete(file: garment.cutoutFile)
+            }
+        } catch {
+            Log.report(error)
+        }
     }
 
     private func insert(_ garment: ScannedGarment, completionID: UUID?, at date: Date) throws {

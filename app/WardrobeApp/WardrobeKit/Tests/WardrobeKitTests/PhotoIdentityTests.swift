@@ -72,10 +72,7 @@ struct StoredPhotoIdentityTests {
         }
     }
 
-    /// Ordering across separate milliseconds is `UUIDv7Tests`. Two saves inside
-    /// one millisecond share a timestamp and differ only in the random tail, so
-    /// asserting their order here would demand more than v7 promises.
-    @Test func newlyMintedPhotoIdentitiesAreVersionSeven() throws {
+    @Test func newlyMintedPhotoIdentitiesCarryTheMomentTheyWereSaved() throws {
         let repository = FilePhotoRepository(directory: temporaryDirectory())
 
         let first = try repository.saveOriginal(Data([0xFF, 0xD8]))
@@ -84,9 +81,11 @@ struct StoredPhotoIdentityTests {
         #expect(first.uuidString.split(separator: "-")[2].first == "7")
         #expect(second.uuidString.split(separator: "-")[2].first == "7")
         #expect(first != second)
+
+        let stamp = try #require(mintedAt(first))
         #expect(
-            first.uuidString.prefix(13) == second.uuidString.prefix(13),
-            "the leading timestamp is what makes them sort by when they were taken"
+            abs(stamp.timeIntervalSinceNow) < 5,
+            "the leading 48 bits are a millisecond clock, which is what makes ids sort by time"
         )
     }
 
@@ -104,4 +103,10 @@ private func temporaryDirectory() -> URL {
     let directory = URL.temporaryDirectory.appending(path: UUID().uuidString)
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     return directory
+}
+
+private func mintedAt(_ identity: UUID) -> Date? {
+    let hex = identity.uuidString.replacingOccurrences(of: "-", with: "").prefix(12)
+    guard let milliseconds = UInt64(hex, radix: 16) else { return nil }
+    return Date(timeIntervalSince1970: Double(milliseconds) / 1000)
 }

@@ -9,6 +9,7 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
     public let fingerprint: ItemFingerprint
     public let matches: [ItemMatch]
     public var decision: Decision
+    public var wornAt: Date?
 
     public init(
         id: UUID,
@@ -18,7 +19,8 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
         cutoutFile: String,
         fingerprint: ItemFingerprint,
         matches: [ItemMatch],
-        decision: Decision
+        decision: Decision,
+        wornAt: Date? = nil
     ) {
         self.id = id
         self.name = name ?? category.defaultName
@@ -28,6 +30,7 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
         self.fingerprint = fingerprint
         self.matches = matches
         self.decision = decision
+        self.wornAt = wornAt
     }
 
     public enum Decision: Equatable, Sendable {

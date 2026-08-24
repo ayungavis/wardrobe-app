@@ -4996,6 +4996,54 @@
         }
       }
     },
+    "wardrobe.review.wearDate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wear date"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanggal pakai"
+          }
+        }
+      }
+    },
+    "wardrobe.review.wearDate.held": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items without a date stay here until you choose one."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Item tanpa tanggal tetap di sini sampai kamu memilihnya."
+          }
+        }
+      }
+    },
+    "wardrobe.review.wearDate.missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This photo has no capture date. Choose one before saving."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto ini tidak punya tanggal pengambilan. Pilih satu sebelum menyimpan."
+          }
+        }
+      }
+    },
     "wardrobe.scan.add": {
       "localizations": {
         "en": {

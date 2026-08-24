@@ -172,4 +172,79 @@ struct GarmentReviewModelTests {
         #expect(sut.garments.first?.decision == .new)
         #expect(sut.garments.last?.decision == .discard)
     }
+
+    // MARK: Wear dates on imported photos
+
+    private func stage(
+        _ sut: GarmentReviewModel,
+        _ garments: [ScannedGarment],
+        scanner: FakeGarmentScanService
+    ) async {
+        scanner.result = garments
+        sut.scan(photo: Data([0x01]))
+        await sut.scanTask?.value
+    }
+
+    @Test func anImportedGarmentWithNoCaptureDateWritesNoWear() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let scanner = FakeGarmentScanService()
+        let sut = makeSUT(repository: repository, scanner: scanner)
+        let garment = makeGarment(decision: .new)
+        await stage(sut, [garment], scanner: scanner)
+
+        sut.commitImported()
+
+        #expect(
+            try repository.wears(for: garment.id).isEmpty,
+            "FR-048: never silently use the import date"
+        )
+        #expect(try repository.items().isEmpty)
+        #expect(sut.garments.count == 1, "and the garment stays so the date can still be chosen")
+        #expect(sut.isMissingAWearDate)
+    }
+
+    @Test func aCorrectedDateIsTheOneThatGetsWritten() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let scanner = FakeGarmentScanService()
+        let sut = makeSUT(repository: repository, scanner: scanner)
+        await stage(sut, [makeGarment(decision: .new)], scanner: scanner)
+        let chosen = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let garmentID = try #require(sut.garments.first).id
+        sut.setWornAt(chosen, for: garmentID)
+        sut.commitImported()
+
+        #expect(try repository.wears(for: garmentID).map(\.wornAt) == [chosen])
+        #expect(sut.garments.isEmpty)
+    }
+
+    @Test func aDatedGarmentCommitsWhileAnUndatedOneIsHeldBack() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let scanner = FakeGarmentScanService()
+        let sut = makeSUT(repository: repository, scanner: scanner)
+        await stage(sut, [makeGarment(decision: .new), makeGarment(decision: .new)],
+                    scanner: scanner)
+        let chosen = Date(timeIntervalSince1970: 1_700_000_000)
+        let dated = try #require(sut.garments.first).id
+        sut.setWornAt(chosen, for: dated)
+
+        sut.commitImported()
+
+        #expect(try repository.wears(for: dated).count == 1)
+        #expect(sut.garments.count == 1)
+    }
+
+    @Test func theCameraAndCompletionPathsStillWriteNow() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let scanner = FakeGarmentScanService()
+        let sut = makeSUT(repository: repository, scanner: scanner)
+        await stage(sut, [makeGarment(decision: .new)], scanner: scanner)
+        let now = Date()
+        let garmentID = try #require(sut.garments.first).id
+
+        sut.commit(completionID: nil, at: now)
+
+        #expect(try repository.wears(for: garmentID).map(\.wornAt) == [now])
+        #expect(sut.garments.isEmpty)
+    }
 }

@@ -18,7 +18,13 @@ struct AddByPhotosView: View {
                     picker
                 }
 
-                GarmentReviewListView(review: review)
+                GarmentReviewListView(review: review, showsWearDate: true)
+
+                if review.isMissingAWearDate {
+                    Text("wardrobe.review.wearDate.held", bundle: .module)
+                        .font(AppFont.caption)
+                        .foregroundStyle(AppColor.textSecondary)
+                }
             }
             .navigationTitle(Text("wardrobe.add.photos.title", bundle: .module))
             #if os(iOS)
@@ -27,8 +33,10 @@ struct AddByPhotosView: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button {
-                            review.commit(completionID: nil, at: Date())
-                            dismiss()
+                            review.commitImported()
+                            if review.garments.isEmpty {
+                                dismiss()
+                            }
                         } label: {
                             Text("wardrobe.review.confirm", bundle: .module)
                         }
