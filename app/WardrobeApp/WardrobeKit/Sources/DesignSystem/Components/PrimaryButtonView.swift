@@ -3,9 +3,11 @@ import SwiftUI
 public struct PrimaryButtonView: View {
     private let title: Text
     private let action: () -> Void
+    private let minHeight: CGFloat
 
-    public init(_ title: Text, action: @escaping () -> Void) {
+    public init(_ title: Text, minHeight: CGFloat = 44, action: @escaping () -> Void) {
         self.title = title
+        self.minHeight = minHeight
         self.action = action
     }
 
@@ -13,7 +15,7 @@ public struct PrimaryButtonView: View {
         Button(action: action) {
             title
                 .font(AppFont.body.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: minHeight)
         }
         .buttonStyle(.borderedProminent)
         .tint(AppColor.accent)

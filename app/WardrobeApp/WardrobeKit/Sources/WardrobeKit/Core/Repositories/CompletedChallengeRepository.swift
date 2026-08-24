@@ -45,11 +45,11 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
 
     public func append(_ completion: CompletedChallenge) {
         var completions = load()
-        guard !completions.contains(where: {
-            calendar.isDate($0.completedAt, inSameDayAs: completion.completedAt)
-        }) else {
-            return
-        }
+//        guard !completions.contains(where: {
+//            calendar.isDate($0.completedAt, inSameDayAs: completion.completedAt)
+//        }) else {
+//            return
+//        }
         completions.append(completion)
         save(completions)
     }

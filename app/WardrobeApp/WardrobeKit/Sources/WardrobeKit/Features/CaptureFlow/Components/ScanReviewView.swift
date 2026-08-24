@@ -79,10 +79,11 @@ struct GarmentScanReviewList: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xl) {
-            ForEach(review.garments) { garment in
+            ForEach(review.garments.filter { $0.decision != .discard }) { garment in
                 GarmentScanSectionView(garment: garment, review: review)
             }
         }
+        .animation(.snappy, value: review.garments)
     }
 }
 
@@ -135,9 +136,11 @@ struct GarmentScanSectionView: View {
                     .fill(AppColor.surface)
                     .frame(width: 140, height: 140)
             }
-
+            
             Button {
-                review.choose(.discard, for: garment.id)
+                withAnimation(.snappy) {
+                    review.choose(.discard, for: garment.id)
+                }
             } label: {
                 Image(systemName: "trash")
                     .foregroundStyle(AppColor.textPrimary)

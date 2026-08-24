@@ -16,12 +16,17 @@ public struct CompletedTodayView: View {
                 titleKey: "challenge.empty.freestyle.title",
                 messageKey: "challenge.empty.freestyle.text",
                 buttonKey: "challenge.accept",
-                onAccept: { onAccept(Self.freestyleCard) }
+                onAccept: {
+                    print("Freestyle button tapped!")
+                    onAccept(Self.freestyleCard)
+                }
             )
             .aspectRatio(346 / 617, contentMode: .fit)
+            .allowsHitTesting(true)
             
             Text("challenge.empty.text", bundle: .module)
                 .font(AppFont.body.weight(.bold))
+                .opacity(0.3)
             //            ContentUnavailableView {
 //                Label {
 //                    Text("challenge.completedToday.title", bundle: .module)
