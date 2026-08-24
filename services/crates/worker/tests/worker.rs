@@ -332,3 +332,38 @@ async fn a_styling_job_waits_until_an_object_store_is_configured(pool: PgPool) -
     );
     Ok(())
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_sweeper_discards_an_upload_over_its_cap_instead_of_stamping_it(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let owner = account(&pool).await?;
+    let media = Uuid::now_v7();
+    let key = format!("{owner}/cutout/{media}");
+    let cap = usize::try_from(wardrobe_db::upload_cap("cutout")).expect("a positive cap");
+    store()
+        .put(&key, vec![0u8; cap + 1], "image/png")
+        .await
+        .expect("the oversize object lands");
+    sqlx::query(
+        "insert into media_object (id, account_id, kind, storage_key, content_type, created_at)
+         values ($1, $2, 'cutout', $3, 'image/png', now() - interval '48 hours')",
+    )
+    .bind(media)
+    .bind(owner)
+    .bind(&key)
+    .execute(&pool)
+    .await?;
+
+    let swept = sweep_media(&pool, &store(), Duration::hours(24))
+        .await
+        .expect("the sweep runs");
+
+    assert_eq!(swept.stamped, 0, "an oversize upload must never be stamped");
+    let left: i64 = sqlx::query_scalar("select count(*) from media_object where id = $1")
+        .bind(media)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(left, 0);
+    Ok(())
+}

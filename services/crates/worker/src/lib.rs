@@ -133,7 +133,7 @@ fn backoff_seconds(attempts: i32) -> i32 {
 
 // -------------------------------------------------------------- sweeping media
 
-const SWEEPABLE: &str = "select id, storage_key
+const SWEEPABLE: &str = "select id, storage_key, kind
    from media_object m
   where m.uploaded_at is null
     and m.created_at < now() - $1::interval
@@ -155,7 +155,7 @@ pub async fn sweep_media(
     storage: &Storage,
     grace: Duration,
 ) -> Result<Swept, &'static str> {
-    let candidates: Vec<(Uuid, String)> = sqlx::query_as(SWEEPABLE)
+    let candidates: Vec<(Uuid, String, String)> = sqlx::query_as(SWEEPABLE)
         .bind(grace)
         .bind(SWEEP_BATCH)
         .fetch_all(pool)
@@ -163,8 +163,11 @@ pub async fn sweep_media(
         .map_err(|_| "database")?;
 
     let mut swept = Swept::default();
-    for (id, key) in candidates {
-        if let Some(size) = storage.head(&key).await.map_err(|_| "object_store")? {
+    for (id, key, kind) in candidates {
+        let found = storage.head(&key).await.map_err(|_| "object_store")?;
+        if let Some(size) = found.filter(|size| {
+            i64::try_from(*size).unwrap_or(i64::MAX) <= wardrobe_db::upload_cap(&kind)
+        }) {
             sqlx::query(
                 "update media_object set uploaded_at = now(), byte_size = $2 where id = $1",
             )

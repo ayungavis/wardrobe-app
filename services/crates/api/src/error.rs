@@ -16,6 +16,8 @@ pub enum Error {
     NotFound,
     #[error("the request is too large")]
     TooLarge,
+    #[error("too many requests")]
+    TooManyRequests,
     #[error("service unavailable")]
     Unavailable,
     #[error("internal error")]
@@ -32,6 +34,7 @@ impl Error {
             Self::Conflict => StatusCode::CONFLICT,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) | Self::MergeIncomplete => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -44,6 +47,7 @@ impl Error {
             Self::Conflict => "conflict",
             Self::NotFound => "not_found",
             Self::TooLarge => "payload_too_large",
+            Self::TooManyRequests => "too_many_requests",
             Self::Unavailable => "unavailable",
             Self::Internal(_) | Self::MergeIncomplete => "internal",
         }
@@ -58,6 +62,7 @@ impl Error {
             Self::TooLarge => {
                 "The request is larger than this endpoint accepts. Send fewer changes at a time."
             }
+            Self::TooManyRequests => "Too many requests. Wait a moment and try again.",
             Self::Unavailable => "The service is temporarily unavailable. Try again shortly.",
             Self::Internal(_) | Self::MergeIncomplete => "Something went wrong on our side.",
         }
@@ -81,6 +86,13 @@ pub struct ErrorDetail {
 }
 
 impl Error {
+    #[must_use]
+    pub fn body(&self) -> ErrorBody {
+        ErrorBody {
+            error: self.detail(),
+        }
+    }
+
     #[must_use]
     pub fn detail(&self) -> ErrorDetail {
         if let Self::Internal(source) = self {

@@ -7,6 +7,8 @@ pub struct Config {
     pub observability: wardrobe_observability::Settings,
     pub apple_bundle_id: Option<String>,
     pub storage: Option<wardrobe_storage::Settings>,
+    pub trusted_proxy_hops: usize,
+    pub serve_docs: bool,
 }
 
 impl std::fmt::Debug for Config {
@@ -18,6 +20,8 @@ impl std::fmt::Debug for Config {
             .field("observability", &self.observability)
             .field("apple_bundle_id", &self.apple_bundle_id)
             .field("storage", &self.storage)
+            .field("trusted_proxy_hops", &self.trusted_proxy_hops)
+            .field("serve_docs", &self.serve_docs)
             .finish()
     }
 }
@@ -41,6 +45,10 @@ impl Config {
             observability: wardrobe_observability::Settings::from_env(),
             apple_bundle_id: optional("APPLE_BUNDLE_ID")?,
             storage: wardrobe_storage::Settings::from_env(),
+            trusted_proxy_hops: optional("TRUSTED_PROXY_HOPS")?
+                .and_then(|raw| raw.parse().ok())
+                .unwrap_or(crate::limit::DEFAULT_TRUSTED_HOPS),
+            serve_docs: optional("SERVE_DOCS")?.as_deref() == Some("true"),
         })
     }
 }
@@ -91,6 +99,8 @@ mod tests {
                 path_style: true,
                 presign_ttl: std::time::Duration::from_secs(300),
             }),
+            trusted_proxy_hops: 1,
+            serve_docs: false,
         };
 
         let printed = format!("{config:?}");

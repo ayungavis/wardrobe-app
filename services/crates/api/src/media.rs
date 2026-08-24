@@ -35,6 +35,7 @@ struct Stored {
     account_id: Uuid,
     storage_key: String,
     content_type: String,
+    kind: String,
     byte_size: Option<i64>,
     uploaded_at: Option<DateTime<Utc>>,
 }
@@ -47,7 +48,7 @@ fn expires_at(storage: &Storage) -> DateTime<Utc> {
 
 async fn stored(pool: &PgPool, media_id: Uuid, account_id: Uuid) -> Result<Option<Stored>, Error> {
     let found: Option<Stored> = sqlx::query_as(
-        "select account_id, storage_key, content_type, byte_size, uploaded_at
+        "select account_id, storage_key, content_type, kind, byte_size, uploaded_at
            from media_object
           where id = $1",
     )
@@ -126,6 +127,18 @@ pub async fn download(
             return Err(Error::NotFound);
         };
         let size = i64::try_from(size).unwrap_or(i64::MAX);
+        if size > wardrobe_db::upload_cap(&row.kind) {
+            tracing::warn!(
+                media.kind = %row.kind,
+                "an upload broke its size cap and was discarded"
+            );
+            storage.delete(&row.storage_key).await?;
+            sqlx::query("delete from media_object where id = $1")
+                .bind(media_id)
+                .execute(pool)
+                .await?;
+            return Err(Error::TooLarge);
+        }
         sqlx::query("update media_object set uploaded_at = now(), byte_size = $2 where id = $1")
             .bind(media_id)
             .bind(size)

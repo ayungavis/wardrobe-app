@@ -59,7 +59,14 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         .as_ref()
         .map(|settings| std::sync::Arc::new(wardrobe_storage::Storage::new(settings)));
 
-    axum::serve(listener, wardrobe_api::app(pool, apple, storage))
+    let app = wardrobe_api::app_with(
+        pool,
+        apple,
+        storage,
+        config.trusted_proxy_hops,
+        config.serve_docs,
+    );
+    axum::serve(listener, app)
         .with_graceful_shutdown(shutdown())
         .await?;
     Ok(())

@@ -13,6 +13,16 @@ pub const ILLUSTRATION: &str = "illustration";
 pub const STYLISE_ILLUSTRATION: &str = "styliseIllustration";
 pub const STYLE_VERSION: &str = "v1";
 
+#[must_use]
+pub fn upload_cap(kind: &str) -> i64 {
+    match kind {
+        "original" => 25 * 1024 * 1024,
+        "derivative" | "illustration" => 10 * 1024 * 1024,
+        "cutout" | "history" => 5 * 1024 * 1024,
+        _ => 2 * 1024 * 1024,
+    }
+}
+
 /// # Errors
 ///
 /// Returns [`sqlx::Error::RowNotFound`] when the account does not exist.

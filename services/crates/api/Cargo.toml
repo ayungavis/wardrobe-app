@@ -6,6 +6,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+tower_governor.workspace = true
+governor.workspace = true
 axum.workspace = true
 base64.workspace = true
 chrono.workspace = true
