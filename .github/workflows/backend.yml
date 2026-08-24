@@ -63,9 +63,7 @@ jobs:
           echo "MinIO never became ready" >&2
           docker logs minio >&2
           exit 1
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: services

@@ -84,11 +84,10 @@ impl Mask {
             coverage_permille: self.coverage_permille(),
             touches_edge: touches_edge(self),
             components,
-            dominant_share_permille: if total == 0 {
-                0
-            } else {
-                u32::try_from(largest * 1000 / total).unwrap_or(1000)
-            },
+            dominant_share_permille: u32::try_from(
+                (largest * 1000).checked_div(total).unwrap_or(0),
+            )
+            .unwrap_or(1000),
         }
     }
 
@@ -98,7 +97,12 @@ impl Mask {
 
     fn coverage_permille(&self) -> u32 {
         let painted = self.garment.iter().filter(|kept| **kept).count();
-        u32::try_from(painted * 1000 / self.garment.len()).unwrap_or(1000)
+        u32::try_from(
+            (painted * 1000)
+                .checked_div(self.garment.len())
+                .unwrap_or(0),
+        )
+        .unwrap_or(1000)
     }
 }
 
@@ -393,6 +397,21 @@ mod tests {
     fn centred(side: u32) -> RgbaImage {
         let box_side = side / 2;
         canvas(side, &[(side / 4, side / 4, box_side, box_side)])
+    }
+
+    #[test]
+    fn an_empty_mask_reports_zeroes_instead_of_dividing_by_nothing() {
+        let empty = Mask {
+            width: 0,
+            height: 0,
+            garment: Vec::new(),
+        };
+
+        let report = empty.report();
+
+        assert_eq!(report.coverage_permille, 0);
+        assert_eq!(report.dominant_share_permille, 0);
+        assert_eq!(report.components, 0);
     }
 
     fn mask_of(canvas: &RgbaImage) -> Mask {
