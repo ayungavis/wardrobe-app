@@ -11,8 +11,20 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 // ------------------------------------------------------------------- fixtures
 
-const CUTOUT_BYTES: &[u8] = b"the confirmed normalised cut-out";
 const ITEM_NAME: &str = "Ayung's favourite blue shirt";
+
+fn flat_png(width: u32, height: u32) -> Vec<u8> {
+    let canvas = image::RgbImage::from_pixel(width, height, image::Rgb([70, 110, 150]));
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(canvas)
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .expect("a png");
+    bytes.into_inner()
+}
+
+fn cutout_bytes() -> Vec<u8> {
+    flat_png(512, 512)
+}
 
 fn store() -> Storage {
     fn env(name: &str, fallback: &str) -> String {
@@ -37,14 +49,15 @@ fn provider(server: &MockServer) -> Provider {
     }
 }
 
-const ONE_PIXEL_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk\
-                             +M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-
 fn rendered_image() -> Value {
+    rendered_canvas(1024, 1024)
+}
+
+fn rendered_canvas(width: u32, height: u32) -> Value {
     json!({
         "provider": "a-provider",
         "usage": { "prompt_tokens": 11, "completion_tokens": 22 },
-        "data": [{ "b64_json": ONE_PIXEL_PNG.replace(char::is_whitespace, ""),
+        "data": [{ "b64_json": STANDARD.encode(flat_png(width, height)),
                    "media_type": "image/png" }]
     })
 }
@@ -86,6 +99,10 @@ async fn configure(pool: &PgPool, alternate: Option<&str>) -> sqlx::Result<()> {
 }
 
 async fn scene(pool: &PgPool, with_cutout: bool) -> sqlx::Result<Scene> {
+    scene_carrying(pool, with_cutout.then(cutout_bytes)).await
+}
+
+async fn scene_carrying(pool: &PgPool, cutout: Option<Vec<u8>>) -> sqlx::Result<Scene> {
     let account = Uuid::now_v7();
     sqlx::query("insert into account (id) values ($1)")
         .bind(account)
@@ -103,11 +120,11 @@ async fn scene(pool: &PgPool, with_cutout: bool) -> sqlx::Result<Scene> {
     .execute(pool)
     .await?;
 
-    if with_cutout {
+    if let Some(cutout) = cutout {
         let media = Uuid::now_v7();
         let key = format!("{account}/cutout/{media}");
         store()
-            .put(&key, CUTOUT_BYTES.to_vec(), "image/png")
+            .put(&key, cutout, "image/png")
             .await
             .expect("the cut-out lands");
         sqlx::query(
@@ -493,6 +510,201 @@ async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
     .execute(&pool)
     .await?;
     assert!(illustration::ready(&pool).await?);
+    Ok(())
+}
+
+// --------------------------------------------------- what may be sent
+
+fn png_claiming(width: u32, height: u32) -> Vec<u8> {
+    let mut bytes = flat_png(8, 8);
+    bytes[16..20].copy_from_slice(&width.to_be_bytes());
+    bytes[20..24].copy_from_slice(&height.to_be_bytes());
+    let crc = crc32(&bytes[12..29]);
+    bytes[29..33].copy_from_slice(&crc.to_be_bytes());
+    bytes
+}
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffff_u32;
+    for byte in bytes {
+        crc ^= u32::from(*byte);
+        for _ in 0..8 {
+            crc = if crc & 1 == 1 {
+                (crc >> 1) ^ 0xedb8_8320
+            } else {
+                crc >> 1
+            };
+        }
+    }
+    !crc
+}
+
+fn jpeg_carrying_exif() -> Vec<u8> {
+    let canvas = image::RgbImage::from_pixel(64, 64, image::Rgb([70, 110, 150]));
+    let mut body = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(canvas)
+        .write_to(&mut body, image::ImageFormat::Jpeg)
+        .expect("a jpeg");
+    let body = body.into_inner();
+
+    let payload = b"Exif\0\0MM\0\x2aWARDROBE-SECRET-CAMERA-TAG";
+    let length = u16::try_from(payload.len() + 2).expect("a short segment");
+    let mut spliced = vec![0xff, 0xd8, 0xff, 0xe1];
+    spliced.extend_from_slice(&length.to_be_bytes());
+    spliced.extend_from_slice(payload);
+    spliced.extend_from_slice(&body[2..]);
+    spliced
+}
+
+async fn reached_provider(server: &MockServer) -> usize {
+    server.received_requests().await.expect("recording").len()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_cutout_over_the_pixel_budget_never_reaches_the_provider(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    sqlx::query("update ai_model_config set params = '{\"maxInputPixels\": 1024}'::jsonb")
+        .execute(&pool)
+        .await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    assert_eq!(
+        reached_provider(&server).await,
+        0,
+        "a cut-out we refuse must never be sent to a third party, nor billed for"
+    );
+    assert!(
+        attempts(&pool, scene.job).await.is_empty(),
+        "no inference happened, so no attempt row may claim one did"
+    );
+    assert_eq!(state_of(&pool, scene.item).await.0, "failed");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_header_claiming_a_huge_canvas_is_refused_before_decoding(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let bomb = png_claiming(60_000, 60_000);
+    assert!(
+        bomb.len() < 1_000,
+        "the bomb is small on disk; that is the point"
+    );
+    scene_carrying(&pool, Some(bomb)).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    assert_eq!(reached_provider(&server).await, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_cutout_that_is_not_square_is_refused(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene_carrying(&pool, Some(flat_png(640, 480))).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    assert_eq!(reached_provider(&server).await, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn bytes_that_are_not_an_image_are_refused(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene_carrying(&pool, Some(b"the confirmed normalised cut-out".to_vec())).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    assert_eq!(reached_provider(&server).await, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn camera_metadata_never_travels_with_the_cutout(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let original = jpeg_carrying_exif();
+    assert!(
+        original
+            .windows(23)
+            .any(|window| window == b"WARDROBE-SECRET-CAMERA-TAG"[..23].as_ref()),
+        "the fixture has to carry the tag before the test can prove it is gone"
+    );
+    scene_carrying(&pool, Some(original)).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Succeeded);
+
+    let sent = sent_body(&server).await;
+    let reference = sent["input_references"][0]["image_url"]["url"]
+        .as_str()
+        .expect("a data uri");
+    let (prefix, encoded) = reference.split_once(',').expect("a data uri");
+    assert_eq!(prefix, "data:image/png;base64");
+    let forwarded = STANDARD.decode(encoded).expect("base64");
+    assert!(
+        !forwarded
+            .windows(23)
+            .any(|window| window == b"WARDROBE-SECRET-CAMERA-TAG"[..23].as_ref()),
+        "re-encoding is what strips metadata, and this is what proves it did"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_generation_on_the_wrong_canvas_is_invalid_output(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_canvas(640, 480)),
+    )
+    .await;
+
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    assert_eq!(attempts(&pool, scene.job).await[0].2, "invalid_output");
+    let (state, current) = state_of(&pool, scene.item).await;
+    assert_eq!(state, "failed");
+    assert_eq!(
+        current, None,
+        "a wrong canvas never becomes a stored version"
+    );
     Ok(())
 }
 

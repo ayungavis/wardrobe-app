@@ -1,3 +1,4 @@
+pub mod image;
 pub mod openrouter;
 
 use rust_decimal::Decimal;
@@ -29,11 +30,11 @@ struct Settings {
     prompt: String,
     resolution: String,
     aspect_ratio: String,
+    bounds: image::Bounds,
 }
 
 struct Cutout {
     storage_key: String,
-    content_type: String,
 }
 
 /// # Errors
@@ -54,6 +55,12 @@ pub async fn ready(pool: &PgPool) -> sqlx::Result<bool> {
     Ok(enabled)
 }
 
+fn positive(configured: Option<i64>) -> Option<u64> {
+    configured
+        .filter(|value| *value > 0)
+        .and_then(|value| u64::try_from(value).ok())
+}
+
 #[derive(sqlx::FromRow)]
 struct ConfigRow {
     active_model: String,
@@ -62,6 +69,8 @@ struct ConfigRow {
     prompt: Option<String>,
     resolution: Option<String>,
     aspect_ratio: Option<String>,
+    max_input_bytes: Option<i64>,
+    max_input_pixels: Option<i64>,
 }
 
 async fn settings(pool: &PgPool) -> Result<Settings, &'static str> {
@@ -69,7 +78,9 @@ async fn settings(pool: &PgPool) -> Result<Settings, &'static str> {
         "select active_model, alternate_model, prompt_version,
                 params->>'prompt' as prompt,
                 params->>'resolution' as resolution,
-                params->>'aspectRatio' as aspect_ratio
+                params->>'aspectRatio' as aspect_ratio,
+                (params->>'maxInputBytes')::bigint as max_input_bytes,
+                (params->>'maxInputPixels')::bigint as max_input_pixels
            from ai_model_config
           where capability = $1 and enabled",
     )
@@ -90,12 +101,16 @@ async fn settings(pool: &PgPool) -> Result<Settings, &'static str> {
         aspect_ratio: row
             .aspect_ratio
             .unwrap_or_else(|| openrouter::DEFAULT_ASPECT_RATIO.to_owned()),
+        bounds: image::Bounds {
+            max_bytes: positive(row.max_input_bytes).unwrap_or(image::DEFAULT_MAX_BYTES),
+            max_pixels: positive(row.max_input_pixels).unwrap_or(image::DEFAULT_MAX_PIXELS),
+        },
     })
 }
 
 async fn cutout_for(pool: &PgPool, item: Uuid) -> Result<Option<Cutout>, &'static str> {
     sqlx::query_as(
-        "select m.storage_key, m.content_type
+        "select m.storage_key
            from item_cutout c
            join media_object m on m.id = c.media_object_id
           where c.item_id = $1 and c.deleted_at is null
@@ -105,12 +120,7 @@ async fn cutout_for(pool: &PgPool, item: Uuid) -> Result<Option<Cutout>, &'stati
     .bind(item)
     .fetch_optional(pool)
     .await
-    .map(|row: Option<(String, String)>| {
-        row.map(|(storage_key, content_type)| Cutout {
-            storage_key,
-            content_type,
-        })
-    })
+    .map(|row: Option<(String,)>| row.map(|(storage_key,)| Cutout { storage_key }))
     .map_err(|_| "database")
 }
 
@@ -350,11 +360,23 @@ pub async fn render_for(
         return set_state(pool, account, item, "failed").await;
     }
 
-    set_state(pool, account, item, "rendering").await?;
     let bytes = storage
         .get(&cutout.storage_key)
         .await
         .map_err(|_| "object_store")?;
+    let bytes = match image::prepare(&bytes, settings.bounds) {
+        Ok(prepared) => prepared,
+        Err(rejection) => {
+            tracing::warn!(
+                job.id = %job.id,
+                rejection = rejection.code(),
+                "the cut-out cannot be sent, so no render was attempted"
+            );
+            return set_state(pool, account, item, "failed").await;
+        }
+    };
+
+    set_state(pool, account, item, "rendering").await?;
 
     let started = std::time::Instant::now();
     let outcome = openrouter::render(
@@ -365,7 +387,7 @@ pub async fn render_for(
             model: &pinned.model,
             prompt: &settings.prompt,
             cutout: &bytes,
-            content_type: &cutout.content_type,
+            content_type: "image/png",
             resolution: &settings.resolution,
             aspect_ratio: &settings.aspect_ratio,
             seed: pinned.seed,
@@ -418,7 +440,13 @@ async fn settle(
         }
     };
 
-    let oversize = rendered.image.len() > MAX_IMAGE_BYTES;
+    let unusable = rendered.image.len() > MAX_IMAGE_BYTES
+        || image::verify_generation(
+            &rendered.image,
+            &work.settings.resolution,
+            &work.settings.aspect_ratio,
+        )
+        .is_err();
     record(
         work.pool,
         work.job,
@@ -426,7 +454,7 @@ async fn settle(
         work.pinned,
         work.settings,
         &Accounting {
-            status: if oversize {
+            status: if unusable {
                 "invalid_output"
             } else {
                 "succeeded"
@@ -439,7 +467,7 @@ async fn settle(
     )
     .await?;
 
-    if oversize {
+    if unusable {
         if !final_attempt && worth_another_attempt(Failure::InvalidOutput, work.pinned) {
             return Err("provider_retryable");
         }
