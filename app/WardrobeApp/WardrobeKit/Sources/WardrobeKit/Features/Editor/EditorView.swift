@@ -12,7 +12,7 @@ public struct EditorView<ReviewDrawer: View>: View {
 
     private let isCompleting: Bool
     private let didResumeDraft: Bool
-    private let makeCropViewModel: (String) -> CropViewModel
+    private let makeCropViewModel: (UUID) -> CropViewModel
     private let onDiscard: () -> Void
     private let onComplete: () -> Void
     private let reviewDrawer: ReviewDrawer
@@ -21,7 +21,7 @@ public struct EditorView<ReviewDrawer: View>: View {
         viewModel: EditorViewModel,
         isCompleting: Bool,
         didResumeDraft: Bool,
-        makeCropViewModel: @escaping (String) -> CropViewModel,
+        makeCropViewModel: @escaping (UUID) -> CropViewModel,
         onDiscard: @escaping () -> Void,
         onComplete: @escaping () -> Void,
         @ViewBuilder reviewDrawer: () -> ReviewDrawer

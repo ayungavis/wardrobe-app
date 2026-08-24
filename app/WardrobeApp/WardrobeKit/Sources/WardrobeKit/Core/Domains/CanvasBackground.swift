@@ -3,7 +3,7 @@ import SwiftUI
 
 public enum CanvasBackground: Equatable, Sendable {
     case palette(Palette)
-    case photo(id: String, crop: CropSpec?)
+    case photo(id: UUID, crop: CropSpec?)
 
     public static let `default` = CanvasBackground.palette(.white)
 
@@ -40,7 +40,7 @@ public enum CanvasBackground: Equatable, Sendable {
         }
     }
 
-    public var photoID: String? {
+    public var photoID: UUID? {
         guard case let .photo(id, _) = self else { return nil }
         return id
     }
@@ -70,7 +70,7 @@ extension CanvasBackground: Codable {
         }
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self = try .photo(
-            id: container.decode(String.self, forKey: .photoID),
+            id: container.decode(UUID.self, forKey: .photoID),
             crop: container.decodeIfPresent(CropSpec.self, forKey: .crop)
         )
     }

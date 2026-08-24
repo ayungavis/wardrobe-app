@@ -7,7 +7,7 @@ public final class GarmentReviewModel {
     public private(set) var garments: [ScannedGarment] = []
     public private(set) var isScanning = false
 
-    private var scannedPhotoID: String?
+    private var scannedPhotoID: UUID?
     private let scanner: GarmentScanService
     private let photoRepository: PhotoRepository
     private let wardrobeRepository: WardrobeItemRepository
@@ -30,7 +30,7 @@ public final class GarmentReviewModel {
     // screen — a second of jank on a big photo. Moving Core ML off the main
     // actor is the upgrade when it starts to bite.
 
-    public func scanIfNeeded(photoID: String?) {
+    public func scanIfNeeded(photoID: UUID?) {
         guard let photoID, scannedPhotoID != photoID else { return }
         scannedPhotoID = photoID
         scan { [photoRepository] in try photoRepository.loadOriginal(id: photoID) }

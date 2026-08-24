@@ -141,7 +141,7 @@ struct ChallengeViewModelTests {
     private func makeCompletion(at date: Date) -> CompletedChallenge {
         CompletedChallenge(
             card: ChallengeCard(prompt: "done"),
-            photoID: UUID().uuidString,
+            photoID: UUID.v7(),
             document: .fixture(),
             completedAt: date
         )
@@ -191,7 +191,7 @@ struct ChallengeViewModelTests {
         sut.accept(ChallengeCard(prompt: "x"))
 
         var active = try #require(activeRepository.stored)
-        active.photoID = "11111111-2222-3333-4444-555555555555"
+        active.photoID = id("11111111-2222-3333-4444-555555555555")
         activeRepository.stored = active
         sut.refreshActiveChallenge()
 
@@ -200,7 +200,7 @@ struct ChallengeViewModelTests {
         #expect(sut.activeChallenge != nil)
 
         sut.abandon()
-        #expect(photoRepository.deleted == ["11111111-2222-3333-4444-555555555555"])
+        #expect(photoRepository.deleted == [id("11111111-2222-3333-4444-555555555555")])
         #expect(sut.activeChallenge == nil)
         #expect(activeRepository.stored == nil)
     }

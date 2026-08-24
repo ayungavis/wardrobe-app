@@ -3,7 +3,7 @@ import Foundation
 public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let card: ChallengeCard
-    public let photoID: String
+    public let photoID: UUID
     public let document: EditorDocument
     public let completedAt: Date
     public var previewFile: String?
@@ -11,7 +11,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public init(
         id: UUID = UUID(),
         card: ChallengeCard,
-        photoID: String,
+        photoID: UUID,
         document: EditorDocument,
         completedAt: Date,
         previewFile: String? = nil
@@ -33,7 +33,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         card = try container.decode(ChallengeCard.self, forKey: .card)
-        photoID = try container.decode(String.self, forKey: .photoID)
+        photoID = try container.decode(UUID.self, forKey: .photoID)
         completedAt = try container.decode(Date.self, forKey: .completedAt)
         previewFile = try container.decodeIfPresent(String.self, forKey: .previewFile)
 

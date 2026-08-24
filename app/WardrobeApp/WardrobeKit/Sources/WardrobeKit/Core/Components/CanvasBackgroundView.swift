@@ -3,7 +3,7 @@ import SwiftUI
 
 struct CanvasBackgroundView: View {
     let background: CanvasBackground
-    var photo: (String) -> CGImage? = { _ in nil }
+    var photo: (UUID) -> CGImage? = { _ in nil }
 
     var body: some View {
         switch background {

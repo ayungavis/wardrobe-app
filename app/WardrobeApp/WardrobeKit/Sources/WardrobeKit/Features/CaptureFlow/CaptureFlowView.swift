@@ -7,12 +7,12 @@ public struct CaptureFlowView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: CaptureFlowViewModel
     private let makeEditorViewModel: (ActiveChallenge) -> EditorViewModel
-    private let makeCropViewModel: (String) -> CropViewModel
+    private let makeCropViewModel: (UUID) -> CropViewModel
 
     public init(
         viewModel: CaptureFlowViewModel,
         makeEditorViewModel: @escaping (ActiveChallenge) -> EditorViewModel,
-        makeCropViewModel: @escaping (String) -> CropViewModel
+        makeCropViewModel: @escaping (UUID) -> CropViewModel
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.makeEditorViewModel = makeEditorViewModel

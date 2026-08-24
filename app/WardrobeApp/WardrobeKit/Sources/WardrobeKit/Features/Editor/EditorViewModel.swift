@@ -21,9 +21,9 @@ public final class EditorViewModel {
     /// ponytail: every photo's bytes live here at once. Two or three is fine;
     /// if a document ever holds many, read them back from the repository at
     /// export time instead.
-    public internal(set) var originals: Loadable<[String: Data]> = .idle
-    public internal(set) var previewImages: [String: CGImage] = [:]
-    public internal(set) var croppedPreviews: [String: CGImage] = [:]
+    public internal(set) var originals: Loadable<[UUID: Data]> = .idle
+    public internal(set) var previewImages: [UUID: CGImage] = [:]
+    public internal(set) var croppedPreviews: [UUID: CGImage] = [:]
     public internal(set) var document: EditorDocument
 
     public internal(set) var selectedLayerID: UUID?
@@ -127,7 +127,7 @@ public final class EditorViewModel {
         activeTool = .crop(target)
     }
 
-    public var croppingPhotoID: String? {
+    public var croppingPhotoID: UUID? {
         guard case let .crop(target) = activeTool else { return nil }
         return photoID(for: target)
     }
@@ -145,7 +145,7 @@ public final class EditorViewModel {
         return StoryCanvas.aspectRatio
     }
 
-    private func photoID(for target: CropTarget) -> String? {
+    private func photoID(for target: CropTarget) -> UUID? {
         switch target {
         case let .layer(id):
             guard case let .photo(content) = document.layer(id: id)?.content else { return nil }

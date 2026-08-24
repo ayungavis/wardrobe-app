@@ -2,21 +2,21 @@ import Foundation
 
 public protocol PhotoRepository: Sendable {
     @discardableResult
-    func saveOriginal(_ data: Data) throws -> String
-    func loadOriginal(id: String) throws -> Data
-    func deleteOriginal(id: String) throws
+    func saveOriginal(_ data: Data) throws -> UUID
+    func loadOriginal(id: UUID) throws -> Data
+    func deleteOriginal(id: UUID) throws
 }
 
 public extension PhotoRepository {
-    func deleteOriginals(of document: EditorDocument, and photoID: String?) {
+    func deleteOriginals(of document: EditorDocument, and photoID: UUID?) {
         delete(Set(document.photoIDs).union([photoID].compactMap(\.self)))
     }
 
-    func deleteUnusedOriginals(of document: EditorDocument, imported: [String]) {
+    func deleteUnusedOriginals(of document: EditorDocument, imported: [UUID]) {
         delete(Set(imported).subtracting(document.photoIDs))
     }
 
-    private func delete(_ ids: Set<String>) {
+    private func delete(_ ids: Set<UUID>) {
         for id in ids {
             do {
                 try deleteOriginal(id: id)
@@ -35,9 +35,9 @@ public final class FilePhotoRepository: PhotoRepository, @unchecked Sendable {
             ?? URL.applicationSupportDirectory.appending(path: "Photos")
     }
 
-    public func saveOriginal(_ data: Data) throws -> String {
+    public func saveOriginal(_ data: Data) throws -> UUID {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let id = UUID().uuidString
+        let id = UUID.v7()
         var options: Data.WritingOptions = [.atomic]
         #if os(iOS)
             options.insert(.completeFileProtection)
@@ -46,20 +46,15 @@ public final class FilePhotoRepository: PhotoRepository, @unchecked Sendable {
         return id
     }
 
-    public func loadOriginal(id: String) throws -> Data {
-        try Data(contentsOf: fileURL(validated: id))
+    public func loadOriginal(id: UUID) throws -> Data {
+        try Data(contentsOf: fileURL(id))
     }
 
-    public func deleteOriginal(id: String) throws {
-        try FileManager.default.removeItem(at: fileURL(validated: id))
+    public func deleteOriginal(id: UUID) throws {
+        try FileManager.default.removeItem(at: fileURL(id))
     }
 
-    private func fileURL(_ id: String) -> URL {
-        directory.appending(path: "\(id).jpg")
-    }
-
-    private func fileURL(validated id: String) throws -> URL {
-        guard UUID(uuidString: id) != nil else { throw AppError.unexpected }
-        return fileURL(id)
+    private func fileURL(_ id: UUID) -> URL {
+        directory.appending(path: "\(id.uuidString).jpg")
     }
 }

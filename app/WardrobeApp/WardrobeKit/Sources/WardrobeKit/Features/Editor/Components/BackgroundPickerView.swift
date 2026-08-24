@@ -7,7 +7,7 @@ struct BackgroundPickerView: View {
     @Environment(\.dismiss) private var dismiss
 
     let selected: CanvasBackground
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     let onPick: (CanvasBackground) -> Void
     let onPickPhoto: (Data) -> Void
 
@@ -115,7 +115,7 @@ private struct BackgroundTileView: View {
     }
 
     let artwork: Artwork
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     let title: Text
     let isSelected: Bool
 

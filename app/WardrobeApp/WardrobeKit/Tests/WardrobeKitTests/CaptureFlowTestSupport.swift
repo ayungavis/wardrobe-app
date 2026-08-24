@@ -41,7 +41,7 @@ func makeEditorStageCaptureFlowSUT(
     previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository()
 ) -> CaptureFlowViewModel {
     var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-    challenge.photoID = UUID().uuidString
+    challenge.photoID = UUID.v7()
     activeRepository.stored = challenge
     let camera = FakeCameraService()
     camera.permission = .granted

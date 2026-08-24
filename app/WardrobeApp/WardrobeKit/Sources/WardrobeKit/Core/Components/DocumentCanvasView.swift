@@ -3,7 +3,7 @@ import SwiftUI
 
 struct DocumentCanvasView: View {
     let document: EditorDocument
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     let size: CGSize
 
     var body: some View {

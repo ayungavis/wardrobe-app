@@ -6,7 +6,7 @@ struct EditorLayerView: View {
     let layer: EditorLayer
     let canvasSize: CGSize
     let transform: ElementTransform
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     let isSelected: Bool
     let isOverDeleteTarget: Bool
     let isChallengePhoto: Bool

@@ -99,7 +99,7 @@ struct EditorPhotoTests {
     /// reopened from History protects a different photo. This is what stops it
     /// being moved into `EditorDocument` later by mistake.
     @Test func theDocumentItselfHasNoOpinionAboutTheChallengePhoto() {
-        var document = EditorDocument(photoID: "photo-1")
+        var document = EditorDocument(photoID: id("photo-1"))
         let layerID = document.layers[0].id
 
         document.removeLayer(id: layerID)

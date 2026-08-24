@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import CryptoKit
 import Foundation
 @testable import WardrobeKit
 
@@ -163,25 +164,25 @@ actor FakePhotoLibrary: PhotoLibraryService {
 }
 
 final class SpyPhotoRepository: PhotoRepository, @unchecked Sendable {
-    var saved: [String: Data] = [:]
-    var deleted: [String] = []
+    var saved: [UUID: Data] = [:]
+    var deleted: [UUID] = []
     var saveError: Error?
 
-    func saveOriginal(_ data: Data) throws -> String {
+    func saveOriginal(_ data: Data) throws -> UUID {
         if let saveError {
             throw saveError
         }
-        let id = UUID().uuidString
+        let id = UUID.v7()
         saved[id] = data
         return id
     }
 
-    func loadOriginal(id: String) throws -> Data {
+    func loadOriginal(id: UUID) throws -> Data {
         guard let data = saved[id] else { throw AppError.unexpected }
         return data
     }
 
-    func deleteOriginal(id: String) throws {
+    func deleteOriginal(id: UUID) throws {
         deleted.append(id)
         saved[id] = nil
     }
@@ -255,7 +256,7 @@ final class FakeCameraService: CameraService {
 
 extension EditorDocument {
     /// The same document with every photo layer pointed at `photoID`.
-    func showingPhoto(_ photoID: String) -> EditorDocument {
+    func showingPhoto(_ photoID: UUID) -> EditorDocument {
         var copy = self
         copy.layers = layers.map { layer in
             guard case let .photo(content) = layer.content else { return layer }
@@ -285,7 +286,7 @@ extension EditorDocument {
     /// the migration has its own tests, so a break there fails loudly at the
     /// source instead of quietly here.
     static func fixture(
-        photoID: String? = "photo-1",
+        photoID: UUID? = samplePhotoID,
         crop: CropSpec? = nil,
         texts: [TextItem] = [],
         stickers: [StickerItem] = [],
@@ -365,4 +366,20 @@ final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, 
     func save(_ preferences: AccountPreferences) {
         stored = preferences
     }
+}
+
+// -------------------------------------------------- readable photo identities
+
+/// A stable UUID for a fixture name, so `id("photo-1")` still reads like the
+/// string literal it replaced while satisfying the typed identity.
+let samplePhotoID = id("photo-1")
+
+func id(_ name: String) -> UUID {
+    var bytes = Array(SHA256.hash(data: Data(name.utf8)).prefix(16))
+    bytes[6] = (bytes[6] & 0x0F) | 0x70
+    bytes[8] = (bytes[8] & 0x3F) | 0x80
+    return UUID(uuid: (
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    ))
 }

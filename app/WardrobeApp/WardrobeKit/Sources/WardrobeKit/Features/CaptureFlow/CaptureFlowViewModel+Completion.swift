@@ -41,7 +41,7 @@ public extension CaptureFlowViewModel {
     /// ponytail: stored at full export size, roughly 300 KB a completion.
     /// Downscale, or keep a second smaller rendition, when storage complains.
     func renderPreview(of completion: CompletedChallenge) async -> String? {
-        var originals: [String: Data] = [:]
+        var originals: [UUID: Data] = [:]
         for id in Set(completion.document.photoIDs) {
             originals[id] = try? photoRepository.loadOriginal(id: id)
         }

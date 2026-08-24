@@ -102,10 +102,11 @@ struct DevMenuViewModelTests {
     /// the shape FR-093 produces, and the only one that can catch a leak.
     private func makeCompletion(
         at date: Date,
-        photoID: String = UUID().uuidString,
-        extraPhotoIDs: [String] = []
+        named name: String = UUID().uuidString,
+        extraPhotoIDs: [UUID] = []
     ) -> CompletedChallenge {
-        var document = EditorDocument.fixture(photoID: "doc-\(photoID)")
+        let photoID = id(name)
+        var document = EditorDocument.fixture(photoID: id("doc-\(name)"))
         for extra in extraPhotoIDs {
             document.appendPhoto(extra)
         }
@@ -117,7 +118,7 @@ struct DevMenuViewModelTests {
         )
     }
 
-    private func makeActive(photoID: String?) -> ActiveChallenge {
+    private func makeActive(photoID: UUID?) -> ActiveChallenge {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
         return challenge
@@ -125,9 +126,9 @@ struct DevMenuViewModelTests {
 
     @Test func resetTodayClearsCompletionActiveChallengeAndPhotos() {
         let activeRepository = InMemoryActiveChallengeRepository()
-        activeRepository.stored = makeActive(photoID: "active-photo")
+        activeRepository.stored = makeActive(photoID: id("active-photo"))
         let completedRepository = InMemoryCompletedChallengeRepository()
-        completedRepository.stored = [makeCompletion(at: Date(), photoID: "done-photo")]
+        completedRepository.stored = [makeCompletion(at: Date(), named: "done-photo")]
         let photoRepository = SpyPhotoRepository()
         let sut = makeSUT(
             activeRepository: activeRepository,
@@ -139,7 +140,7 @@ struct DevMenuViewModelTests {
 
         #expect(completedRepository.stored.isEmpty)
         #expect(activeRepository.stored == nil)
-        #expect(photoRepository.deleted.sorted() == ["active-photo", "doc-done-photo", "done-photo"])
+        #expect(photoRepository.deleted.sorted() == [id("active-photo"), id("doc-done-photo"), id("done-photo")].sorted())
         #expect(sut.summary == DevStateSummary())
         #expect(sut.lastAction != nil)
     }
@@ -147,15 +148,15 @@ struct DevMenuViewModelTests {
     @Test func resetTodayKeepsEarlierCompletions() {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         let completedRepository = InMemoryCompletedChallengeRepository()
-        completedRepository.stored = [makeCompletion(at: yesterday, photoID: "old"), makeCompletion(at: Date())]
+        completedRepository.stored = [makeCompletion(at: yesterday, named: "old"), makeCompletion(at: Date())]
         let photoRepository = SpyPhotoRepository()
         let sut = makeSUT(completedRepository: completedRepository, photoRepository: photoRepository)
 
         sut.resetToday()
 
-        #expect(completedRepository.stored.map(\.photoID) == ["old"])
-        #expect(!photoRepository.deleted.contains("old"))
-        #expect(!photoRepository.deleted.contains("doc-old"))
+        #expect(completedRepository.stored.map(\.photoID) == [id("old")])
+        #expect(!photoRepository.deleted.contains(id("old")))
+        #expect(!photoRepository.deleted.contains(id("doc-old")))
         #expect(sut.summary.completionCount == 1)
         #expect(!sut.summary.hasCompletedToday)
     }
@@ -174,8 +175,8 @@ struct DevMenuViewModelTests {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [
-            makeCompletion(at: yesterday, photoID: "old"),
-            makeCompletion(at: Date(), photoID: "today"),
+            makeCompletion(at: yesterday, named: "old"),
+            makeCompletion(at: Date(), named: "today"),
         ]
         let photoRepository = SpyPhotoRepository()
         let sut = makeSUT(completedRepository: completedRepository, photoRepository: photoRepository)
@@ -183,7 +184,7 @@ struct DevMenuViewModelTests {
         sut.resetHistory()
 
         #expect(completedRepository.stored.isEmpty)
-        #expect(photoRepository.deleted.sorted() == ["doc-old", "doc-today", "old", "today"])
+        #expect(photoRepository.deleted.sorted() == [id("doc-old"), id("doc-today"), id("old"), id("today")].sorted())
         #expect(sut.summary.completionCount == 0)
         #expect(!sut.summary.hasCompletedToday)
         #expect(sut.lastAction != nil)
@@ -197,7 +198,7 @@ struct DevMenuViewModelTests {
         let previews = InMemoryCompletionPreviewRepository()
         let file = try previews.save(Data([0x01]), id: UUID())
         let completedRepository = InMemoryCompletedChallengeRepository()
-        var completion = makeCompletion(at: Date(), photoID: "done")
+        var completion = makeCompletion(at: Date(), named: "done")
         completion.previewFile = file
         completedRepository.stored = [completion]
         let sut = makeSUT(completedRepository: completedRepository, previews: previews)
@@ -213,9 +214,9 @@ struct DevMenuViewModelTests {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         let todayFile = try previews.save(Data([0x01]), id: UUID())
         let oldFile = try previews.save(Data([0x02]), id: UUID())
-        var today = makeCompletion(at: Date(), photoID: "today")
+        var today = makeCompletion(at: Date(), named: "today")
         today.previewFile = todayFile
-        var old = makeCompletion(at: yesterday, photoID: "old")
+        var old = makeCompletion(at: yesterday, named: "old")
         old.previewFile = oldFile
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [old, today]
@@ -228,9 +229,9 @@ struct DevMenuViewModelTests {
 
     @Test func resetHistoryLeavesTheActiveChallengeAlone() {
         let activeRepository = InMemoryActiveChallengeRepository()
-        activeRepository.stored = makeActive(photoID: "active-photo")
+        activeRepository.stored = makeActive(photoID: id("active-photo"))
         let completedRepository = InMemoryCompletedChallengeRepository()
-        completedRepository.stored = [makeCompletion(at: Date(), photoID: "done")]
+        completedRepository.stored = [makeCompletion(at: Date(), named: "done")]
         let photoRepository = SpyPhotoRepository()
         let sut = makeSUT(
             activeRepository: activeRepository,
@@ -241,7 +242,7 @@ struct DevMenuViewModelTests {
         sut.resetHistory()
 
         #expect(activeRepository.stored != nil)
-        #expect(!photoRepository.deleted.contains("active-photo"))
+        #expect(!photoRepository.deleted.contains(id("active-photo")))
         #expect(sut.summary.hasActiveChallenge)
     }
 
@@ -259,14 +260,14 @@ struct DevMenuViewModelTests {
     /// them is a file on disk that nothing else can name once the record goes.
     @Test func resetTodayDeletesEveryPhotoTheCanvasHolds() {
         let activeRepository = InMemoryActiveChallengeRepository()
-        var active = makeActive(photoID: "active-photo")
-        active.document.appendPhoto("active-extra")
+        var active = makeActive(photoID: id("active-photo"))
+        active.document.appendPhoto(id("active-extra"))
         // Imported, then deleted from the canvas — no layer left to name it.
-        active.importedPhotoIDs = ["active-extra", "active-orphan"]
+        active.importedPhotoIDs = [id("active-extra"), id("active-orphan")]
         activeRepository.stored = active
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [
-            makeCompletion(at: Date(), photoID: "done", extraPhotoIDs: ["done-extra"]),
+            makeCompletion(at: Date(), named: "done", extraPhotoIDs: [id("done-extra")]),
         ]
         let photoRepository = SpyPhotoRepository()
         let sut = makeSUT(
@@ -278,9 +279,9 @@ struct DevMenuViewModelTests {
         sut.resetToday()
 
         #expect(photoRepository.deleted.sorted() == [
-            "active-extra", "active-orphan", "active-photo",
-            "doc-done", "done", "done-extra",
-        ])
+            id("active-extra"), id("active-orphan"), id("active-photo"),
+            id("doc-done"), id("done"), id("done-extra"),
+        ].sorted())
     }
 
     @Test func summaryReflectsStoresAfterRefresh() {

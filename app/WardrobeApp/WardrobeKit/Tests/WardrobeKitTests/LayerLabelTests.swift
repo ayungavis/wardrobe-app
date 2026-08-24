@@ -17,7 +17,7 @@ struct LayerLabelTests {
     /// Every other kind is named by its kind, so the title is a catalogue key
     /// rather than anything user-generated.
     @Test func everyOtherKindIsNamedByItsKind() {
-        #expect(LayerLabel.title(for: .photo(PhotoContent(photoID: "p"))) == "editor.layer.photo")
+        #expect(LayerLabel.title(for: .photo(PhotoContent(photoID: id("p")))) == "editor.layer.photo")
         #expect(LayerLabel.title(for: .sticker(StickerContent(emoji: "✨"))) == "editor.layer.sticker")
         #expect(LayerLabel.title(for: .drawing(DrawingContent(strokes: []))) == "editor.layer.drawing")
     }

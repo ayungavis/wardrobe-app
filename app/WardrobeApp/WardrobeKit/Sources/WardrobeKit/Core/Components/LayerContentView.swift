@@ -4,7 +4,7 @@ import SwiftUI
 struct LayerContentView: View {
     let content: LayerContent
     let canvasSize: CGSize
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
 
     var body: some View {
         switch content {

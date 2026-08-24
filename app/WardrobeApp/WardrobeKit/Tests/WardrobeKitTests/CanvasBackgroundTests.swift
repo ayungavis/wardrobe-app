@@ -22,11 +22,11 @@ struct CanvasBackgroundTests {
     @Test func anUnknownPaletteTokenFallsBackAndKeepsTheLayers() throws {
         let json = """
         {
-          "id": "\(UUID().uuidString)",
+          "id": "\(UUID.v7())",
           "schemaVersion": 1,
           "background": "chartreuse",
           "layers": [
-            { "id": "\(UUID().uuidString)", "content": { "kind": "text", "value": { "content": "hi" } } }
+            { "id": "\(UUID.v7())", "content": { "kind": "text", "value": { "content": "hi" } } }
           ]
         }
         """
@@ -42,10 +42,10 @@ struct CanvasBackgroundTests {
     @Test func anUnknownLayerKindStillRefuses() {
         let json = """
         {
-          "id": "\(UUID().uuidString)",
+          "id": "\(UUID.v7())",
           "schemaVersion": 1,
           "layers": [
-            { "id": "\(UUID().uuidString)", "content": { "kind": "hologram", "value": {} } }
+            { "id": "\(UUID.v7())", "content": { "kind": "hologram", "value": {} } }
           ]
         }
         """
@@ -70,36 +70,36 @@ struct CanvasBackgroundTests {
 
     @Test func aPhotoBackgroundSurvivesARoundTripWithItsCrop() throws {
         let crop = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.6))
-        let document = EditorDocument(layers: [], background: .photo(id: "bg-1", crop: crop))
+        let document = EditorDocument(layers: [], background: .photo(id: id("bg-1"), crop: crop))
 
         let restored = try JSONDecoder().decode(
             EditorDocument.self, from: JSONEncoder().encode(document)
         )
 
-        #expect(restored.background == .photo(id: "bg-1", crop: crop))
+        #expect(restored.background == .photo(id: id("bg-1"), crop: crop))
     }
 
     @Test func aPhotoBackgroundWithoutACropSurvivesToo() throws {
-        let document = EditorDocument(layers: [], background: .photo(id: "bg-1", crop: nil))
+        let document = EditorDocument(layers: [], background: .photo(id: id("bg-1"), crop: nil))
 
         let restored = try JSONDecoder().decode(
             EditorDocument.self, from: JSONEncoder().encode(document)
         )
 
-        #expect(restored.background == .photo(id: "bg-1", crop: nil))
+        #expect(restored.background == .photo(id: id("bg-1"), crop: nil))
     }
 
     /// The background's file has the same lifetime as any layer's, and every
     /// loader and cleanup path reads `photoIDs` to find it.
     @Test func photoIDsIncludesTheBackground() {
         let document = EditorDocument(
-            layers: [EditorLayer(content: .photo(PhotoContent(photoID: "layer-1")))],
-            background: .photo(id: "bg-1", crop: nil)
+            layers: [EditorLayer(content: .photo(PhotoContent(photoID: id("layer-1"))))],
+            background: .photo(id: id("bg-1"), crop: nil)
         )
 
-        #expect(document.photoIDs.sorted() == ["bg-1", "layer-1"])
+        #expect(document.photoIDs.sorted() == [id("bg-1"), id("layer-1")])
         // Layer lookups must not start finding the background.
-        #expect(document.photoLayerID(showing: "bg-1") == nil)
+        #expect(document.photoLayerID(showing: id("bg-1")) == nil)
     }
 
     /// Undo refreshes previews by comparing this, so a background crop missing
@@ -107,17 +107,17 @@ struct CanvasBackgroundTests {
     @Test func photoCropsIncludesTheBackground() {
         let crop = CropSpec(rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))
         let document = EditorDocument(
-            layers: [EditorLayer(content: .photo(PhotoContent(photoID: "layer-1")))],
-            background: .photo(id: "bg-1", crop: crop)
+            layers: [EditorLayer(content: .photo(PhotoContent(photoID: id("layer-1"))))],
+            background: .photo(id: id("bg-1"), crop: crop)
         )
 
-        #expect(document.photoCrops["bg-1"] == crop)
-        #expect(document.photoCrops["layer-1"] == CropSpec?.none)
+        #expect(document.photoCrops[id("bg-1")] == crop)
+        #expect(document.photoCrops[id("layer-1")] == CropSpec?.none)
     }
 
     @Test func aDocumentWithNoBackgroundUsesTheDefault() throws {
         let json = """
-        { "id": "\(UUID().uuidString)", "schemaVersion": 1, "layers": [] }
+        { "id": "\(UUID.v7())", "schemaVersion": 1, "layers": [] }
         """
 
         #expect(try JSONDecoder().decode(EditorDocument.self, from: Data(json.utf8)).background == .default)

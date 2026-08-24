@@ -7,7 +7,7 @@ struct LayerThumbnailView: View {
     private static let cornerRadius: CGFloat = 11
 
     let content: LayerContent
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
 
     var body: some View {
         artwork
@@ -32,7 +32,7 @@ struct LayerThumbnailView: View {
     }
 
     @ViewBuilder
-    private func photoFill(_ photoID: String) -> some View {
+    private func photoFill(_ photoID: UUID) -> some View {
         if let photo = photo(photoID) {
             Image(decorative: photo, scale: 1)
                 .resizable()

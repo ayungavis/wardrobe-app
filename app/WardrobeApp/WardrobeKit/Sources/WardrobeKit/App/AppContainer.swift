@@ -121,7 +121,7 @@ public final class AppContainer {
         )
     }
 
-    public func makeCropViewModel(photoID: String) -> CropViewModel {
+    public func makeCropViewModel(photoID: UUID) -> CropViewModel {
         CropViewModel(photoID: photoID, photoRepository: photoRepository)
     }
 

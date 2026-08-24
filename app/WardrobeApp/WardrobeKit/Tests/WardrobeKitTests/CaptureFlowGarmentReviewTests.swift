@@ -118,7 +118,7 @@ struct CaptureFlowGarmentReviewTests {
 
     @Test func aFailedScanLeavesTheEditorUsable() async {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString // never saved, so loading throws
+        challenge.photoID = UUID.v7() // never saved, so loading throws
         let sut = makeSUT(challenge: challenge)
 
         sut.review.scanIfNeeded(photoID: sut.challenge.photoID)

@@ -54,10 +54,10 @@ extension LayerContent: Codable {
 }
 
 public struct PhotoContent: Equatable, Codable, Sendable {
-    public let photoID: String
+    public let photoID: UUID
     public var crop: CropSpec?
 
-    public init(photoID: String, crop: CropSpec? = nil) {
+    public init(photoID: UUID, crop: CropSpec? = nil) {
         self.photoID = photoID
         self.crop = crop
     }

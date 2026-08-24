@@ -42,7 +42,7 @@ public final class HistoryViewModel {
     public func renderMissingPreview(for completion: CompletedChallenge) async {
         guard previewData(for: completion) == nil else { return }
 
-        var originals: [String: Data] = [:]
+        var originals: [UUID: Data] = [:]
         for id in Set(completion.document.photoIDs) {
             originals[id] = try? photoRepository.loadOriginal(id: id)
         }

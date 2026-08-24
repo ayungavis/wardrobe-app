@@ -19,7 +19,7 @@ struct GarmentReviewModelTests {
     private func makeGarment(
         decision: ScannedGarment.Decision,
         matches: [ItemMatch] = [],
-        file: String = "\(UUID().uuidString).png"
+        file: String = "\(UUID.v7()).png"
     ) -> ScannedGarment {
         let id = UUID()
         return ScannedGarment(

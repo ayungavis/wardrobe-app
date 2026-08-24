@@ -7,7 +7,7 @@ import Testing
 struct LayerOrderingTests {
     private func makeDocument() -> EditorDocument {
         EditorDocument(layers: [
-            EditorLayer(content: .photo(PhotoContent(photoID: "photo-1"))),
+            EditorLayer(content: .photo(PhotoContent(photoID: id("photo-1")))),
             EditorLayer(content: .sticker(StickerContent(emoji: "✨"))),
             EditorLayer(content: .text(TextContent(content: "OOTD"))),
         ])

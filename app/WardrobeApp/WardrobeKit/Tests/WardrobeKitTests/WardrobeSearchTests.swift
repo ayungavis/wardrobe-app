@@ -8,7 +8,7 @@ struct WardrobeSearchTests {
             name: name,
             description: description,
             category: .top,
-            cutoutFile: "\(UUID().uuidString).png",
+            cutoutFile: "\(UUID.v7()).png",
             createdAt: Date(),
             updatedAt: Date()
         )
