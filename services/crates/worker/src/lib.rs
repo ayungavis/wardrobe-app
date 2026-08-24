@@ -23,6 +23,11 @@ pub fn kinds(illustration: bool) -> Vec<&'static str> {
 // and runs twice. Raise it above the slowest handler, or move to a heartbeat
 // the handler refreshes, once any job can outlive it.
 pub const STALL_AFTER_MINUTES: i64 = 15;
+
+// ponytail: 300s is roughly twice the 147s a live Seedream render measured in
+// T15h. Raise it from a new measurement, and keep it under STALL_AFTER_MINUTES
+// or the reclaimer races a request that is still running.
+pub const PROVIDER_TIMEOUT_SECONDS: u64 = 300;
 pub const SWEEP_GRACE_HOURS: i64 = 24;
 const SWEEP_BATCH: i64 = 500;
 const MAX_BACKOFF_SECONDS: i32 = 3600;
@@ -177,4 +182,18 @@ pub async fn sweep_media(
     }
 
     Ok(swept)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PROVIDER_TIMEOUT_SECONDS, STALL_AFTER_MINUTES};
+
+    #[test]
+    fn a_provider_call_gives_up_long_before_the_reclaimer_wakes() {
+        let stall = u64::try_from(STALL_AFTER_MINUTES).expect("a positive threshold") * 60;
+        assert!(
+            PROVIDER_TIMEOUT_SECONDS < stall,
+            "a request still running when the reclaimer fires is a second render, and a second bill"
+        );
+    }
 }

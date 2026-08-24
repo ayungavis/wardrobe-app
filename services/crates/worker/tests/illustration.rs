@@ -40,10 +40,6 @@ fn provider(server: &MockServer) -> Provider {
 const ONE_PIXEL_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk\
                              +M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-fn png_bytes() -> Vec<u8> {
-    STANDARD.decode(ONE_PIXEL_PNG).expect("a png")
-}
-
 fn rendered_image() -> Value {
     json!({
         "provider": "a-provider",
@@ -500,20 +496,85 @@ async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
     Ok(())
 }
 
+// ------------------------------------------------------- the clock
+
+#[tokio::test]
+async fn a_provider_that_never_answers_gives_up_instead_of_hanging() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/images"))
+        .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(30)))
+        .mount(&server)
+        .await;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(100))
+        .build()
+        .expect("a client");
+
+    let outcome = illustration::openrouter::render(
+        &client,
+        &server.uri(),
+        "test-key",
+        &live_ask("a/model", b"cut-out"),
+    )
+    .await;
+
+    assert_eq!(
+        outcome.err(),
+        Some(illustration::openrouter::Failure::Unavailable),
+        "a hung provider must be retryable, not a worker that stops claiming anything"
+    );
+    assert!(
+        illustration::openrouter::Failure::Unavailable.status() == "failed",
+        "and it settles as failed only after the attempts run out"
+    );
+}
+
 // --------------------------------------------------- the shape, for real
+
+const FLAT_SQUARE_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAACAElEQVR42u3TQQ0AAAjEsFOHHOSglz\
+                               caaFIFS5bqgbciAQYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYA\
+                               A4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABMIAKGAAMAAYAA4\
+                               ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYA\
+                               A4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAbAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgA\
+                               HAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgAD\
+                               gAHAAGAAMAAGUAEDgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgA\
+                               HAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAABgADAAGAAOAAcAA\
+                               YAAwABgADAAGAAOAAcAAYAAwABgADAAGAAOAAcAAYAAwABgADAAGAAOAAcAAYAAwABgADAAGAAOAAc\
+                               AAYAAwABgADAAGAAOAAcAAYAAwAFwLWzETVzKC750AAAAASUVORK5CYII=";
+
+fn live_credentials() -> (String, String) {
+    (
+        std::env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY"),
+        std::env::var("OPENROUTER_TEST_MODEL").expect("OPENROUTER_TEST_MODEL"),
+    )
+}
+
+fn live_base_url() -> String {
+    std::env::var("OPENROUTER_BASE_URL")
+        .unwrap_or_else(|_| illustration::openrouter::DEFAULT_BASE_URL.to_owned())
+}
+
+fn live_ask<'a>(model: &'a str, cutout: &'a [u8]) -> illustration::openrouter::Ask<'a> {
+    illustration::openrouter::Ask {
+        model,
+        prompt: "Redraw this as a flat-lay product illustration. Garment only, no person.",
+        cutout,
+        content_type: "image/png",
+        resolution: illustration::openrouter::DEFAULT_RESOLUTION,
+        aspect_ratio: illustration::openrouter::DEFAULT_ASPECT_RATIO,
+        seed: 184_726,
+    }
+}
 
 #[tokio::test]
 #[ignore = "needs OPENROUTER_API_KEY and OPENROUTER_TEST_MODEL in services/.env"]
-async fn the_live_provider_answers_in_the_shape_this_client_parses() {
-    let api_key = std::env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY");
-    let model = std::env::var("OPENROUTER_TEST_MODEL").expect("OPENROUTER_TEST_MODEL");
-    let cutout = png_bytes();
+async fn the_live_model_advertises_every_parameter_this_client_sends() {
+    let (api_key, model) = live_credentials();
 
     let advertised: Value = reqwest::Client::new()
-        .get(format!(
-            "{}/images/models",
-            illustration::openrouter::DEFAULT_BASE_URL
-        ))
+        .get(format!("{}/images/models", live_base_url()))
         .bearer_auth(&api_key)
         .send()
         .await
@@ -521,31 +582,84 @@ async fn the_live_provider_answers_in_the_shape_this_client_parses() {
         .json()
         .await
         .expect("json");
-    let descriptor = advertised.to_string();
-    for parameter in ["resolution", "aspect_ratio", "seed", "input_references"] {
+
+    let listed = advertised["data"]
+        .as_array()
+        .expect("a data array")
+        .iter()
+        .find(|entry| entry["id"] == model.as_str())
+        .unwrap_or_else(|| panic!("{model} is not offered by this endpoint"));
+    let supported = &listed["supported_parameters"];
+
+    let cutout = STANDARD
+        .decode(FLAT_SQUARE_PNG.replace(char::is_whitespace, ""))
+        .expect("a png");
+    let sent = illustration::openrouter::payload(&live_ask(&model, &cutout));
+    let sent = sent.as_object().expect("an object");
+
+    for parameter in sent.keys() {
+        if ["model", "prompt", "provider"].contains(&parameter.as_str()) {
+            continue;
+        }
         assert!(
-            descriptor.contains(parameter),
-            "we send {parameter}, so the live endpoint must advertise it: {descriptor}"
+            !supported[parameter].is_null(),
+            "we send {parameter} but {model} does not advertise it: {supported}"
         );
     }
+    assert_eq!(supported["resolution"]["values"][0], "1K");
+    assert_eq!(supported["n"]["max"], 1);
+}
+
+#[tokio::test]
+#[ignore = "needs OPENROUTER_API_KEY, OPENROUTER_TEST_MODEL, and credits on the account"]
+async fn the_live_provider_answers_in_the_shape_this_client_parses() {
+    let (api_key, model) = live_credentials();
+    let base_url = live_base_url();
+    let cutout = STANDARD
+        .decode(FLAT_SQUARE_PNG.replace(char::is_whitespace, ""))
+        .expect("a png");
+
+    let raw = reqwest::Client::new()
+        .post(format!("{base_url}/images"))
+        .bearer_auth(&api_key)
+        .json(&illustration::openrouter::payload(&live_ask(
+            &model, &cutout,
+        )))
+        .send()
+        .await
+        .expect("the images endpoint is reachable");
+
+    let status = raw.status().as_u16();
+    let body: Value = raw.json().await.expect("a json body");
+    assert_ne!(
+        status, 402,
+        "the account has no credits, so this run says nothing about the shape: {}",
+        body["error"]["message"]
+    );
+    assert!(
+        (200..300).contains(&status),
+        "status {status}, and the shape stays unverified: {body}"
+    );
+
+    assert!(
+        body["data"][0]["b64_json"].is_string(),
+        "the client reads data[].b64_json; the live reply carries {body}"
+    );
 
     let rendered = illustration::openrouter::render(
         &reqwest::Client::new(),
-        illustration::openrouter::DEFAULT_BASE_URL,
+        &base_url,
         &api_key,
-        &illustration::openrouter::Ask {
-            model: &model,
-            prompt: "Redraw this as a flat-lay product illustration. Garment only, no person.",
-            cutout: &cutout,
-            content_type: "image/png",
-            resolution: illustration::openrouter::DEFAULT_RESOLUTION,
-            aspect_ratio: illustration::openrouter::DEFAULT_ASPECT_RATIO,
-            seed: 184_726,
-        },
+        &live_ask(&model, &cutout),
     )
     .await
     .expect("the live provider answers in the shape this client parses");
 
     assert!(!rendered.image.is_empty());
     assert!(rendered.content_type.starts_with("image/"));
+
+    eprintln!(
+        "live accounting — route: {:?}, prompt tokens: {:?}, completion tokens: {:?}",
+        rendered.provider_route, rendered.input_tokens, rendered.output_tokens
+    );
 }

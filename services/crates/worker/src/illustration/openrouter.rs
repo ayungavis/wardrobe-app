@@ -74,22 +74,14 @@ struct Usage {
 
 /// # Errors
 ///
-/// Returns [`Failure::Ineligible`] when no approved zero-retention route can
-/// serve the request, [`Failure::Refused`] when the provider declines the
-/// content, [`Failure::Unavailable`] when it asks to be retried, and
-/// [`Failure::InvalidOutput`] when the reply carries no usable image.
-pub async fn render(
-    client: &reqwest::Client,
-    base_url: &str,
-    api_key: &str,
-    ask: &Ask<'_>,
-) -> Result<Rendered, Failure> {
+#[must_use]
+pub fn payload(ask: &Ask<'_>) -> serde_json::Value {
     let data_uri = format!(
         "data:{};base64,{}",
         ask.content_type,
         STANDARD.encode(ask.cutout)
     );
-    let payload = serde_json::json!({
+    serde_json::json!({
         "model": ask.model,
         "prompt": ask.prompt,
         "resolution": ask.resolution,
@@ -100,7 +92,22 @@ pub async fn render(
             { "type": "image_url", "image_url": { "url": data_uri } }
         ],
         "provider": { "zdr": true }
-    });
+    })
+}
+
+/// # Errors
+///
+/// Returns [`Failure::Ineligible`] when no approved zero-retention route can
+/// serve the request, [`Failure::Refused`] when the provider declines the
+/// content, [`Failure::Unavailable`] when it asks to be retried, and
+/// [`Failure::InvalidOutput`] when the reply carries no usable image.
+pub async fn render(
+    client: &reqwest::Client,
+    base_url: &str,
+    api_key: &str,
+    ask: &Ask<'_>,
+) -> Result<Rendered, Failure> {
+    let payload = payload(ask);
 
     let response = client
         .post(format!("{base_url}/images"))
@@ -141,8 +148,8 @@ pub async fn render(
 
 fn classify(status: u16) -> Failure {
     match status {
-        402 | 403 => Failure::Ineligible,
-        429 => Failure::Unavailable,
+        402 | 429 => Failure::Unavailable,
+        403 => Failure::Ineligible,
         400..=499 => Failure::Refused,
         _ => Failure::Unavailable,
     }
@@ -184,7 +191,6 @@ mod tests {
     #[test]
     fn a_policy_refusal_never_becomes_a_retry() {
         assert_eq!(classify(403), Failure::Ineligible);
-        assert_eq!(classify(402), Failure::Ineligible);
         assert!(!Failure::Ineligible.may_try_another_model());
     }
 
@@ -193,5 +199,10 @@ mod tests {
         assert_eq!(classify(429), Failure::Unavailable);
         assert_eq!(classify(502), Failure::Unavailable);
         assert_eq!(classify(400), Failure::Refused);
+    }
+
+    #[test]
+    fn an_empty_wallet_is_not_a_permanent_ineligibility() {
+        assert_eq!(classify(402), Failure::Unavailable);
     }
 }

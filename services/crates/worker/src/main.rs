@@ -69,8 +69,13 @@ fn provider_from_env() -> Option<Provider> {
         .ok()
         .filter(|key| !key.is_empty())?;
 
+    let client = reqwest::Client::builder()
+        .timeout(Wait::from_secs(wardrobe_worker::PROVIDER_TIMEOUT_SECONDS))
+        .build()
+        .ok()?;
+
     Some(Provider {
-        client: reqwest::Client::new(),
+        client,
         base_url: std::env::var("OPENROUTER_BASE_URL")
             .unwrap_or_else(|_| illustration::openrouter::DEFAULT_BASE_URL.to_owned()),
         api_key,

@@ -11,7 +11,7 @@ TEST_FLAGS ?=
 .PHONY: help validate \
         ios-generate ios-format ios-lint ios-test ios-build ios-run ios-validate \
         backend-up backend-down backend-migrate backend-reset backend-run backend-openapi \
-        backend-fmt backend-lint backend-test backend-validate
+        backend-fmt backend-lint backend-test backend-validate backend-live-ai
 
 ## Descriptions come from the `##` comments below, so this list cannot go stale.
 help:
@@ -87,6 +87,9 @@ backend-test: services/.env ## cargo test (starts the containers it needs)
 backend-validate: services/.env ## fmt → clippy → test
 	$(MAKE) -C services validate
 	@echo "✅ backend OK — fmt, clippy, test all green"
+
+backend-live-ai: services/.env ## Call OpenRouter for real (needs a key and credits)
+	$(MAKE) -C services live-ai
 
 # ------------------------------------------------------------------- both
 

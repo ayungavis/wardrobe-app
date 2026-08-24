@@ -39,6 +39,9 @@ openapi:
 test: up
 	cargo test --workspace
 
+live-ai:
+	cargo test -p wardrobe-worker --test illustration -- --ignored --nocapture
+
 fmt:
 	cargo fmt --all
 

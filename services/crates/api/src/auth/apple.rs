@@ -9,6 +9,7 @@ const ISSUER: &str = "https://appleid.apple.com";
 const JWKS_URL: &str = "https://appleid.apple.com/auth/keys";
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
 const REFETCH_FLOOR: Duration = Duration::from_secs(60);
+const JWKS_TIMEOUT_SECONDS: u64 = 10;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct AppleIdentity {
@@ -114,7 +115,10 @@ impl Verifier {
                 keys: Vec::new(),
                 fetched_at: None,
             }),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(JWKS_TIMEOUT_SECONDS))
+                .build()
+                .unwrap_or_default(),
         }
     }
 
