@@ -1,6 +1,6 @@
 mod common;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wardrobe_api::account::merge;
@@ -228,7 +228,7 @@ async fn preferences_keep_the_destination_row_and_the_earliest_onboarding(
     pool: PgPool,
 ) -> sqlx::Result<()> {
     let (destination, source, ..) = two_full_accounts(&pool).await?;
-    let early: DateTime<Utc> = Utc::now() - Duration::days(30);
+    let early: DateTime<Utc> = (Utc::now() - Duration::days(30)).trunc_subsecs(6);
     sqlx::query("update account_preference set onboarding_completed_at = $2 where account_id = $1")
         .bind(source)
         .bind(early)

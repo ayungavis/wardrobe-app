@@ -3,7 +3,7 @@ mod common;
 use std::collections::BTreeSet;
 
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use chrono::Duration;
 use serde_json::Value;
 use sqlx::PgPool;
 
@@ -200,6 +200,5 @@ async fn an_expired_token_cannot_read_the_feed(pool: PgPool) -> sqlx::Result<()>
     )
     .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    let _ = Utc::now();
     Ok(())
 }

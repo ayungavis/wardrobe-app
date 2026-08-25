@@ -15,12 +15,16 @@ on:
   pull_request:
     paths: *backend
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  backend:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
-      run:
+      run:˝
         working-directory: services
     services:
       postgres:
