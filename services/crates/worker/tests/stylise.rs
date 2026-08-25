@@ -83,10 +83,11 @@ async fn scene(pool: &PgPool, bytes: Vec<u8>) -> sqlx::Result<Scene> {
     .await?;
 
     sqlx::query(
-        "insert into job (id, account_id, kind, dedupe_key, payload)
+        "insert into job (id, account_id, kind, dedupe_key, payload, run_after)
          values ($1, $2, $3, $4, jsonb_build_object(
              'itemId', $5::text, 'mediaId', $4,
-             'model', 'a/model', 'promptVersion', 'p1', 'styleVersion', 'v1'))",
+             'model', 'a/model', 'promptVersion', 'p1', 'styleVersion', 'v1'),
+             now() - interval '1 minute')",
     )
     .bind(Uuid::now_v7())
     .bind(account)
@@ -110,12 +111,16 @@ async fn scene(pool: &PgPool, bytes: Vec<u8>) -> sqlx::Result<Scene> {
 
 async fn run(pool: &PgPool) -> Outcome {
     let storage = store();
-    run_one(pool, wardrobe_db::STYLISE_ILLUSTRATION, |job| async move {
+    let claimed = run_one(pool, wardrobe_db::STYLISE_ILLUSTRATION, |job| async move {
         illustration::stylise_for(pool, &storage, &job).await
     })
     .await
-    .expect("the claim itself works")
-    .expect("a job was waiting")
+    .expect("the claim itself works");
+
+    match claimed {
+        Some(outcome) => outcome,
+        None => panic!("a job was waiting; {}", queue_state(pool).await),
+    }
 }
 
 async fn state_of(pool: &PgPool, item: Uuid) -> (String, Option<Uuid>) {
@@ -263,4 +268,18 @@ async fn the_new_illustration_carries_its_own_feed_position(pool: PgPool) -> sql
     assert!(version_seq > 1, "the client learns about it from the feed");
     assert_eq!(version_seq, item_seq);
     Ok(())
+}
+
+async fn queue_state(pool: &PgPool) -> String {
+    let database: String = sqlx::query_scalar("select current_database()")
+        .fetch_one(pool)
+        .await
+        .unwrap_or_else(|error| format!("<{error}>"));
+    let rows: Vec<(Uuid, String, String, i32, bool)> = sqlx::query_as(
+        "select id, kind, status, attempts, run_after <= now() from job order by run_after",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    format!("database {database}, {} job row(s): {rows:?}", rows.len())
 }

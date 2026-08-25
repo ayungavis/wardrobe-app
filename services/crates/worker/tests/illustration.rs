@@ -150,8 +150,8 @@ async fn scene_carrying(pool: &PgPool, cutout: Option<Vec<u8>>) -> sqlx::Result<
 
     let job = Uuid::now_v7();
     sqlx::query(
-        "insert into job (id, account_id, kind, dedupe_key, payload, max_attempts)
-         values ($1, $2, $3, $4, jsonb_build_object('itemId', $4), 2)",
+        "insert into job (id, account_id, kind, dedupe_key, payload, max_attempts, run_after)
+         values ($1, $2, $3, $4, jsonb_build_object('itemId', $4), 2, now() - interval '1 minute')",
     )
     .bind(job)
     .bind(account)
@@ -166,12 +166,16 @@ async fn scene_carrying(pool: &PgPool, cutout: Option<Vec<u8>>) -> sqlx::Result<
 async fn run(pool: &PgPool, server: &MockServer, final_attempt: bool) -> Outcome {
     let provider = provider(server);
     let storage = store();
-    run_one(pool, wardrobe_db::ILLUSTRATION, |job| async move {
+    let claimed = run_one(pool, wardrobe_db::ILLUSTRATION, |job| async move {
         illustration::render_for(pool, &storage, &provider, &job, final_attempt).await
     })
     .await
-    .expect("the claim itself works")
-    .expect("a job was waiting")
+    .expect("the claim itself works");
+
+    match claimed {
+        Some(outcome) => outcome,
+        None => panic!("a job was waiting; {}", queue_state(pool).await),
+    }
 }
 
 async fn state_of(pool: &PgPool, item: Uuid) -> (String, Option<Uuid>) {
@@ -913,4 +917,18 @@ fn corner_spread(canvas: &image::RgbaImage) -> u32 {
         })
         .max()
         .unwrap_or(0)
+}
+
+async fn queue_state(pool: &PgPool) -> String {
+    let database: String = sqlx::query_scalar("select current_database()")
+        .fetch_one(pool)
+        .await
+        .unwrap_or_else(|error| format!("<{error}>"));
+    let rows: Vec<(Uuid, String, String, i32, bool)> = sqlx::query_as(
+        "select id, kind, status, attempts, run_after <= now() from job order by run_after",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    format!("database {database}, {} job row(s): {rows:?}", rows.len())
 }

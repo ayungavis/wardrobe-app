@@ -21,6 +21,20 @@ fn store() -> Storage {
     })
 }
 
+async fn queue_state(pool: &PgPool) -> String {
+    let database: String = sqlx::query_scalar("select current_database()")
+        .fetch_one(pool)
+        .await
+        .unwrap_or_else(|error| format!("<{error}>"));
+    let rows: Vec<(Uuid, String, String, i32, bool)> = sqlx::query_as(
+        "select id, kind, status, attempts, run_after <= now() from job order by run_after",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    format!("database {database}, {} job row(s): {rows:?}", rows.len())
+}
+
 async fn account(pool: &PgPool) -> sqlx::Result<Uuid> {
     let id = Uuid::now_v7();
     sqlx::query("insert into account (id) values ($1)")
@@ -31,9 +45,20 @@ async fn account(pool: &PgPool) -> sqlx::Result<Uuid> {
 }
 
 async fn a_job(pool: &PgPool, kind: &str, max_attempts: i32) -> sqlx::Result<Uuid> {
+    let existing: i64 = sqlx::query_scalar("select count(*) from job")
+        .fetch_one(pool)
+        .await?;
+    assert_eq!(
+        existing,
+        0,
+        "a test database was handed over dirty: {}",
+        queue_state(pool).await
+    );
+
     let id = Uuid::now_v7();
     sqlx::query(
-        "insert into job (id, kind, dedupe_key, max_attempts) values ($1, $2, $1::text, $3)",
+        "insert into job (id, kind, dedupe_key, max_attempts, run_after)
+         values ($1, $2, $1::text, $3, now() - interval '1 minute')",
     )
     .bind(id)
     .bind(kind)
@@ -52,7 +77,7 @@ async fn state(pool: &PgPool, id: Uuid) -> (String, i32, Option<String>) {
 }
 
 async fn make_claimable(pool: &PgPool, id: Uuid) {
-    sqlx::query("update job set run_after = now() where id = $1")
+    sqlx::query("update job set run_after = now() - interval '1 minute' where id = $1")
         .bind(id)
         .execute(pool)
         .await
@@ -92,12 +117,27 @@ async fn a_failing_job_retries_to_its_limit_then_stops(pool: PgPool) -> sqlx::Re
     let id = a_job(&pool, "probe", 2).await?;
 
     let first = run_one(&pool, "probe", |_| async { Err("handler_refused") }).await?;
-    assert_eq!(first, Some(Outcome::Retrying));
-    assert_eq!(state(&pool, id).await.0, "pending");
+    assert_eq!(
+        first,
+        Some(Outcome::Retrying),
+        "{}",
+        queue_state(&pool).await
+    );
+    assert_eq!(
+        state(&pool, id).await.0,
+        "pending",
+        "{}",
+        queue_state(&pool).await
+    );
 
     make_claimable(&pool, id).await;
     let second = run_one(&pool, "probe", |_| async { Err("handler_refused") }).await?;
-    assert_eq!(second, Some(Outcome::Failed));
+    assert_eq!(
+        second,
+        Some(Outcome::Failed),
+        "{}",
+        queue_state(&pool).await
+    );
 
     let (status, attempts, code) = state(&pool, id).await;
     assert_eq!((status.as_str(), attempts), ("failed", 2));
@@ -131,12 +171,14 @@ async fn a_job_whose_worker_never_came_back_can_be_claimed_again(pool: PgPool) -
     let mut conn = pool.acquire().await?;
     let reclaimed = wardrobe_db::reclaim_stalled(&mut conn, "probe", Duration::minutes(15)).await?;
     drop(conn);
-    assert_eq!(reclaimed, 1);
+    assert_eq!(reclaimed, 1, "{}", queue_state(&pool).await);
 
     assert_eq!(
         run_one(&pool, "probe", |_| async { Ok(()) }).await?,
         Some(Outcome::Succeeded),
-        "a killed worker must not strand its job forever"
+        "{}: {}",
+        "a killed worker must not strand its job forever",
+        queue_state(&pool).await
     );
     Ok(())
 }
@@ -146,13 +188,18 @@ async fn a_succeeding_job_clears_the_error_it_recorded_earlier(pool: PgPool) -> 
     let id = a_job(&pool, "probe", 3).await?;
 
     run_one(&pool, "probe", |_| async { Err("temporary") }).await?;
-    assert_eq!(state(&pool, id).await.2.as_deref(), Some("temporary"));
+    assert_eq!(
+        state(&pool, id).await.2.as_deref(),
+        Some("temporary"),
+        "{}",
+        queue_state(&pool).await
+    );
 
     make_claimable(&pool, id).await;
     run_one(&pool, "probe", |_| async { Ok(()) }).await?;
 
     let (status, _, code) = state(&pool, id).await;
-    assert_eq!(status, "succeeded");
+    assert_eq!(status, "succeeded", "{}", queue_state(&pool).await);
     assert_eq!(
         code, None,
         "a stale error code reads as a failure that is not there"

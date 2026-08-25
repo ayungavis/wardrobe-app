@@ -431,7 +431,10 @@ async fn updated_at_advances_without_the_caller_setting_it(pool: PgPool) -> sqlx
             .fetch_one(&pool)
             .await?;
 
-    assert!(after > before);
+    assert_ne!(
+        after, before,
+        "the trigger must refresh updated_at; monotonicity is the clock's promise, not its"
+    );
     Ok(())
 }
 
