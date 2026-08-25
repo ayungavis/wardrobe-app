@@ -40,6 +40,11 @@ struct DevMenuView: View {
                     onWhoami: { viewModel.loadSession(callingWhoami: true) },
                     onHealth: { viewModel.checkHealth() }
                 )
+                DevSyncSectionView(
+                    cursor: viewModel.cursor,
+                    state: viewModel.pullState,
+                    onPull: { viewModel.pullChanges() }
+                )
                 DevOutboxSectionView(
                     entries: viewModel.outbox,
                     onRetryFailed: { viewModel.retryFailedOutbox() },

@@ -105,3 +105,28 @@ final class InMemoryOutboxStore: OutboxStore {
         envelopes.sorted { $0.createdAt < $1.createdAt }
     }
 }
+
+@MainActor
+final class InMemoryCursorStore: CursorStore {
+    private var committed: Int64 = 0
+    private var staged: Int64?
+
+    func position() throws -> Int64 {
+        committed
+    }
+
+    func stage(position: Int64) throws {
+        staged = position
+    }
+
+    func commit() throws {
+        if let staged {
+            committed = staged
+        }
+        staged = nil
+    }
+
+    func discard() {
+        staged = nil
+    }
+}

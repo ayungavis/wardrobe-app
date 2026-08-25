@@ -11,6 +11,9 @@ public final class DevMenuViewModel {
     private(set) var healthState: Loadable<String> = .idle
     private(set) var healthTask: Task<Void, Never>?
     private(set) var outbox: [OutboxEnvelope] = []
+    private(set) var cursor: Int64 = 0
+    private(set) var pullState: Loadable<PullOutcome> = .idle
+    private(set) var pullTask: Task<Void, Never>?
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -25,9 +28,10 @@ public final class DevMenuViewModel {
     let baseURL: URL
     private let tokens: any SessionTokenRepository
     private let outboxRepository: any OutboxRepository
+    private let feed: any ChangeFeedRepository
     private let calendar: Calendar
 
-    public init(
+    init(
         activeRepository: ActiveChallengeRepository,
         completedRepository: CompletedChallengeRepository,
         photoRepository: PhotoRepository,
@@ -41,6 +45,7 @@ public final class DevMenuViewModel {
         baseURL: URL,
         tokens: any SessionTokenRepository,
         outboxRepository: any OutboxRepository,
+        feed: any ChangeFeedRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -56,6 +61,7 @@ public final class DevMenuViewModel {
         self.baseURL = baseURL
         self.tokens = tokens
         self.outboxRepository = outboxRepository
+        self.feed = feed
         self.calendar = calendar
     }
 
@@ -117,6 +123,7 @@ public final class DevMenuViewModel {
 
     public func refresh() {
         outbox = (try? outboxRepository.entries()) ?? []
+        cursor = (try? feed.position()) ?? 0
         let active = activeRepository.load()
         summary = DevStateSummary(
             completionCount: completedRepository.load().count,
@@ -191,6 +198,24 @@ public final class DevMenuViewModel {
         refresh()
         lastAction = "History cleared"
         Log.ui.info("Dev: history cleared")
+    }
+
+    func pullChanges() {
+        pullTask?.cancel()
+        pullState = .loading
+
+        pullTask = Task { [feed] in
+            do {
+                let outcome = try await feed.pull(applying: NoopChangeApplier())
+                try Task.checkCancellation()
+                pullState = .loaded(outcome)
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, logger: Log.network)
+                pullState = .failed(AppError(wrapping: error))
+            }
+            refresh()
+        }
     }
 
     public func retryFailedOutbox() {

@@ -31,7 +31,8 @@ func makeDevMenuViewModel(
         plainClient: URLSessionAPIClient(baseURL: URL(string: "https://stub.invalid")!),
         baseURL: URL(string: "https://stub.invalid")!,
         tokens: tokens,
-        outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore())
+        outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore()),
+        feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore())
     )
 }
 

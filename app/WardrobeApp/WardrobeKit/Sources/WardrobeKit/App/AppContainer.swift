@@ -201,6 +201,13 @@ public final class AppContainer {
         StoredOutboxRepository(store: SwiftDataOutboxStore(context: wardrobeContext))
     }
 
+    func makeChangeFeedRepository() -> ChangeFeedRepository {
+        ServerChangeFeedRepository(
+            client: makeAuthenticatedClient(),
+            cursor: SwiftDataCursorStore(context: Self.wardrobeContext)
+        )
+    }
+
     @MainActor
     private static let wardrobeContext = ModelContext(wardrobeContainer)
 
@@ -241,7 +248,8 @@ public final class AppContainer {
             plainClient: makeUnauthenticatedClient(),
             baseURL: Self.apiBaseURL,
             tokens: sessionTokenRepository,
-            outboxRepository: makeOutboxRepository()
+            outboxRepository: makeOutboxRepository(),
+            feed: makeChangeFeedRepository()
         )
     }
 

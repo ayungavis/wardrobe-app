@@ -29,7 +29,8 @@ struct DevMenuSessionTests {
             plainClient: plainClient,
             baseURL: healthBase,
             tokens: tokens,
-            outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore())
+            outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore()),
+            feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore())
         )
     }
 
