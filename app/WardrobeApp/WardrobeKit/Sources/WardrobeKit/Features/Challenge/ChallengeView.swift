@@ -4,7 +4,6 @@ import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
-    @State private var isDevMenuPresented = DevMode.opensOnLaunch
     @State private var hasSwiped = false
 
     private let container: AppContainer
@@ -54,38 +53,6 @@ public struct ChallengeView: View {
                             hasSwiped = true
                         }
                     }
-                }
-            )
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 1).onEnded { _ in
-                    isDevMenuPresented = true
-
-                },
-                including: DevMode.isEnabled ? .all : .none
-            )
-            .overlay(alignment: .topTrailing) {
-                if DevMode.isXcodeDebugBuild {
-                    Button {
-                        isDevMenuPresented = true
-                    } label: {
-                        Image(systemName: "hammer.fill")
-                            .foregroundStyle(AppColor.onMedia)
-                            .padding(Spacing.sm)
-                            .background(Circle().fill(AppColor.mediaBackground.opacity(0.4)))
-                    }
-                    .padding(Spacing.md)
-                }
-            }
-            .sheet(
-                isPresented: $isDevMenuPresented,
-                onDismiss: { viewModel.refreshActiveChallenge() },
-                content: {
-                    DevMenuView(
-                        viewModel: container.makeDevMenuViewModel(),
-                        makeReview: { container.makeGarmentReviewModel() },
-                        makeBenchmark: { container.makeMatchBenchmarkViewModel() },
-                        onStateChanged: { viewModel.refreshActiveChallenge() }
-                    )
                 }
             )
         }

@@ -3,6 +3,8 @@ import Foundation
 public enum HTTPMethod: String, Sendable {
     case get = "GET"
     case post = "POST"
+    case put = "PUT"
+    case delete = "DELETE"
 }
 
 public protocol Endpoint: Sendable {
@@ -10,7 +12,7 @@ public protocol Endpoint: Sendable {
 
     var path: String { get }
     var method: HTTPMethod { get }
-    var accessToken: String? { get }
+    var queryItems: [URLQueryItem] { get }
 }
 
 public extension Endpoint {
@@ -18,8 +20,8 @@ public extension Endpoint {
         .get
     }
 
-    var accessToken: String? {
-        nil
+    var queryItems: [URLQueryItem] {
+        []
     }
 }
 

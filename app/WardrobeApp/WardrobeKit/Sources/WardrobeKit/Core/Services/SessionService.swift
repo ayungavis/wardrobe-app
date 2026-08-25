@@ -4,6 +4,7 @@ public protocol SessionService: Sendable {
     func identity() throws -> UUID
     func start() async
     func accessToken() async throws -> String
+    func refreshedAccessToken() async throws -> String
     func linkApple(identityToken: String, nonce: String) async throws -> UUID
     func signOut() async throws
 }
@@ -42,6 +43,10 @@ public actor ServerSessionService: SessionService {
             return stored.accessToken
         }
         return try await claim().accessToken
+    }
+
+    public func refreshedAccessToken() async throws -> String {
+        try await claim().accessToken
     }
 
     public func linkApple(identityToken: String, nonce: String) async throws -> UUID {

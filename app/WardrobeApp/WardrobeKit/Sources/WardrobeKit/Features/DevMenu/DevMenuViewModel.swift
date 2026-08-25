@@ -6,6 +6,10 @@ import Observation
 public final class DevMenuViewModel {
     public private(set) var summary = DevStateSummary()
     public private(set) var lastAction: String?
+    private(set) var sessionState: Loadable<DevSessionInfo> = .idle
+    private(set) var sessionTask: Task<Void, Never>?
+    private(set) var healthState: Loadable<String> = .idle
+    private(set) var healthTask: Task<Void, Never>?
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -14,6 +18,11 @@ public final class DevMenuViewModel {
     private let thumbnails: GarmentThumbnailRepository
     private let previews: CompletionPreviewRepository
     private let onboarding: OnboardingModel
+    private let session: any SessionService
+    private let client: any AuthenticatedAPIClient
+    private let plainClient: any APIClient
+    let baseURL: URL
+    private let tokens: any SessionTokenRepository
     private let calendar: Calendar
 
     public init(
@@ -24,6 +33,11 @@ public final class DevMenuViewModel {
         thumbnails: GarmentThumbnailRepository,
         previews: CompletionPreviewRepository,
         onboarding: OnboardingModel,
+        session: any SessionService,
+        client: any AuthenticatedAPIClient,
+        plainClient: any APIClient,
+        baseURL: URL,
+        tokens: any SessionTokenRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -33,7 +47,68 @@ public final class DevMenuViewModel {
         self.thumbnails = thumbnails
         self.previews = previews
         self.onboarding = onboarding
+        self.session = session
+        self.client = client
+        self.plainClient = plainClient
+        self.baseURL = baseURL
+        self.tokens = tokens
         self.calendar = calendar
+    }
+
+    func checkHealth() {
+        healthTask?.cancel()
+        healthState = .loading
+
+        healthTask = Task { [plainClient] in
+            do {
+                let response = try await plainClient.send(GetHealthEndpoint())
+                try Task.checkCancellation()
+                healthState = .loaded(response.status)
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, logger: Log.network)
+                healthState = .failed(AppError(wrapping: error))
+            }
+        }
+    }
+
+    func loadSession(callingWhoami: Bool = false) {
+        sessionTask?.cancel()
+        sessionState = .loading
+
+        sessionTask = Task {
+            do {
+                _ = try await session.accessToken()
+                try Task.checkCancellation()
+
+                let whoami: DevSessionInfo.Whoami?
+                if callingWhoami {
+                    let response = try await client.send(GetWhoamiEndpoint())
+                    try Task.checkCancellation()
+                    whoami = DevSessionInfo.Whoami(
+                        accountID: response.accountId, sessionID: response.sessionId
+                    )
+                } else {
+                    whoami = nil
+                }
+
+                guard let stored = tokens.load() else {
+                    sessionState = .failed(.sessionExpired)
+                    return
+                }
+                sessionState = .loaded(DevSessionInfo(
+                    accountID: stored.accountID,
+                    accessExpiresAt: stored.expiresAt,
+                    refreshExpiresAt: stored.refreshExpiresAt,
+                    isAccessUsable: stored.isUsable(at: .now),
+                    whoami: whoami
+                ))
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, logger: Log.network)
+                sessionState = .failed(AppError(wrapping: error))
+            }
+        }
     }
 
     public func refresh() {

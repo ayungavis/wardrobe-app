@@ -32,6 +32,14 @@ struct DevMenuView: View {
         NavigationStack {
             List {
                 DevStateSectionView(summary: viewModel.summary)
+                DevSessionSectionView(
+                    baseURL: viewModel.baseURL,
+                    state: viewModel.sessionState,
+                    health: viewModel.healthState,
+                    onReload: { viewModel.loadSession() },
+                    onWhoami: { viewModel.loadSession(callingWhoami: true) },
+                    onHealth: { viewModel.checkHealth() }
+                )
                 DevTodaySectionView(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
                 }

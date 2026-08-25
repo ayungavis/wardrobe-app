@@ -30,6 +30,9 @@ final class FakeSessionService: SessionService, @unchecked Sendable {
     private(set) var linkedWith: (identityToken: String, nonce: String)?
     private(set) var signedOut = false
     private(set) var startCount = 0
+    private(set) var refreshCount = 0
+    var tokensInOrder: [String] = ["access"]
+    var tokenError: AppError?
 
     func identity() throws -> UUID {
         deviceID
@@ -40,7 +43,18 @@ final class FakeSessionService: SessionService, @unchecked Sendable {
     }
 
     func accessToken() async throws -> String {
-        "access"
+        if let tokenError {
+            throw tokenError
+        }
+        return tokensInOrder.first ?? "access"
+    }
+
+    func refreshedAccessToken() async throws -> String {
+        refreshCount += 1
+        if tokensInOrder.count > 1 {
+            tokensInOrder.removeFirst()
+        }
+        return tokensInOrder.first ?? "access"
     }
 
     func linkApple(identityToken: String, nonce: String) async throws -> UUID {
@@ -53,5 +67,32 @@ final class FakeSessionService: SessionService, @unchecked Sendable {
 
     func signOut() async throws {
         signedOut = true
+    }
+}
+
+final class StubAuthenticatedClient: AuthenticatedAPIClient, @unchecked Sendable {
+    // @unchecked: tests drive it from one actor at a time.
+    var whoamiAccountID = UUID()
+    var whoamiSessionID = UUID()
+    var error: AppError?
+    private(set) var callCount = 0
+
+    func send<Route: Endpoint>(_: Route) async throws -> Route.Response {
+        try reply()
+    }
+
+    func send<Route: RequestEndpoint>(_: Route) async throws -> Route.Response {
+        try reply()
+    }
+
+    private func reply<Value: Decodable>() throws -> Value {
+        callCount += 1
+        if let error {
+            throw error
+        }
+        let json = """
+        {"accountId":"\(whoamiAccountID.uuidString)","sessionId":"\(whoamiSessionID.uuidString)"}
+        """
+        return try JSONDecoder.api.decode(Value.self, from: Data(json.utf8))
     }
 }

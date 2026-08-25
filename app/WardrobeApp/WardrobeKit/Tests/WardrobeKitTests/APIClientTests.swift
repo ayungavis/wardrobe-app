@@ -18,8 +18,24 @@ private struct ProbeEndpoint: Endpoint {
     var path: String {
         "probe"
     }
+}
 
-    var accessToken: String?
+private struct PagedProbeEndpoint: Endpoint {
+    typealias Response = ProbeDTO
+
+    let since: Int
+    let limit: Int
+
+    var path: String {
+        "v1/changes"
+    }
+
+    var queryItems: [URLQueryItem] {
+        [
+            URLQueryItem(name: "since", value: String(since)),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+    }
 }
 
 private struct ProbeRequestDTO: Encodable, Sendable {
@@ -71,26 +87,26 @@ struct APIClientTests {
         }
     }
 
-    @Test func anUnavailableDependencyReadsAsANetworkProblem() async {
+    @Test func anUnavailableDependencyIsSeparateFromAnOfflineDevice() async {
         let server = StubServer()
         server.stub(
             "/probe",
             .json(#"{"error":{"code":"unavailable","message":"down"}}"#, status: 503)
         )
 
-        await #expect(throws: AppError.network) {
+        await #expect(throws: AppError.unavailable) {
             try await client(server).send(ProbeEndpoint())
         }
     }
 
-    @Test func anyOtherRejectionIsSeparateFromAnOfflineDevice() async {
+    @Test func aRejectedRequestCarriesItsOwnCode() async {
         let server = StubServer()
         server.stub(
             "/probe",
             .json(#"{"error":{"code":"bad_request","message":"no"}}"#, status: 400)
         )
 
-        await #expect(throws: AppError.serverRejected) {
+        await #expect(throws: AppError.badRequest) {
             try await client(server).send(ProbeEndpoint())
         }
     }
@@ -141,10 +157,65 @@ struct APIClientTests {
         let server = StubServer()
         server.stub("/probe", .json(#"{"stampedAt":"2026-08-24T03:14:15Z"}"#))
 
-        _ = try await client(server).send(ProbeEndpoint(accessToken: "tok"))
+        _ = try await client(server).send(ProbeEndpoint(), authorization: "tok")
 
         let sent = try #require(server.sent(to: "/probe").first)
         #expect(sent.authorization == "Bearer tok")
+    }
+
+    @Test(arguments: [
+        ("bad_request", 400, AppError.badRequest),
+        ("not_found", 404, AppError.notFound),
+        ("conflict", 409, AppError.conflict),
+        ("payload_too_large", 413, AppError.payloadTooLarge),
+        ("unavailable", 503, AppError.unavailable),
+        ("unauthenticated", 401, AppError.sessionExpired),
+        ("internal", 500, AppError.serverRejected),
+    ])
+    func everyContractCodeReachesTheCallerAsItself(
+        code: String, status: Int, expected: AppError
+    ) async {
+        let server = StubServer()
+        server.stub("/probe", .json(#"{"error":{"code":"\#(code)","message":"m"}}"#, status: status))
+
+        await #expect(throws: expected) {
+            try await client(server).send(ProbeEndpoint())
+        }
+    }
+
+    @Test func aRateLimitCarriesTheServersRetryAfter() async {
+        let server = StubServer()
+        server.stub(
+            "/probe",
+            .json(#"{"error":{"code":"too_many_requests","message":"slow"}}"#, status: 429)
+                .with(header: "Retry-After", "17")
+        )
+
+        await #expect(throws: AppError.rateLimited(retryAfter: .seconds(17))) {
+            try await client(server).send(ProbeEndpoint())
+        }
+    }
+
+    @Test func aRateLimitWithoutAHeaderStillWaits() async {
+        let server = StubServer()
+        server.stub(
+            "/probe",
+            .json(#"{"error":{"code":"too_many_requests","message":"slow"}}"#, status: 429)
+        )
+
+        await #expect(throws: AppError.rateLimited(retryAfter: .seconds(1))) {
+            try await client(server).send(ProbeEndpoint())
+        }
+    }
+
+    @Test func queryItemsReachTheURLTheServerExpects() async throws {
+        let server = StubServer()
+        server.stub("/v1/changes", .json(#"{"stampedAt":"2026-08-24T03:14:15Z"}"#))
+
+        _ = try await client(server).send(PagedProbeEndpoint(since: 42, limit: 500))
+
+        let sent = try #require(server.sent(to: "/v1/changes").first)
+        #expect(sent.query == "since=42&limit=500")
     }
 }
 

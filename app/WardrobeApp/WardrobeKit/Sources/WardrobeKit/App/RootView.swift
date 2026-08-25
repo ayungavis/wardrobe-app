@@ -2,10 +2,14 @@ import DesignSystem
 import SwiftUI
 
 public struct RootView: View {
+    @State private var challenge: ChallengeViewModel
+    @State private var isDevMenuPresented = DevMode.opensOnLaunch
+
     private let container: AppContainer
 
     public init(container: AppContainer) {
         self.container = container
+        _challenge = State(wrappedValue: container.makeChallengeViewModel())
     }
 
     public var body: some View {
@@ -22,13 +26,37 @@ public struct RootView: View {
         }
         .preferredColorScheme(.light)
         .task { await container.startSession() }
+        // ponytail: only the Challenge screen is refreshed after a dev reset. Wardrobe
+        // and History load in .task, which does not re-run on a tab switch, so a reset
+        // made from those tabs reads stale until the tab is rebuilt. Give RootView
+        // their view models too if that starts biting.
+        .sheet(
+            isPresented: $isDevMenuPresented,
+            onDismiss: { challenge.refreshActiveChallenge() },
+            content: {
+                DevMenuView(
+                    viewModel: container.makeDevMenuViewModel(),
+                    makeReview: { container.makeGarmentReviewModel() },
+                    makeBenchmark: { container.makeMatchBenchmarkViewModel() },
+                    onStateChanged: { challenge.refreshActiveChallenge() }
+                )
+            }
+        )
+        #if os(iOS)
+        .background {
+            if DevMode.isEnabled {
+                ShakeDetectorView { isDevMenuPresented = true }
+                    .frame(width: 0, height: 0)
+            }
+        }
+        #endif
     }
 
     private var tabs: some View {
         TabView {
             Tab {
                 ZStack {}
-                ChallengeView(viewModel: container.makeChallengeViewModel(), container: container)
+                ChallengeView(viewModel: challenge, container: container)
 
             } label: {
                 Label {

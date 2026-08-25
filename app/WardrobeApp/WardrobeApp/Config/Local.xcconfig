@@ -1,4 +1,4 @@
-API_BASE_URL = http:/$()/localhost:8080
+API_BASE_URL = http:/$()/127.0.0.1:8080
 SENTRY_DSN = https://20d03438cf41ffe30a30fa9c28f6f19a@o447656.ingest.us.sentry.io/4511867550171136
 SENTRY_ENVIRONMENT = development
 

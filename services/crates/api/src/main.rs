@@ -50,7 +50,12 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("migrations applied");
 
     let listener = TcpListener::bind(&config.bind_addr).await?;
-    tracing::info!(addr = %config.bind_addr, "listening; docs at /docs");
+    let contract = if config.serve_docs {
+        "/docs"
+    } else {
+        "/openapi.json (SERVE_DOCS is off)"
+    };
+    tracing::info!(addr = %config.bind_addr, contract, "listening");
 
     let apple = std::sync::Arc::new(apple::Verifier::new(config.apple_bundle_id.clone()));
 

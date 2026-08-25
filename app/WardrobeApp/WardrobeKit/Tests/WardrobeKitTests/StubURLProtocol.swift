@@ -4,14 +4,22 @@ import Synchronization
 struct StubbedReply: Sendable {
     var status = 200
     var body = Data()
+    var headers: [String: String] = [:]
 
     static func json(_ text: String, status: Int = 200) -> StubbedReply {
         StubbedReply(status: status, body: Data(text.utf8))
+    }
+
+    func with(header name: String, _ value: String) -> StubbedReply {
+        var reply = self
+        reply.headers[name] = value
+        return reply
     }
 }
 
 struct RecordedRequest: Sendable {
     let path: String
+    let query: String?
     let body: Data
     let authorization: String?
     let contentType: String?
@@ -76,6 +84,7 @@ final class StubURLProtocol: URLProtocol {
         }
         let recorded = RecordedRequest(
             path: url.path(),
+            query: URLComponents(url: url, resolvingAgainstBaseURL: false)?.query,
             body: Self.body(of: request),
             authorization: request.value(forHTTPHeaderField: "Authorization"),
             contentType: request.value(forHTTPHeaderField: "Content-Type")
@@ -101,7 +110,10 @@ final class StubURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: error)
         case let .success(reply):
             let response = HTTPURLResponse(
-                url: url, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: nil
+                url: url,
+                statusCode: reply.status,
+                httpVersion: "HTTP/1.1",
+                headerFields: reply.headers
             )
             if let response {
                 client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

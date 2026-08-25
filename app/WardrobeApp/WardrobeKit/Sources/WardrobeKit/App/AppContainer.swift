@@ -11,6 +11,7 @@ public final class AppContainer {
     private let completionPreviewRepository: CompletionPreviewRepository
     let onboarding: OnboardingModel
     private let session: SessionService
+    private let sessionTokenRepository: SessionTokenRepository
     private let cameraService: CameraService
 
     public init(
@@ -22,6 +23,7 @@ public final class AppContainer {
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
         appleAccountRepository: AppleAccountRepository = StoredAppleAccountRepository(),
         session: SessionService? = nil,
+        sessionTokenRepository: SessionTokenRepository = StoredSessionTokenRepository(),
         cameraService: CameraService? = nil
     ) {
         self.challengeRepository = challengeRepository
@@ -30,7 +32,8 @@ public final class AppContainer {
         self.photoRepository = photoRepository
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
-        let session = session ?? Self.defaultSession()
+        self.sessionTokenRepository = sessionTokenRepository
+        let session = session ?? Self.defaultSession(tokens: sessionTokenRepository)
         self.session = session
         onboarding = OnboardingModel(
             preferences: preferencesRepository,
@@ -40,11 +43,23 @@ public final class AppContainer {
         self.cameraService = cameraService ?? Self.defaultCameraService()
     }
 
-    private static func defaultSession() -> SessionService {
+    var baseURL: URL {
+        Self.apiBaseURL
+    }
+
+    func makeUnauthenticatedClient() -> APIClient {
+        URLSessionAPIClient(baseURL: Self.apiBaseURL)
+    }
+
+    public func makeAuthenticatedClient() -> AuthenticatedAPIClient {
+        SessionedAPIClient(client: URLSessionAPIClient(baseURL: Self.apiBaseURL), session: session)
+    }
+
+    private static func defaultSession(tokens: SessionTokenRepository) -> SessionService {
         ServerSessionService(
             client: URLSessionAPIClient(baseURL: apiBaseURL),
             identities: StoredAnonymousIdentityRepository(),
-            tokens: StoredSessionTokenRepository()
+            tokens: tokens
         )
     }
 
@@ -207,7 +222,12 @@ public final class AppContainer {
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
             previews: completionPreviewRepository,
-            onboarding: onboarding
+            onboarding: onboarding,
+            session: session,
+            client: makeAuthenticatedClient(),
+            plainClient: makeUnauthenticatedClient(),
+            baseURL: Self.apiBaseURL,
+            tokens: sessionTokenRepository
         )
     }
 

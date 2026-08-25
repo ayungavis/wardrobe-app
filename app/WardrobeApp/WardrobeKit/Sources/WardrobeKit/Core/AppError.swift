@@ -4,6 +4,12 @@ public enum AppError: Error, Equatable, Sendable {
     case network
     case sessionExpired
     case serverRejected
+    case badRequest
+    case notFound
+    case conflict
+    case payloadTooLarge
+    case rateLimited(retryAfter: Duration)
+    case unavailable
     case unexpected
     case cameraUnavailable
     case captureFailed
@@ -21,6 +27,18 @@ public enum AppError: Error, Equatable, Sendable {
             String(localized: "error.sessionExpired", bundle: .module)
         case .serverRejected:
             String(localized: "error.serverRejected", bundle: .module)
+        case .badRequest:
+            String(localized: "error.badRequest", bundle: .module)
+        case .notFound:
+            String(localized: "error.notFound", bundle: .module)
+        case .conflict:
+            String(localized: "error.conflict", bundle: .module)
+        case .payloadTooLarge:
+            String(localized: "error.payloadTooLarge", bundle: .module)
+        case .rateLimited:
+            String(localized: "error.rateLimited", bundle: .module)
+        case .unavailable:
+            String(localized: "error.unavailable", bundle: .module)
         case .unexpected:
             String(localized: "error.unexpected", bundle: .module)
         case .cameraUnavailable:

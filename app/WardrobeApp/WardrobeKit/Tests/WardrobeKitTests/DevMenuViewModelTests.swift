@@ -15,7 +15,10 @@ struct DevMenuViewModelTests {
             preferences: InMemoryAccountPreferencesRepository(),
             accounts: StoredAppleAccountRepository(store: InMemorySecureStore()),
             session: FakeSessionService()
-        )
+        ),
+        session: FakeSessionService = FakeSessionService(),
+        client: any AuthenticatedAPIClient = StubAuthenticatedClient(),
+        tokens: SessionTokenRepository = StoredSessionTokenRepository(store: InMemorySecureStore())
     ) -> DevMenuViewModel {
         DevMenuViewModel(
             activeRepository: activeRepository,
@@ -24,7 +27,12 @@ struct DevMenuViewModelTests {
             wardrobeRepository: wardrobeRepository,
             thumbnails: thumbnails,
             previews: previews,
-            onboarding: onboarding
+            onboarding: onboarding,
+            session: session,
+            client: client,
+            plainClient: URLSessionAPIClient(baseURL: URL(string: "https://stub.invalid")!),
+            baseURL: URL(string: "https://stub.invalid")!,
+            tokens: tokens
         )
     }
 
