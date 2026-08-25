@@ -35,6 +35,8 @@ public final class CaptureFlowViewModel {
     let completedRepository: CompletedChallengeRepository
     let photoRepository: PhotoRepository
     let previews: CompletionPreviewRepository
+    let outbox: any OutboxRepository
+    let uploads: any MediaUploadRepository
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
     private(set) var sessionTask: Task<Void, Never>?
@@ -54,7 +56,9 @@ public final class CaptureFlowViewModel {
         scanner: GarmentScanService,
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
-        preferences: AccountPreferencesRepository
+        preferences: AccountPreferencesRepository,
+        outbox: any OutboxRepository,
+        uploads: any MediaUploadRepository
     ) {
         self.challenge = challenge
         self.camera = camera
@@ -64,6 +68,8 @@ public final class CaptureFlowViewModel {
         self.previews = previews
         self.library = library
         self.preferences = preferences
+        self.outbox = outbox
+        self.uploads = uploads
         review = GarmentReviewModel(
             scanner: scanner,
             photoRepository: photoRepository,

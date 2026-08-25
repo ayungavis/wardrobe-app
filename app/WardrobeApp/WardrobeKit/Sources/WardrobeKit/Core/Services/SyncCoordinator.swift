@@ -9,6 +9,7 @@ enum SyncTrigger: String, Sendable, CaseIterable {
 }
 
 struct ReconcileOutcome: Sendable, Equatable {
+    var uploaded = 0
     var pushed = 0
     var rejected = 0
     var pulled = 0
@@ -32,6 +33,8 @@ final class ServerSyncCoordinator: SyncCoordinator {
     private let client: any AuthenticatedAPIClient
     private let outbox: any OutboxRepository
     private let feed: any ChangeFeedRepository
+    private let uploads: any MediaUploadRepository
+    private let media: any MediaRepository
     private let applier: any ChangeApplier
     private var inFlight: Task<ReconcileOutcome, Never>?
 
@@ -39,11 +42,15 @@ final class ServerSyncCoordinator: SyncCoordinator {
         client: any AuthenticatedAPIClient,
         outbox: any OutboxRepository,
         feed: any ChangeFeedRepository,
+        uploads: any MediaUploadRepository,
+        media: any MediaRepository,
         applier: any ChangeApplier = NoopChangeApplier()
     ) {
         self.client = client
         self.outbox = outbox
         self.feed = feed
+        self.uploads = uploads
+        self.media = media
         self.applier = applier
     }
 
@@ -61,6 +68,14 @@ final class ServerSyncCoordinator: SyncCoordinator {
 
     private func run(_ trigger: SyncTrigger) async -> ReconcileOutcome {
         var outcome = ReconcileOutcome()
+
+        let sent = await uploadDueMedia()
+        outcome.uploaded = sent.uploaded
+        if let fatal = sent.fatal {
+            outcome.pushError = fatal
+            outcome.pullError = fatal
+            return outcome
+        }
 
         do {
             let sent = try await push()
@@ -90,8 +105,42 @@ final class ServerSyncCoordinator: SyncCoordinator {
         return outcome
     }
 
+    private func uploadDueMedia() async -> (uploaded: Int, fatal: AppError?) {
+        let due = (try? uploads.due(at: Date(), limit: SyncBatching.maxMutations)) ?? []
+        var uploaded = 0
+
+        for row in due {
+            do {
+                let bytes = try uploads.bytes(for: row)
+                try await media.upload(bytes, id: row.id, kind: row.kind, contentType: row.contentType)
+                try uploads.acknowledge(id: row.id)
+                uploaded += 1
+            } catch is CancellationError {
+                return (uploaded, nil)
+            } catch AppError.sessionExpired {
+                return (uploaded, .sessionExpired)
+            } catch {
+                let failure = AppError(wrapping: error)
+                Log.report(
+                    failure,
+                    context: Log.Context(operation: "sync.upload.\(row.kind.rawValue)"),
+                    logger: Log.network
+                )
+                try? uploads.recordFailure(of: row.id, error: failure, code: nil, at: Date())
+            }
+        }
+        return (uploaded, nil)
+    }
+
     private func push() async throws -> PushOutcome {
+        // ponytail: a completeChallenge whose media rows still exist would only be
+        // rejected by the server's foreign keys, so it waits — held back by
+        // ownership, not by name. An unreadable queue holds it back too, because
+        // pushing on a guess spends attempts on a certain rejection.
         let due = try outbox.due(at: Date(), limit: SyncBatching.maxMutations)
+            .filter { entry in
+                entry.name != "completeChallenge" || ((try? uploads.holdsRows(owner: entry.id)) ?? true) == false
+            }
         guard !due.isEmpty else { return PushOutcome() }
 
         let decoder = JSONDecoder.api

@@ -42,6 +42,7 @@ struct DevMenuView: View {
                 )
                 DevMediaSectionView(
                     state: viewModel.mediaState,
+                    pendingUploads: viewModel.pendingUploads,
                     onRoundTrip: { viewModel.runMediaRoundTrip() }
                 )
                 DevDiagnosticsSectionView(

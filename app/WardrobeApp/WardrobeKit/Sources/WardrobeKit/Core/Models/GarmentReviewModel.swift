@@ -109,11 +109,71 @@ public final class GarmentReviewModel {
         return thumbnailData(forFile: item.cutoutFile)
     }
 
+    public func commitStaged() throws {
+        try wardrobeRepository.commitStaged()
+    }
+
+    public func discardStaged() {
+        wardrobeRepository.discardStaged()
+    }
+
     public func commit(completionID: UUID?, at date: Date) {
         for garment in garments {
             record(garment, wornAt: completionID.map { _ in date }, completionID: completionID, at: date)
         }
         garments = []
+    }
+
+    // ponytail: staged, never saved — the caller's single save is what makes the
+    // checkmark atomic. A garment that fails throws instead of being logged past,
+    // because "one of them silently vanished" is not what atomically means.
+    public func stageCommit(completionID: UUID, at date: Date) throws -> [ScannedGarment] {
+        let committed = garments
+        for garment in committed {
+            switch garment.decision {
+            case .new:
+                stageInsert(garment, completionID: completionID, at: date)
+            case let .existing(itemID):
+                stageMerge(garment, into: itemID, completionID: completionID, at: date)
+                try thumbnails.delete(file: garment.cutoutFile)
+            case .discard:
+                try thumbnails.delete(file: garment.cutoutFile)
+            }
+        }
+        return committed
+    }
+
+    private func stageInsert(_ garment: ScannedGarment, completionID: UUID, at date: Date) {
+        wardrobeRepository.stageInsert(
+            WardrobeItem(
+                id: garment.id,
+                name: garment.name,
+                description: garment.description,
+                category: garment.category,
+                cutoutFile: garment.cutoutFile,
+                createdAt: date,
+                updatedAt: date
+            ),
+            fingerprint: garment.fingerprint,
+            wear: WearRecord(itemID: garment.id, completionID: completionID, wornAt: date)
+        )
+    }
+
+    private func stageMerge(
+        _ garment: ScannedGarment, into itemID: UUID, completionID: UUID, at date: Date
+    ) {
+        wardrobeRepository.stageWear(
+            WearRecord(itemID: itemID, completionID: completionID, wornAt: date),
+            fingerprint: ItemFingerprint(
+                itemID: itemID,
+                version: garment.fingerprint.version,
+                colorLab: garment.fingerprint.colorLab,
+                aspectRatio: garment.fingerprint.aspectRatio,
+                featurePrint: garment.fingerprint.featurePrint,
+                maskQuality: garment.fingerprint.maskQuality,
+                createdAt: date
+            )
+        )
     }
 
     public func commitImported() {

@@ -165,7 +165,10 @@ struct SyncCoordinatorTests {
         let cursor = InMemoryCursorStore()
         let feed = ServerChangeFeedRepository(client: client, cursor: cursor)
         return SUT(
-            coordinator: ServerSyncCoordinator(client: client, outbox: outbox, feed: feed),
+            coordinator: ServerSyncCoordinator(
+                client: client, outbox: outbox, feed: feed,
+                uploads: makeInMemoryUploads(), media: StubMediaRepository()
+            ),
             client: client, outbox: outbox, cursor: cursor
         )
     }

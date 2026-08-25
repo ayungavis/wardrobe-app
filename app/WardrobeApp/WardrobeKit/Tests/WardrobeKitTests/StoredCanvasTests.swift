@@ -6,6 +6,7 @@ import Testing
 /// What people already have on their phones has to keep opening, and history
 /// has to survive a shape change. Both are one-way doors, so they are tested
 /// against the stored bytes rather than against the types.
+@MainActor
 struct StoredCanvasTests {
     private func makeDefaults(_ name: String) throws -> UserDefaults {
         let defaults = try #require(UserDefaults(suiteName: name))

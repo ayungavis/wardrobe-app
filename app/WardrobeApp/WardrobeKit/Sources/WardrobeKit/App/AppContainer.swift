@@ -17,7 +17,7 @@ public final class AppContainer {
     public init(
         challengeRepository: ChallengeRepository = MockChallengeRepository(),
         activeChallengeRepository: ActiveChallengeRepository = FileActiveChallengeRepository(),
-        completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
+        completedChallengeRepository: CompletedChallengeRepository? = nil,
         photoRepository: PhotoRepository = FilePhotoRepository(),
         preferencesRepository: AccountPreferencesRepository? = nil,
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
@@ -28,6 +28,8 @@ public final class AppContainer {
     ) {
         self.challengeRepository = challengeRepository
         self.activeChallengeRepository = activeChallengeRepository
+        let completedChallengeRepository = completedChallengeRepository
+            ?? Self.migratedCompletions()
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
         let preferencesRepository = preferencesRepository
@@ -117,7 +119,9 @@ public final class AppContainer {
             scanner: makeGarmentScanService(),
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
-            preferences: preferencesRepository
+            preferences: preferencesRepository,
+            outbox: makeOutboxRepository(),
+            uploads: makeMediaUploadRepository()
         )
     }
 
@@ -206,13 +210,24 @@ public final class AppContainer {
     private(set) lazy var syncCoordinator: any SyncCoordinator = ServerSyncCoordinator(
         client: makeAuthenticatedClient(),
         outbox: makeOutboxRepository(),
-        feed: makeChangeFeedRepository()
+        feed: makeChangeFeedRepository(),
+        uploads: makeMediaUploadRepository(),
+        media: makeMediaRepository()
     )
 
     private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
 
     public func makeMediaRepository() -> MediaRepository {
         ServerMediaRepository(client: makeAuthenticatedClient(), cache: FileMediaCacheStore())
+    }
+
+    func makeMediaUploadRepository() -> MediaUploadRepository {
+        StoredMediaUploadRepository(
+            store: SwiftDataMediaUploadStore(context: Self.wardrobeContext),
+            photos: photoRepository,
+            previews: completionPreviewRepository,
+            thumbnails: garmentThumbnailRepository
+        )
     }
 
     func makeChangeFeedRepository() -> ChangeFeedRepository {
@@ -248,28 +263,6 @@ public final class AppContainer {
         #endif
     }
 
-    public func makeDevMenuViewModel() -> DevMenuViewModel {
-        DevMenuViewModel(
-            activeRepository: activeChallengeRepository,
-            completedRepository: completedChallengeRepository,
-            photoRepository: photoRepository,
-            wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository,
-            previews: completionPreviewRepository,
-            onboarding: onboarding,
-            session: session,
-            client: makeAuthenticatedClient(),
-            plainClient: makeUnauthenticatedClient(),
-            baseURL: Self.apiBaseURL,
-            tokens: sessionTokenRepository,
-            outboxRepository: makeOutboxRepository(),
-            feed: makeChangeFeedRepository(),
-            coordinator: syncCoordinator,
-            diagnosticsStore: diagnostics,
-            media: makeMediaRepository()
-        )
-    }
-
     private static func defaultLibrarySaver() -> PhotoLibrarySaveService {
         #if os(iOS)
             PHPhotoLibrarySaveService()
@@ -293,11 +286,45 @@ public final class AppContainer {
     }
 }
 
+// MARK: - Dev menu
+
+public extension AppContainer {
+    func makeDevMenuViewModel() -> DevMenuViewModel {
+        DevMenuViewModel(
+            activeRepository: activeChallengeRepository,
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository,
+            onboarding: onboarding,
+            session: session,
+            client: makeAuthenticatedClient(),
+            plainClient: makeUnauthenticatedClient(),
+            baseURL: Self.apiBaseURL,
+            tokens: sessionTokenRepository,
+            outboxRepository: makeOutboxRepository(),
+            feed: makeChangeFeedRepository(),
+            coordinator: syncCoordinator,
+            diagnosticsStore: diagnostics,
+            media: makeMediaRepository(),
+            uploadQueue: makeMediaUploadRepository()
+        )
+    }
+}
+
 // MARK: - Diagnostics
 
 extension AppContainer {
     var diagnostics: any DiagnosticsStore {
         Self.diagnosticsStore
+    }
+
+    @MainActor
+    static func migratedCompletions() -> CompletedChallengeRepository {
+        let repository = SwiftDataCompletedChallengeRepository(context: wardrobeContext)
+        migrateCompletions(from: UserDefaultsCompletedChallengeRepository(), into: repository)
+        return repository
     }
 
     func startDiagnostics() {

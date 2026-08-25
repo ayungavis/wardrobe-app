@@ -5,6 +5,7 @@ enum SyncMutation: Sendable {
     case deleteItem(DeleteItemArgsDTO)
     case upsertPreferences(UpsertPreferencesArgsDTO)
     case resolveCompletion(ResolveCompletionArgsDTO)
+    case completeChallenge(CompleteChallengeArgsDTO)
 
     var name: String {
         switch self {
@@ -12,6 +13,7 @@ enum SyncMutation: Sendable {
         case .deleteItem: "deleteItem"
         case .upsertPreferences: "upsertPreferences"
         case .resolveCompletion: "resolveCompletion"
+        case .completeChallenge: "completeChallenge"
         }
     }
 
@@ -26,6 +28,7 @@ enum SyncMutation: Sendable {
         case let .deleteItem(args): return try encoder.encode(args)
         case let .upsertPreferences(args): return try encoder.encode(args)
         case let .resolveCompletion(args): return try encoder.encode(args)
+        case let .completeChallenge(args): return try encoder.encode(args)
         }
     }
 }

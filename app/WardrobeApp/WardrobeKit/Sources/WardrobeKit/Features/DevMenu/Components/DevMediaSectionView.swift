@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DevMediaSectionView: View {
     let state: Loadable<String>
+    let pendingUploads: [MediaUpload]
     let onRoundTrip: () -> Void
 
     var body: some View {
@@ -12,10 +13,22 @@ struct DevMediaSectionView: View {
                 Text(verbatim: "Round trip")
             }
 
+            LabeledContent {
+                Text(verbatim: Self.queueSummary(pendingUploads)).font(.caption.monospaced())
+            } label: {
+                Text(verbatim: "Upload queue")
+            }
+
             Button(action: onRoundTrip) { Text(verbatim: "Media round trip") }
         } header: {
             Text(verbatim: "Media")
         }
+    }
+
+    private static func queueSummary(_ uploads: [MediaUpload]) -> String {
+        guard !uploads.isEmpty else { return "empty" }
+        let failed = uploads.count { $0.state == .failed }
+        return "\(uploads.count) queued, \(failed) failed"
     }
 
     private static func detail(_ state: Loadable<String>) -> String {

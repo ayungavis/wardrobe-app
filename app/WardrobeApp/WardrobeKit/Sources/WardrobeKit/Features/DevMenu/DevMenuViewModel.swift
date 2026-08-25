@@ -17,6 +17,7 @@ public final class DevMenuViewModel {
     private(set) var reconcileState: Loadable<ReconcileOutcome> = .idle
     private(set) var diagnostics: [DiagnosticEntry] = []
     private(set) var mediaState: Loadable<String> = .idle
+    private(set) var pendingUploads: [MediaUpload] = []
     private(set) var mediaTask: Task<Void, Never>?
 
     private let activeRepository: ActiveChallengeRepository
@@ -36,6 +37,7 @@ public final class DevMenuViewModel {
     private let coordinator: any SyncCoordinator
     private let diagnosticsStore: any DiagnosticsStore
     private let media: any MediaRepository
+    private let uploadQueue: any MediaUploadRepository
     private let calendar: Calendar
 
     init(
@@ -56,6 +58,7 @@ public final class DevMenuViewModel {
         coordinator: any SyncCoordinator,
         diagnosticsStore: any DiagnosticsStore,
         media: any MediaRepository,
+        uploadQueue: any MediaUploadRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -75,6 +78,7 @@ public final class DevMenuViewModel {
         self.coordinator = coordinator
         self.diagnosticsStore = diagnosticsStore
         self.media = media
+        self.uploadQueue = uploadQueue
         self.calendar = calendar
     }
 
@@ -142,6 +146,7 @@ public final class DevMenuViewModel {
         outbox = (try? outboxRepository.entries()) ?? []
         cursor = (try? feed.position()) ?? 0
         diagnostics = (try? diagnosticsStore.entries()) ?? []
+        pendingUploads = (try? uploadQueue.entries()) ?? []
         let active = activeRepository.load()
         summary = DevStateSummary(
             completionCount: completedRepository.load().count,
@@ -222,6 +227,7 @@ public final class DevMenuViewModel {
     public func retryFailedOutbox() {
         do {
             try outboxRepository.retryFailed(at: Date())
+            try uploadQueue.retryFailed(at: Date())
         } catch {
             Log.report(error)
         }

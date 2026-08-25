@@ -128,7 +128,7 @@ public final class StoredOutboxRepository: OutboxRepository {
         )
     }
 
-    private static func code(for error: AppError) -> String {
+    static func code(for error: AppError) -> String {
         switch error {
         case .network: "network"
         case .sessionExpired: "session_expired"

@@ -7,7 +7,11 @@ public protocol WardrobeItemRepository: AnyObject {
     func fingerprints() throws -> [ItemFingerprint]
     func wears(for itemID: UUID) throws -> [WearRecord]
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
+    func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?)
     func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
+    func stageWear(_ wear: WearRecord?, fingerprint: ItemFingerprint)
+    func commitStaged() throws
+    func discardStaged()
     func update(_ item: WardrobeItem) throws
     func delete(itemID: UUID) throws
     func deleteAll() throws
@@ -29,6 +33,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         Schema([
             WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self,
             OutboxEntryEntity.self, SyncCursorEntity.self, DiagnosticEntryEntity.self,
+            CompletionEntity.self, MediaUploadEntity.self,
         ])
     }
 
@@ -59,6 +64,11 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     }
 
     public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {
+        stageInsert(item, fingerprint: fingerprint, wear: wear)
+        try context.save()
+    }
+
+    public func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) {
         context.insert(WardrobeItemEntity(item))
         if let fingerprint {
             context.insert(ItemFingerprintEntity(fingerprint))
@@ -66,15 +76,26 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         if let wear {
             context.insert(WearRecordEntity(wear))
         }
-        try context.save()
     }
 
     public func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws {
+        stageWear(wear, fingerprint: fingerprint)
+        try context.save()
+    }
+
+    public func stageWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) {
         if let wear {
             context.insert(WearRecordEntity(wear))
         }
         context.insert(ItemFingerprintEntity(fingerprint))
+    }
+
+    public func commitStaged() throws {
         try context.save()
+    }
+
+    public func discardStaged() {
+        context.rollback()
     }
 
     public func update(_ item: WardrobeItem) throws {

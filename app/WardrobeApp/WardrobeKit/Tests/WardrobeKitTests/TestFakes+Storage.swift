@@ -168,3 +168,68 @@ final class InMemoryMediaCacheStore: MediaCacheStore, @unchecked Sendable {
         stored = [:]
     }
 }
+
+@MainActor
+final class InMemoryMediaUploadStore: MediaUploadStore {
+    private var rows: [MediaUpload] = []
+
+    func stage(_ upload: MediaUpload) {
+        rows.append(upload)
+    }
+
+    func all() throws -> [MediaUpload] {
+        rows.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    func due(at date: Date, limit: Int) throws -> [MediaUpload] {
+        rows.filter { $0.state == .pending && $0.nextAttemptAt <= date }.prefix(limit).map(\.self)
+    }
+
+    func hasRows(owner: UUID) throws -> Bool {
+        rows.contains { $0.ownerID == owner }
+    }
+
+    func update(_ upload: MediaUpload) throws {
+        guard let index = rows.firstIndex(where: { $0.id == upload.id }) else {
+            throw AppError.unexpected
+        }
+        rows[index] = upload
+    }
+
+    func remove(id: UUID) throws {
+        rows.removeAll { $0.id == id }
+    }
+
+    func removeAll() throws {
+        rows = []
+    }
+}
+
+@MainActor
+final class StubMediaRepository: MediaRepository {
+    var error: AppError?
+    private(set) var uploadedIDs: [UUID] = []
+
+    func upload(_: Data, id: UUID, kind _: MediaKind, contentType _: String) async throws {
+        if let error {
+            throw error
+        }
+        uploadedIDs.append(id)
+    }
+
+    func data(for _: UUID) async throws -> Data {
+        throw AppError.unexpected
+    }
+
+    func clearCache() throws {}
+}
+
+@MainActor
+func makeInMemoryUploads() -> StoredMediaUploadRepository {
+    StoredMediaUploadRepository(
+        store: InMemoryMediaUploadStore(),
+        photos: SpyPhotoRepository(),
+        previews: InMemoryCompletionPreviewRepository(),
+        thumbnails: InMemoryGarmentThumbnailRepository()
+    )
+}

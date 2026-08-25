@@ -36,12 +36,15 @@ func makeDevMenuViewModel(
         coordinator: ServerSyncCoordinator(
             client: StubAuthenticatedClient(),
             outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
-            feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore())
+            feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore()),
+            uploads: makeInMemoryUploads(),
+            media: StubMediaRepository()
         ),
         diagnosticsStore: InMemoryDiagnosticsStore(),
         media: ServerMediaRepository(
             client: StubAuthenticatedClient(), cache: InMemoryMediaCacheStore()
-        )
+        ),
+        uploadQueue: makeInMemoryUploads()
     )
 }
 

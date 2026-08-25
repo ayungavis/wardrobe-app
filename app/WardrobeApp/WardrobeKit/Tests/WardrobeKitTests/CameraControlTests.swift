@@ -25,7 +25,9 @@ struct CameraControlTests {
             scanner: FakeGarmentScanService(),
             wardrobeRepository: InMemoryWardrobeItemRepository(),
             thumbnails: InMemoryGarmentThumbnailRepository(),
-            preferences: InMemoryAccountPreferencesRepository()
+            preferences: InMemoryAccountPreferencesRepository(),
+            outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
+            uploads: makeInMemoryUploads()
         )
     }
 
