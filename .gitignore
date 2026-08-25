@@ -22,3 +22,6 @@ services/target/
 
 # Per-developer service config (see services/.env.example)
 services/.env
+
+# Railway IaC evaluator dependencies (.railway/package.json is committed)
+.railway/node_modules/
