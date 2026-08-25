@@ -91,7 +91,9 @@ public struct URLSessionAPIClient: APIClient {
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
         } catch {
-            throw AppError(wrapping: error)
+            let failure = AppError(wrapping: error)
+            Log.trail(failure, context: Log.Context(endpoint: endpoint.path))
+            throw failure
         }
     }
 

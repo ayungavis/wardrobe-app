@@ -37,6 +37,25 @@ struct WardrobeAppApp: App {
             options.environment = Bundle.main
                 .object(forInfoDictionaryKey: "SentryEnvironment") as? String ?? "development"
         }
+        Log.breadcrumbRecorder = { error, context in
+            let crumb = Breadcrumb(level: .warning, category: "http")
+            crumb.message = String(describing: error)
+            var data: [String: Any] = [:]
+            if let operation = context.operation {
+                data["operation"] = operation
+            }
+            if let endpoint = context.endpoint {
+                data["endpoint"] = endpoint
+            }
+            if let requestID = context.requestID {
+                data["request_id"] = requestID
+            }
+            if let status = context.status {
+                data["status"] = status
+            }
+            crumb.data = data
+            SentrySDK.addBreadcrumb(crumb)
+        }
         Log.errorReporter = { error, context in
             SentrySDK.capture(error: error) { scope in
                 if let operation = context.operation {

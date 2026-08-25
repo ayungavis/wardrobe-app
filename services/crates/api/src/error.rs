@@ -95,14 +95,23 @@ impl Error {
 
     #[must_use]
     pub fn detail(&self) -> ErrorDetail {
-        if let Self::Internal(source) = self {
-            let facts = wardrobe_db::error_facts(source);
-            tracing::error!(
-                error.kind = facts.code,
-                error.sqlstate = facts.sqlstate,
-                error.constraint = facts.constraint,
-                "internal error"
-            );
+        match self {
+            Self::Internal(source) => {
+                let facts = wardrobe_db::error_facts(source);
+                tracing::error!(
+                    error.kind = facts.code,
+                    error.sqlstate = facts.sqlstate,
+                    error.constraint = facts.constraint,
+                    "internal error"
+                );
+            }
+            Self::MergeIncomplete => {
+                tracing::error!(error.code = self.code(), "request refused");
+            }
+            Self::TooManyRequests => {}
+            _ => {
+                tracing::warn!(error.code = self.code(), "request refused");
+            }
         }
 
         ErrorDetail {

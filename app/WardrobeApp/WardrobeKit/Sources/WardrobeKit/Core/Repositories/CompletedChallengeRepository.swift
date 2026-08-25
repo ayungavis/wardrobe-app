@@ -122,7 +122,12 @@ public final class SwiftDataCompletedChallengeRepository: CompletedChallengeRepo
         let descriptor = FetchDescriptor<CompletionEntity>(
             sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
         )
-        return ((try? context.fetch(descriptor)) ?? []).compactMap(\.domain)
+        let fetched = (try? context.fetch(descriptor)) ?? []
+        let decoded = fetched.compactMap(\.domain)
+        if decoded.count != fetched.count {
+            Log.report(AppError.unexpected, context: Log.Context(operation: "completions.load.dropped"))
+        }
+        return decoded
     }
 
     public func append(_ completion: CompletedChallenge) {

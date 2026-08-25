@@ -168,18 +168,23 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     }
 
     func needsCutout(itemID: UUID) -> Bool {
-        let entity = try? context.fetch(
-            FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
-        ).first
-        guard let entity else { return false }
+        guard let entity = fetchItem(itemID) else { return false }
         return entity.cutoutPath.isEmpty && entity.deletedAt == nil
     }
 
     func stageCutout(itemID: UUID, path: String) {
-        let entity = try? context.fetch(
-            FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
-        ).first
-        entity?.cutoutPath = path
+        fetchItem(itemID)?.cutoutPath = path
+    }
+
+    private func fetchItem(_ itemID: UUID) -> WardrobeItemEntity? {
+        do {
+            return try context.fetch(
+                FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+            ).first
+        } catch {
+            Log.report(error, context: Log.Context(operation: "wardrobe.fetchItem"))
+            return nil
+        }
     }
 
     func stageInsert(wear: WearRecord) {

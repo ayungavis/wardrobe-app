@@ -211,6 +211,28 @@ struct CompletionMutationTests {
         )
     }
 
+    @Test func aCorruptRowIsDroppedWithoutSinkingItsNeighbours() throws {
+        let container = try ModelContainer(
+            for: SwiftDataWardrobeItemRepository.schema,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let store = SwiftDataCompletedChallengeRepository(context: context)
+        store.append(makeCompletion())
+        let corrupt = CompletionEntity.restored(
+            RestoredCompletion(
+                id: UUID(), cardID: UUID(), status: .canonical,
+                completedAt: Date(), photoID: nil, derivativeID: nil
+            ),
+            cardData: Data([0x00])
+        )
+        corrupt.documentState = DocumentState.available.rawValue
+        context.insert(corrupt)
+        try context.save()
+
+        #expect(store.load().count == 1, "the readable completion survives its corrupt neighbour")
+    }
+
     private func makeCompletion(at date: Date = Date()) -> CompletedChallenge {
         CompletedChallenge(
             card: ChallengeCard(id: UUID(), prompt: "Wear something blue"),

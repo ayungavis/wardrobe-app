@@ -49,6 +49,7 @@ public enum Log {
     // dependency; the app target assigns the reporter and AppContainer the sink.
     public nonisolated(unsafe) static var errorReporter: (@Sendable (Error, Context) -> Void)?
     public nonisolated(unsafe) static var diagnosticsSink: (@Sendable (Error, Context) -> Void)?
+    public nonisolated(unsafe) static var breadcrumbRecorder: (@Sendable (Error, Context) -> Void)?
 
     // ponytail: the newest trail stands in for a Sentry breadcrumb, so a caller
     // that reports without context still carries the request id its failure came
@@ -58,6 +59,7 @@ public enum Log {
     public static func trail(_ error: Error, context: Context, logger: Logger = Log.network) {
         logger.error("\(String(describing: error), privacy: .public) \(context.summary, privacy: .public)")
         lastTrail = context
+        breadcrumbRecorder?(error, context)
         diagnosticsSink?(error, context)
     }
 

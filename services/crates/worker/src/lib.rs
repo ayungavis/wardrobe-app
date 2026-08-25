@@ -112,6 +112,7 @@ where
         .bind(code)
         .execute(pool)
         .await?;
+        tracing::warn!(job.code = code, job.attempts = attempts, "job retrying");
         return Ok(Some(Outcome::Retrying));
     }
 
@@ -122,6 +123,11 @@ where
     .bind(code)
     .execute(pool)
     .await?;
+    tracing::error!(
+        job.code = code,
+        job.attempts = attempts,
+        "job failed permanently"
+    );
     Ok(Some(Outcome::Failed))
 }
 
