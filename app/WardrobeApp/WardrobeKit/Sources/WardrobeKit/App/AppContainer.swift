@@ -208,13 +208,14 @@ public final class AppContainer {
 
     // ponytail: one instance, deliberately. A coordinator built per call would
     // hold its own inFlight and the single-flight guarantee would be a no-op.
-    private(set) lazy var syncCoordinator: any SyncCoordinator = ServerSyncCoordinator(
+    private(set) lazy var syncCoordinator: any SyncService = ServerSyncService(
         client: makeAuthenticatedClient(),
         outbox: makeOutboxRepository(),
         feed: makeChangeFeedRepository(),
         uploads: makeMediaUploadRepository(),
         media: makeMediaRepository(),
-        preferences: preferencesRepository
+        preferences: preferencesRepository,
+        applier: makeChangeApplier()
     )
 
     private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
@@ -229,6 +230,13 @@ public final class AppContainer {
             photos: photoRepository,
             previews: completionPreviewRepository,
             thumbnails: garmentThumbnailRepository
+        )
+    }
+
+    func makeChangeApplier() -> ChangeApplier {
+        StoreChangeApplier(
+            wardrobe: SwiftDataWardrobeItemRepository(context: Self.wardrobeContext),
+            preferences: preferencesRepository
         )
     }
 
@@ -312,7 +320,8 @@ public extension AppContainer {
             coordinator: syncCoordinator,
             diagnosticsStore: diagnostics,
             media: makeMediaRepository(),
-            uploadQueue: makeMediaUploadRepository()
+            uploadQueue: makeMediaUploadRepository(),
+            applier: makeChangeApplier()
         )
     }
 }

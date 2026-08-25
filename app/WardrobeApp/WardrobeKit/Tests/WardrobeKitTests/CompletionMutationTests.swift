@@ -88,7 +88,7 @@ struct CompletionMutationTests {
 
     @Test func theMutationIdIsTheCompletionIdSoAReplayCollides() throws {
         let completion = makeCompletion()
-        let args = try CaptureFlowViewModel.syncPlan(for: completion, items: [], at: Date()).args
+        let args = try CompletionSyncPlanner.plan(for: completion, items: [], at: Date()).args
         let queued = try SyncMutation.completeChallenge(args).queued(id: completion.id)
 
         #expect(queued.id == completion.id)
@@ -97,7 +97,7 @@ struct CompletionMutationTests {
 
     @Test func theArgumentsCarryTheDevicesOwnDateAndZone() throws {
         let completion = makeCompletion()
-        let args = try CaptureFlowViewModel.syncPlan(for: completion, items: [], at: Date()).args
+        let args = try CompletionSyncPlanner.plan(for: completion, items: [], at: Date()).args
         #expect(args.timeZone == TimeZone.current.identifier)
         #expect(args.localDate.count == 10)
         #expect(args.completionId == completion.id)
@@ -142,7 +142,7 @@ struct CompletionMutationTests {
     @Test func aCompletionWithEditsCarriesItsUndoHistory() throws {
         let steps = [makeCompletion().document, makeCompletion().document]
 
-        let plan = try CaptureFlowViewModel.syncPlan(
+        let plan = try CompletionSyncPlanner.plan(
             for: makeCompletion(), items: [], at: Date(), history: steps
         )
 
@@ -154,7 +154,7 @@ struct CompletionMutationTests {
     }
 
     @Test func aCompletionWithNoEditsCarriesNoHistory() throws {
-        let plan = try CaptureFlowViewModel.syncPlan(for: makeCompletion(), items: [], at: Date())
+        let plan = try CompletionSyncPlanner.plan(for: makeCompletion(), items: [], at: Date())
 
         #expect(plan.args.document.historyMediaObjectId == nil)
         #expect(plan.args.document.historyStepCount == nil)
@@ -165,7 +165,7 @@ struct CompletionMutationTests {
         let steps = [makeCompletion().document]
         #expect(UndoHistoryPayload.data(for: steps, cap: 4) == nil)
 
-        let plan = try CaptureFlowViewModel.syncPlan(
+        let plan = try CompletionSyncPlanner.plan(
             for: makeCompletion(), items: [], at: Date(), history: steps
         )
         #expect(plan.uploads.contains { $0.kind == .document }, "the completion itself still ships")

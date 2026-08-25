@@ -24,12 +24,12 @@ private struct PushOutcome {
 }
 
 @MainActor
-protocol SyncCoordinator: AnyObject {
+protocol SyncService: AnyObject {
     func reconcile(_ trigger: SyncTrigger) async -> ReconcileOutcome
 }
 
 @MainActor
-final class ServerSyncCoordinator: SyncCoordinator {
+final class ServerSyncService: SyncService {
     private let client: any AuthenticatedAPIClient
     private let outbox: any OutboxRepository
     private let feed: any ChangeFeedRepository
@@ -147,7 +147,7 @@ final class ServerSyncCoordinator: SyncCoordinator {
         // pushing on a guess spends attempts on a certain rejection.
         let due = try outbox.due(at: Date(), limit: SyncBatching.maxMutations)
             .filter { entry in
-                entry.name != "completeChallenge" || ((try? uploads.holdsRows(owner: entry.id)) ?? true) == false
+                entry.name != SyncMutation.completeChallengeName || ((try? uploads.holdsRows(owner: entry.id)) ?? true) == false
             }
         guard !due.isEmpty else { return PushOutcome() }
 

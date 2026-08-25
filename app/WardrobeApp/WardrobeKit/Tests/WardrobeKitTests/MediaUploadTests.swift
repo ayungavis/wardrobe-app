@@ -129,7 +129,7 @@ struct MediaUploadTests {
     // MARK: - Fixtures
 
     private struct SUT {
-        let coordinator: ServerSyncCoordinator
+        let coordinator: ServerSyncService
         let client: OrderingSyncClient
         let outbox: StoredOutboxRepository
         let uploads: StoredMediaUploadRepository
@@ -142,7 +142,7 @@ struct MediaUploadTests {
         let uploads = makeInMemoryUploads()
         let media = StubMediaRepository()
         return SUT(
-            coordinator: ServerSyncCoordinator(
+            coordinator: ServerSyncService(
                 client: client, outbox: outbox,
                 feed: ServerChangeFeedRepository(client: client, cursor: InMemoryCursorStore()),
                 uploads: uploads, media: media,

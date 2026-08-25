@@ -219,6 +219,10 @@ final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, 
     func save(_ preferences: AccountPreferences) {
         stored = preferences
     }
+
+    func applyRemote(_ preferences: AccountPreferences) {
+        stored = preferences
+    }
 }
 
 // -------------------------------------------------- readable photo identities

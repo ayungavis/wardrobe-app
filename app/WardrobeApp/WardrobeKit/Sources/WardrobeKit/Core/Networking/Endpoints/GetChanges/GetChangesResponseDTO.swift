@@ -210,6 +210,7 @@ struct AccountPreferenceRecordDTO: Decodable, Sendable {
     let recentStickerIds: [String]
     let lastTextStyle: JSONValue
     let onboardingCompletedAt: Date?
+    let uploadConsentAt: Date?
     let changeSeq: Int64
     let deletedAt: Date?
 }

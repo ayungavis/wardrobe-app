@@ -90,6 +90,70 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         context.insert(ItemFingerprintEntity(fingerprint))
     }
 
+    public struct PulledItem {
+        public let item: WardrobeItem
+        public let deletedAt: Date?
+        public let revisions: PulledRevisions
+
+        public init(item: WardrobeItem, deletedAt: Date?, revisions: PulledRevisions) {
+            self.item = item
+            self.deletedAt = deletedAt
+            self.revisions = revisions
+        }
+    }
+
+    public struct PulledRevisions {
+        public let category: Int64
+        public let name: Int64
+        public let description: Int64
+
+        public init(category: Int64, name: Int64, description: Int64) {
+            self.category = category
+            self.name = name
+            self.description = description
+        }
+    }
+
+    // ponytail: the local cutout path survives a pulled edit — the feed knows
+    // nothing about this device's files, and blanking it would orphan the image.
+    func stageApply(_ pulled: PulledItem) throws {
+        let itemID = pulled.item.id
+        let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+        let entity: WardrobeItemEntity
+        if let existing = try context.fetch(descriptor).first {
+            entity = existing
+        } else {
+            entity = WardrobeItemEntity(pulled.item)
+            context.insert(entity)
+        }
+        entity.name = pulled.item.name
+        entity.itemDescription = pulled.item.description
+        entity.category = pulled.item.category.rawValue
+        entity.deletedAt = pulled.deletedAt
+        entity.categoryRev = pulled.revisions.category
+        entity.nameRev = pulled.revisions.name
+        entity.descriptionRev = pulled.revisions.description
+        entity.updatedAt = Date()
+    }
+
+    func stageApply(fingerprint: ItemFingerprint) throws {
+        let fingerprintID = fingerprint.id
+        var descriptor = FetchDescriptor<ItemFingerprintEntity>(
+            predicate: #Predicate { $0.id == fingerprintID }
+        )
+        descriptor.fetchLimit = 1
+        guard try context.fetchCount(descriptor) == 0 else { return }
+        context.insert(ItemFingerprintEntity(fingerprint))
+    }
+
+    func stageInsert(fingerprint: ItemFingerprint) {
+        context.insert(ItemFingerprintEntity(fingerprint))
+    }
+
+    func stageInsert(wear: WearRecord) {
+        context.insert(WearRecordEntity(wear))
+    }
+
     public func commitStaged() throws {
         try context.save()
     }

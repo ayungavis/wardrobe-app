@@ -4,6 +4,7 @@ import Foundation
 public protocol AccountPreferencesRepository: Sendable {
     func load() -> AccountPreferences
     func save(_ preferences: AccountPreferences)
+    func applyRemote(_ preferences: AccountPreferences)
 }
 
 // ponytail: UserDefaults, so the outbox entry and the preference write are two
@@ -34,6 +35,16 @@ public final class UserDefaultsAccountPreferencesRepository: AccountPreferencesR
             Log.report(error)
             return AccountPreferences()
         }
+    }
+
+    // ponytail: writes without enqueueing — this value came FROM the server, and
+    // echoing it back as a mutation would loop preferences through sync forever.
+    public func applyRemote(_ preferences: AccountPreferences) {
+        guard let data = try? JSONEncoder().encode(preferences) else {
+            Log.report(AppError.unexpected)
+            return
+        }
+        defaults.set(data, forKey: Self.key)
     }
 
     public func save(_ preferences: AccountPreferences) {

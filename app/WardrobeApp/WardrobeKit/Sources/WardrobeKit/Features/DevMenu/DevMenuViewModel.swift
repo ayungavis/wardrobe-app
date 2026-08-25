@@ -34,10 +34,11 @@ public final class DevMenuViewModel {
     private let tokens: any SessionTokenRepository
     private let outboxRepository: any OutboxRepository
     private let feed: any ChangeFeedRepository
-    private let coordinator: any SyncCoordinator
+    private let coordinator: any SyncService
     private let diagnosticsStore: any DiagnosticsStore
     private let media: any MediaRepository
     private let uploadQueue: any MediaUploadRepository
+    private let applier: any ChangeApplier
     private let calendar: Calendar
 
     init(
@@ -55,10 +56,11 @@ public final class DevMenuViewModel {
         tokens: any SessionTokenRepository,
         outboxRepository: any OutboxRepository,
         feed: any ChangeFeedRepository,
-        coordinator: any SyncCoordinator,
+        coordinator: any SyncService,
         diagnosticsStore: any DiagnosticsStore,
         media: any MediaRepository,
         uploadQueue: any MediaUploadRepository,
+        applier: any ChangeApplier = NoopChangeApplier(),
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -79,6 +81,7 @@ public final class DevMenuViewModel {
         self.diagnosticsStore = diagnosticsStore
         self.media = media
         self.uploadQueue = uploadQueue
+        self.applier = applier
         self.calendar = calendar
     }
 
@@ -178,7 +181,7 @@ public final class DevMenuViewModel {
 
         pullTask = Task { [feed] in
             do {
-                let outcome = try await feed.pull(applying: NoopChangeApplier())
+                let outcome = try await feed.pull(applying: applier)
                 try Task.checkCancellation()
                 pullState = .loaded(outcome)
             } catch is CancellationError {

@@ -1,6 +1,8 @@
 import Foundation
 
 enum SyncMutation: Sendable {
+    static let completeChallengeName = "completeChallenge"
+
     case upsertItem(UpsertItemArgsDTO)
     case deleteItem(DeleteItemArgsDTO)
     case upsertPreferences(UpsertPreferencesArgsDTO)
@@ -13,7 +15,7 @@ enum SyncMutation: Sendable {
         case .deleteItem: "deleteItem"
         case .upsertPreferences: "upsertPreferences"
         case .resolveCompletion: "resolveCompletion"
-        case .completeChallenge: "completeChallenge"
+        case .completeChallenge: Self.completeChallengeName
         }
     }
 

@@ -153,7 +153,7 @@ struct SyncCoordinatorTests {
     // MARK: - Fixtures
 
     private struct SUT {
-        let coordinator: ServerSyncCoordinator
+        let coordinator: ServerSyncService
         let client: StubSyncClient
         let outbox: StoredOutboxRepository
         let cursor: InMemoryCursorStore
@@ -165,7 +165,7 @@ struct SyncCoordinatorTests {
         let cursor = InMemoryCursorStore()
         let feed = ServerChangeFeedRepository(client: client, cursor: cursor)
         return SUT(
-            coordinator: ServerSyncCoordinator(
+            coordinator: ServerSyncService(
                 client: client, outbox: outbox, feed: feed,
                 uploads: makeInMemoryUploads(), media: StubMediaRepository(),
                 preferences: makeGrantedPreferences()

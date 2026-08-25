@@ -31,7 +31,7 @@ struct DevMenuSessionTests {
             tokens: tokens,
             outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore()),
             feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore()),
-            coordinator: ServerSyncCoordinator(
+            coordinator: ServerSyncService(
                 client: StubAuthenticatedClient(),
                 outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
                 feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore()),

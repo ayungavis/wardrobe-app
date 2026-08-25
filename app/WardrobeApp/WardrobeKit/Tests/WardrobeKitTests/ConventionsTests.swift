@@ -176,6 +176,50 @@ struct ConventionsTests {
         )
     }
 
+    /// C4: a store file declares stores and storage entities, nothing else. A
+    /// domain-shaped value defined inside `Core/Stores/` is a repository concern
+    /// wearing the wrong address, and the domain layer ends up importing it.
+    @Test func storeFilesDeclareOnlyStoresAndEntities() throws {
+        var offenders: [String] = []
+        for file in try sources() where file.path.contains("/Core/Stores/") {
+            for (index, line) in file.lines.enumerated() {
+                guard let name = Self.declaredType(on: line) else { continue }
+                if !name.hasSuffix("Store"), !name.hasSuffix("Entity") {
+                    offenders.append("\(file.name):\(index + 1) declares \(name)")
+                }
+            }
+        }
+        #expect(offenders.isEmpty, "\(offenders)")
+    }
+
+    /// C5: every file under `Core/Services/` is `<Name>Service.swift`, per the
+    /// layout table. The one named exception is the change applier pair — an
+    /// applier writes into local stores rather than wrapping something outside
+    /// the process, so it fits no table row and carries its reason here.
+    @Test func serviceFilesAreNamedService() throws {
+        let excepted = ["ChangeApplier.swift", "StoreChangeApplier.swift"]
+        var offenders: [String] = []
+        for file in try sources() where file.path.contains("/Core/Services/") {
+            guard !file.name.hasSuffix("Service.swift"), !excepted.contains(file.name) else { continue }
+            offenders.append(file.name)
+        }
+        #expect(offenders.isEmpty, "\(offenders)")
+    }
+
+    private static func declaredType(on line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        for keyword in ["struct ", "enum ", "final class ", "class ", "actor "] {
+            for access in ["public ", "internal ", ""] {
+                let prefix = access + keyword
+                if trimmed.hasPrefix(prefix) {
+                    let rest = trimmed.dropFirst(prefix.count)
+                    return String(rest.prefix { $0.isLetter || $0.isNumber || $0 == "_" })
+                }
+            }
+        }
+        return nil
+    }
+
     @Test func everyViewTypeIsNamedView() throws {
         let offenders = try sources().flatMap { file in
             viewTypes(in: file)

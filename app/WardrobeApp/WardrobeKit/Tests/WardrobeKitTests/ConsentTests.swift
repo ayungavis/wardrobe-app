@@ -101,7 +101,7 @@ struct ConsentTests {
     // MARK: - Fixtures
 
     private struct SUT {
-        let coordinator: ServerSyncCoordinator
+        let coordinator: ServerSyncService
         let client: GateSyncClient
         let outbox: StoredOutboxRepository
         let uploads: StoredMediaUploadRepository
@@ -119,7 +119,7 @@ struct ConsentTests {
             uploadConsentAt: consent, uploadConsentDeclinedAt: declined
         )
         return SUT(
-            coordinator: ServerSyncCoordinator(
+            coordinator: ServerSyncService(
                 client: client, outbox: outbox,
                 feed: ServerChangeFeedRepository(client: client, cursor: InMemoryCursorStore()),
                 uploads: uploads, media: media,
