@@ -118,7 +118,7 @@ public final class ConflictsViewModel {
     }
 
     private func conflictedDays(in stored: [CompletedChallenge]) -> [CompletionDayConflict] {
-        let conflicted = stored.filter { $0.status == .conflicting }
+        let conflicted = stored.filter { $0.status == .conflicting && !$0.isDeliberateExtra }
         let days = Set(conflicted.map { calendar.startOfDay(for: $0.completedAt) })
         return days.sorted(by: >).map { day in
             CompletionDayConflict(

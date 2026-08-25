@@ -10,6 +10,7 @@ struct CompleteChallengeArgsDTO: Encodable, Sendable {
     let derivative: CompletionDerivativeDTO
     let document: CompletionDocumentDTO
     var layerPhotoIds: [UUID] = []
+    var layerPhotos: [CompletionPhotoDTO] = []
     var items: [CompletionItemDTO] = []
 }
 

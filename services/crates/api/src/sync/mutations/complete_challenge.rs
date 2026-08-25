@@ -24,6 +24,8 @@ struct Args {
     #[serde(default)]
     layer_photo_ids: Vec<Uuid>,
     #[serde(default)]
+    layer_photos: Vec<PhotoArgs>,
+    #[serde(default)]
     items: Vec<items::ItemArgs>,
 }
 
@@ -163,6 +165,23 @@ async fn write_all(tx: &mut Tx<'_>, account_id: Uuid, args: &Args) -> Result<Com
     .execute(&mut **tx)
     .await?;
 
+    for photo in &args.layer_photos {
+        let seq = super::next(tx, account_id).await?;
+        sqlx::query(
+            "insert into photo (id, account_id, media_object_id, source, captured_at, change_seq)
+             values ($1, $2, $3, $4, $5, $6)
+             on conflict (id) do nothing",
+        )
+        .bind(photo.id)
+        .bind(account_id)
+        .bind(photo.media_object_id)
+        .bind(&photo.source)
+        .bind(photo.captured_at)
+        .bind(seq)
+        .execute(&mut **tx)
+        .await?;
+    }
+
     let derivative_seq = super::next(tx, account_id).await?;
     sqlx::query(
         "insert into photo_derivative (id, account_id, photo_id, media_object_id, change_seq)
@@ -226,7 +245,7 @@ async fn link_photos(tx: &mut Tx<'_>, args: &Args) -> Result<(), Error> {
     for layer in &args.layer_photo_ids {
         sqlx::query(
             "insert into completion_photo (completion_id, photo_id, role)
-             values ($1, $2, 'layer')
+             select $1, $2, 'layer' where exists (select 1 from photo where id = $2)
              on conflict (completion_id, photo_id) do nothing",
         )
         .bind(args.completion_id)

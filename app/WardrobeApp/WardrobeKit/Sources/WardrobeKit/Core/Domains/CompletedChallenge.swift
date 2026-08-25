@@ -48,6 +48,10 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public var status: CompletionStatus = .canonical
     public var documentState: DocumentState = .available
 
+    public var isDeliberateExtra: Bool {
+        card.isFreestyle
+    }
+
     public init(
         id: UUID = UUID(),
         card: ChallengeCard,

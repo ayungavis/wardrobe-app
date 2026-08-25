@@ -15,6 +15,9 @@ enum CompletionSyncPlanner {
         let minted = MintedMedia()
         let historyPayload = UndoHistoryPayload.data(for: history)
         let garments = items.compactMap { item($0) }
+        let canvasPhotos = Array(Set(completion.document.photoIDs))
+            .filter { $0 != completion.photoID }
+            .map { (id: $0, media: UUID()) }
 
         let args = CompleteChallengeArgsDTO(
             completionId: completion.id,
@@ -34,13 +37,22 @@ enum CompletionSyncPlanner {
                 historyStepCount: historyPayload.map { _ in Int32(history.count) }
             ),
             layerPhotoIds: Array(Set(completion.document.photoIDs)),
+            layerPhotos: canvasPhotos.map {
+                CompletionPhotoDTO(id: $0.id, mediaObjectId: $0.media, source: "import")
+            },
             items: garments.map(\.dto)
         )
 
-        let uploads = try uploadRows(
+        var uploads = try uploadRows(
             for: completion, minted: minted, historyPayload: historyPayload,
             garments: garments, at: date
         )
+        uploads += canvasPhotos.map {
+            MediaUpload(
+                id: $0.media, ownerID: completion.id, kind: .original,
+                contentType: "image/jpeg", source: .photoOriginal($0.id), createdAt: date
+            )
+        }
         return CompletionSyncPlan(args: args, uploads: uploads)
     }
 

@@ -75,7 +75,11 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         let descriptor = FetchDescriptor<CompletionEntity>(
             predicate: #Predicate { $0.status != canonical }
         )
-        return try Set(context.fetch(descriptor).map(\.id))
+        return try Set(
+            context.fetch(descriptor)
+                .filter { $0.domain?.isDeliberateExtra != true }
+                .map(\.id)
+        )
     }
 
     public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {

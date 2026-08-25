@@ -5,6 +5,27 @@ import Testing
 
 @MainActor
 struct ConflictResolutionTests {
+    @Test func aFreestyleOutfitIsAnExtraNotAConflict() throws {
+        let sut = try makeSUT()
+        let challenge = makeCompletion(status: .canonical)
+        let extra = makeCompletion(status: .conflicting, card: .freestyle)
+        sut.completions.append(challenge)
+        sut.completions.append(extra)
+        try sut.wardrobe.insert(
+            makeItem(),
+            fingerprint: nil,
+            wear: WearRecord(itemID: itemID, completionID: extra.id, wornAt: Date())
+        )
+
+        let viewModel = makeViewModel(sut)
+        viewModel.load()
+
+        #expect(viewModel.completionConflicts.isEmpty,
+                "the day's extra outfits are deliberate; only two devices disagreeing is a conflict")
+        #expect(try sut.wardrobe.wears(for: itemID).count == 1,
+                "clothes worn in an extra outfit were really worn")
+    }
+
     // MARK: - The counting rule (FR-065)
 
     @Test func wearsOfANonCanonicalCompletionAreNotCounted() throws {
@@ -223,9 +244,12 @@ struct ConflictResolutionTests {
         ItemConflict(id: id, itemID: itemID, field: .name, value: "other", revision: revision)
     }
 
-    private func makeCompletion(status: CompletionStatus) -> CompletedChallenge {
+    private func makeCompletion(
+        status: CompletionStatus,
+        card: ChallengeCard = ChallengeCard(id: UUID(), prompt: "p")
+    ) -> CompletedChallenge {
         var completion = CompletedChallenge(
-            card: ChallengeCard(id: UUID(), prompt: "p"),
+            card: card,
             photoID: UUID(),
             document: EditorDocument(id: UUID(), layers: []),
             completedAt: Date()

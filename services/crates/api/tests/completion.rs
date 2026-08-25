@@ -94,6 +94,57 @@ fn args(stage: &Stage, ticket: &Ticket, local_date: &str) -> Value {
     })
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_layer_photo_the_client_never_registered_cannot_sink_the_completion(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    let mut body = args(&stage, &ticket, "2026-08-21");
+    body["layerPhotoIds"] = json!([Uuid::now_v7()]);
+
+    let result = complete(&pool, &stage, &body).await;
+
+    assert_eq!(
+        result["status"], "applied",
+        "a decorative layer must never cost the user the whole outfit"
+    );
+    assert_eq!(count(&pool, "challenge_completion", stage.account).await, 1);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_layer_photo_sent_with_the_completion_is_registered_and_linked(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    let layer = Uuid::now_v7();
+    let mut body = args(&stage, &ticket, "2026-08-21");
+    body["layerPhotos"] = json!([{
+        "id": layer, "mediaObjectId": stage.media, "source": "import"
+    }]);
+    body["layerPhotoIds"] = json!([layer]);
+
+    let result = complete(&pool, &stage, &body).await;
+    assert_eq!(result["status"], "applied");
+
+    let source: String = sqlx::query_scalar("select source from photo where id = $1")
+        .bind(layer)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(
+        source, "import",
+        "a canvas photo is a photo the account owns"
+    );
+    let role: String = sqlx::query_scalar("select role from completion_photo where photo_id = $1")
+        .bind(layer)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(role, "layer");
+    Ok(())
+}
+
 async fn complete(pool: &PgPool, stage: &Stage, body: &Value) -> Value {
     let request = Request::builder()
         .method("POST")

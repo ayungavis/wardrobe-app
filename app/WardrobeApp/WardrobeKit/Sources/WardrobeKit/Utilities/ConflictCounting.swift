@@ -11,7 +11,7 @@ enum ConflictCounting {
         let days = completions.map { repository in
             Set(
                 repository.load()
-                    .filter { $0.status == .conflicting }
+                    .filter { $0.status == .conflicting && !$0.isDeliberateExtra }
                     .map { calendar.startOfDay(for: $0.completedAt) }
             ).count
         } ?? 0

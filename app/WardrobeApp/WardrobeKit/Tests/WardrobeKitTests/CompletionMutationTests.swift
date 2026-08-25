@@ -6,6 +6,26 @@ import Testing
 
 @MainActor
 struct CompletionMutationTests {
+    @Test func aCanvasPhotoIsRegisteredAndUploadedWithTheCompletion() throws {
+        let imported = UUID()
+        var document = EditorDocument(id: UUID(), layers: [])
+        document.appendPhoto(imported)
+        let completion = CompletedChallenge(
+            card: ChallengeCard(id: UUID(), prompt: "Wear something blue"),
+            photoID: UUID(),
+            document: document,
+            completedAt: Date()
+        )
+
+        let plan = try CompletionSyncPlanner.plan(for: completion, items: [], at: Date())
+
+        #expect(plan.args.layerPhotos.map(\.id) == [imported],
+                "a photo the server never registered sinks the whole completion on a foreign key")
+        #expect(plan.args.layerPhotos.first?.source == "import")
+        let originals = plan.uploads.filter { $0.kind == .original }
+        #expect(originals.count == 2, "the canvas photo's bytes travel with the outfit")
+    }
+
     // MARK: - The migration
 
     @Test func oldCompletionsArriveAndTheOldKeyIsDropped() throws {
