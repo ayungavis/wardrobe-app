@@ -35,6 +35,7 @@ async fn owned(pool: &PgPool) -> sqlx::Result<Owned> {
     let key = format!("{account}/original/{media}");
 
     storage()
+        .await
         .put(&key, b"a photo".to_vec(), "image/jpeg")
         .await
         .expect("the object lands");
@@ -110,7 +111,7 @@ async fn deleting_an_account_takes_its_rows_and_its_objects(pool: PgPool) -> sql
     assert_eq!(account, 0);
 
     assert_eq!(
-        storage().head(&mine.key).await.expect("head"),
+        storage().await.head(&mine.key).await.expect("head"),
         None,
         "rows without objects is not deletion, it is a rename of the problem"
     );
@@ -159,7 +160,14 @@ async fn another_account_is_untouched(pool: PgPool) -> sqlx::Result<()> {
     call(pool.clone(), delete_me(&mine.token)).await;
 
     assert_eq!(rows(&pool, "photo", theirs.account).await, 1);
-    assert!(storage().head(&theirs.key).await.expect("head").is_some());
+    assert!(
+        storage()
+            .await
+            .head(&theirs.key)
+            .await
+            .expect("head")
+            .is_some()
+    );
     Ok(())
 }
 

@@ -11,7 +11,7 @@ TEST_FLAGS ?=
 .PHONY: help validate \
         ios-generate ios-format ios-lint ios-test ios-build ios-run ios-validate \
         backend-up backend-down backend-migrate backend-reset backend-run backend-openapi \
-        backend-fmt backend-lint backend-test backend-validate backend-live-ai
+        backend-fmt backend-lint backend-test backend-build backend-image backend-validate backend-live-ai
 
 ## Descriptions come from the `##` comments below, so this list cannot go stale.
 help:
@@ -83,6 +83,12 @@ backend-lint: ## cargo clippy -D warnings
 
 backend-test: services/.env ## cargo test (starts the containers it needs)
 	$(MAKE) -C services test
+
+backend-build: ## cargo build --release for both binaries (what the Dockerfile runs)
+	$(MAKE) -C services build
+
+backend-image: ## docker build the deploy image (context is services/, needs a >=4 GiB builder)
+	$(MAKE) -C services image
 
 backend-validate: services/.env ## fmt → clippy → test
 	$(MAKE) -C services validate

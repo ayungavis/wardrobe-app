@@ -10,7 +10,7 @@ S3_SECRET_ACCESS_KEY ?= wardrobe-dev-secret
 S3_FORCE_PATH_STYLE ?= true
 OPENROUTER_BASE_URL ?= https://openrouter.ai/api/v1
 
-.PHONY: up down migrate reset run openapi test fmt lint validate
+.PHONY: up down migrate reset run openapi test fmt lint validate build image
 
 up:
 	docker compose up -d --wait
@@ -47,5 +47,11 @@ fmt:
 
 lint:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+build:
+	cargo build --release --locked --bin wardrobe-api --bin wardrobe-worker
+
+image:
+	docker build -t wardrobe-backend:local .
 
 validate: fmt lint test

@@ -214,7 +214,7 @@ async fn delete_the_account_and_leave_nothing_behind(
 
     for key in keys {
         assert_eq!(
-            storage().head(&key).await.expect("head"),
+            storage().await.head(&key).await.expect("head"),
             None,
             "an object outliving the account it belonged to is the failure FR-071 names"
         );

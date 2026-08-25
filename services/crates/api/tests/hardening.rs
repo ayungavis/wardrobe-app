@@ -11,11 +11,11 @@ use wardrobe_api::{MAX_BODY_BYTES, app_with, limit};
 
 use common::{body_json, get, get_with_auth, session, storage, verifier};
 
-fn router(pool: PgPool, serve_docs: bool) -> axum::Router {
+async fn router(pool: PgPool, serve_docs: bool) -> axum::Router {
     app_with(
         pool,
         verifier(),
-        Some(storage()),
+        Some(storage().await),
         limit::DEFAULT_TRUSTED_HOPS,
         serve_docs,
     )
@@ -32,14 +32,14 @@ async fn send(router: axum::Router, request: Request<Body>) -> axum::response::R
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_api_shape_is_not_published_unless_it_is_asked_for(pool: PgPool) -> sqlx::Result<()> {
-    let closed = send(router(pool.clone(), false), get("/docs")).await;
+    let closed = send(router(pool.clone(), false).await, get("/docs")).await;
     assert_eq!(closed.status(), StatusCode::NOT_FOUND);
 
-    let open = send(router(pool.clone(), true), get("/docs")).await;
+    let open = send(router(pool.clone(), true).await, get("/docs")).await;
     assert_ne!(open.status(), StatusCode::NOT_FOUND);
 
     for serve_docs in [false, true] {
-        let contract = send(router(pool.clone(), serve_docs), get("/openapi.json")).await;
+        let contract = send(router(pool.clone(), serve_docs).await, get("/openapi.json")).await;
         assert_eq!(
             contract.status(),
             StatusCode::OK,
@@ -53,7 +53,7 @@ async fn the_api_shape_is_not_published_unless_it_is_asked_for(pool: PgPool) -> 
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn every_response_refuses_content_type_sniffing(pool: PgPool) -> sqlx::Result<()> {
-    let response = send(router(pool, true), get("/health")).await;
+    let response = send(router(pool, true).await, get("/health")).await;
 
     assert_eq!(
         response.headers().get("x-content-type-options"),
@@ -75,7 +75,7 @@ async fn an_oversize_body_never_reaches_a_handler(pool: PgPool) -> sqlx::Result<
         .body(Body::from(vec![b'x'; MAX_BODY_BYTES + 1024]))
         .expect("request");
 
-    let response = send(router(pool, false), request).await;
+    let response = send(router(pool, false).await, request).await;
 
     assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     assert_eq!(
@@ -95,18 +95,22 @@ async fn no_rejection_body_carries_anything_beyond_code_and_message(
     let unknown = Uuid::now_v7();
 
     let rejections = vec![
-        send(router(pool.clone(), false), get("/v1/whoami")).await,
+        send(router(pool.clone(), false).await, get("/v1/whoami")).await,
         send(
-            router(pool.clone(), false),
+            router(pool.clone(), false).await,
             get_with_auth("/v1/whoami", "Bearer nonsense"),
         )
         .await,
         send(
-            router(pool.clone(), false),
+            router(pool.clone(), false).await,
             get_with_auth(&format!("/v1/media/{unknown}"), &format!("Bearer {token}")),
         )
         .await,
-        send(router(pool.clone(), false), get("/v1/changes?since=0")).await,
+        send(
+            router(pool.clone(), false).await,
+            get("/v1/changes?since=0"),
+        )
+        .await,
     ];
 
     for response in rejections {
@@ -135,6 +139,7 @@ async fn an_upload_over_its_cap_is_discarded_rather_than_stamped(pool: PgPool) -
     let key = format!("{account}/cutout/{media}");
     let cap = usize::try_from(wardrobe_db::upload_cap("cutout")).expect("a positive cap");
     storage()
+        .await
         .put(&key, vec![0u8; cap + 1], "image/png")
         .await
         .expect("the oversize object lands");
@@ -149,7 +154,7 @@ async fn an_upload_over_its_cap_is_discarded_rather_than_stamped(pool: PgPool) -
     .await?;
 
     let response = send(
-        router(pool.clone(), false),
+        router(pool.clone(), false).await,
         get_with_auth(&format!("/v1/media/{media}"), &format!("Bearer {token}")),
     )
     .await;
@@ -161,7 +166,7 @@ async fn an_upload_over_its_cap_is_discarded_rather_than_stamped(pool: PgPool) -
         .await?;
     assert_eq!(left, 0, "the row goes with the object it described");
     assert!(
-        storage().head(&key).await.expect("head").is_none(),
+        storage().await.head(&key).await.expect("head").is_none(),
         "and the bytes are gone from the store, not merely unreferenced"
     );
     let _ = json!({});

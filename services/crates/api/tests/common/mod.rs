@@ -18,14 +18,16 @@ pub fn verifier() -> std::sync::Arc<wardrobe_api::auth::apple::Verifier> {
 }
 
 pub async fn call(pool: PgPool, request: Request<Body>) -> Response {
-    wardrobe_api::app(pool, verifier(), Some(storage()))
+    wardrobe_api::app(pool, verifier(), Some(storage().await))
         .oneshot(request)
         .await
         .expect("the router is infallible")
 }
 
-pub fn storage() -> std::sync::Arc<wardrobe_storage::Storage> {
-    std::sync::Arc::new(wardrobe_storage::Storage::new(&settings()))
+pub async fn storage() -> std::sync::Arc<wardrobe_storage::Storage> {
+    let storage = std::sync::Arc::new(wardrobe_storage::Storage::new(&settings()));
+    storage.ensure_bucket().await.expect("a usable bucket");
+    storage
 }
 
 fn settings() -> wardrobe_storage::Settings {
@@ -44,6 +46,8 @@ fn env(name: &str, fallback: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
 }
 
+// ponytail: deliberately does not ensure the bucket. T13 uses it to reach the
+// "storage unconfigured" branch, which needs a bucket that really is missing.
 pub fn storage_in(bucket: &str) -> std::sync::Arc<wardrobe_storage::Storage> {
     let mut settings = settings();
     bucket.clone_into(&mut settings.bucket);
