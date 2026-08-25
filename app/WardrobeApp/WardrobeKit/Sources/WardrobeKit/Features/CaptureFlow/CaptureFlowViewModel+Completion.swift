@@ -3,8 +3,9 @@ import Foundation
 // MARK: - The checkmark (FR-028/029)
 
 public extension CaptureFlowViewModel {
-    func completeChallenge() {
+    func completeChallenge(history: [EditorDocument] = []) {
         guard !isCompleting, !isCompleted, challenge.photoID != nil else { return }
+        pendingUndoSteps = history
         isCompleting = true
 
         completionTask = Task {
@@ -33,7 +34,9 @@ public extension CaptureFlowViewModel {
         do {
             let committed = try review.stageCommit(completionID: completion.id, at: now)
             completedRepository.stage(completion)
-            let plan = try Self.syncPlan(for: completion, items: committed, at: now)
+            let plan = try Self.syncPlan(
+                for: completion, items: committed, at: now, history: pendingUndoSteps
+            )
             try outbox.stage(
                 SyncMutation.completeChallenge(plan.args).queued(id: completion.id),
                 at: now
@@ -62,11 +65,11 @@ public extension CaptureFlowViewModel {
     internal static func syncPlan(
         for completion: CompletedChallenge,
         items: [ScannedGarment],
-        at date: Date
+        at date: Date,
+        history: [EditorDocument] = []
     ) throws -> CompletionSyncPlan {
-        let photoMediaID = UUID()
-        let derivativeMediaID = UUID()
-        let documentMediaID = UUID()
+        let minted = MintedMedia()
+        let historyPayload = UndoHistoryPayload.data(for: history)
         let garments = items.compactMap { Self.item($0) }
 
         let args = CompleteChallengeArgsDTO(
@@ -76,35 +79,65 @@ public extension CaptureFlowViewModel {
             timeZone: TimeZone.current.identifier,
             completedAt: completion.completedAt,
             photo: CompletionPhotoDTO(
-                id: completion.photoID, mediaObjectId: photoMediaID, source: "capture"
+                id: completion.photoID, mediaObjectId: minted.photo, source: "capture"
             ),
-            derivative: CompletionDerivativeDTO(id: UUID(), mediaObjectId: derivativeMediaID),
+            derivative: CompletionDerivativeDTO(id: UUID(), mediaObjectId: minted.derivative),
             document: CompletionDocumentDTO(
                 id: completion.document.id,
                 schemaVersion: Int32(EditorDocument.currentSchemaVersion),
-                mediaObjectId: documentMediaID
+                mediaObjectId: minted.document,
+                historyMediaObjectId: historyPayload.map { _ in minted.history },
+                historyStepCount: historyPayload.map { _ in Int32(history.count) }
             ),
             layerPhotoIds: Array(Set(completion.document.photoIDs)),
             items: garments.map(\.dto)
         )
 
-        var uploads = try [
+        let uploads = try Self.uploadRows(
+            for: completion, minted: minted, historyPayload: historyPayload,
+            garments: garments, at: date
+        )
+        return CompletionSyncPlan(args: args, uploads: uploads)
+    }
+
+    private struct MintedMedia {
+        let photo = UUID()
+        let derivative = UUID()
+        let document = UUID()
+        let history = UUID()
+    }
+
+    private static func uploadRows(
+        for completion: CompletedChallenge,
+        minted: MintedMedia,
+        historyPayload: Data?,
+        garments: [PlannedItem],
+        at date: Date
+    ) throws -> [MediaUpload] {
+        var uploads = [
             MediaUpload(
-                id: photoMediaID, ownerID: completion.id, kind: .original,
+                id: minted.photo, ownerID: completion.id, kind: .original,
                 contentType: "image/jpeg",
                 source: .photoOriginal(completion.photoID), createdAt: date
             ),
             MediaUpload(
-                id: derivativeMediaID, ownerID: completion.id, kind: .derivative,
+                id: minted.derivative, ownerID: completion.id, kind: .derivative,
                 contentType: "image/jpeg",
                 source: .previewFile(completion.previewFile ?? ""), createdAt: date
             ),
-            MediaUpload(
-                id: documentMediaID, ownerID: completion.id, kind: .document,
-                contentType: "application/json",
-                source: .inline(JSONEncoder().encode(completion.document)), createdAt: date
-            ),
         ]
+        try uploads.append(MediaUpload(
+            id: minted.document, ownerID: completion.id, kind: .document,
+            contentType: "application/json",
+            source: .inline(JSONEncoder().encode(completion.document)), createdAt: date
+        ))
+        if let historyPayload {
+            uploads.append(MediaUpload(
+                id: minted.history, ownerID: completion.id, kind: .history,
+                contentType: "application/zlib",
+                source: .inline(historyPayload), createdAt: date
+            ))
+        }
         uploads += garments.compactMap(\.cutout).map { cutout in
             MediaUpload(
                 id: cutout.mediaID, ownerID: completion.id, kind: .cutout,
@@ -112,7 +145,7 @@ public extension CaptureFlowViewModel {
                 source: .thumbnailFile(cutout.file), createdAt: date
             )
         }
-        return CompletionSyncPlan(args: args, uploads: uploads)
+        return uploads
     }
 
     private struct PlannedItem {

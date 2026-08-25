@@ -59,7 +59,7 @@ public struct CaptureFlowView: View {
                     didResumeDraft: viewModel.didResumeDraft,
                     makeCropViewModel: makeCropViewModel,
                     onDiscard: { viewModel.discardPhoto() },
-                    onComplete: { viewModel.completeChallenge() }
+                    onComplete: { steps in viewModel.completeChallenge(history: steps) }
                 )
                 .task { viewModel.review.scanIfNeeded(photoID: viewModel.challenge.photoID) }
             }

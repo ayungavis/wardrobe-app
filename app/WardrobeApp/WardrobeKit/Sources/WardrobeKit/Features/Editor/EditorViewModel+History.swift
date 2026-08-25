@@ -19,6 +19,10 @@ public extension EditorViewModel {
         history.canUndo
     }
 
+    var recentUndoSteps: [EditorDocument] {
+        Array(history.undoStack.suffix(DocumentHistory.uploadedStepLimit))
+    }
+
     var canRedo: Bool {
         history.canRedo
     }

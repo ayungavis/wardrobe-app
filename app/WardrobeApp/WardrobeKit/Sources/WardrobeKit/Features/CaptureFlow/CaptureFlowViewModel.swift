@@ -24,6 +24,7 @@ public final class CaptureFlowViewModel {
     private let library: PhotoLibraryService
 
     public internal(set) var isCompleted = false
+    var pendingUndoSteps: [EditorDocument] = []
     public internal(set) var isCompleting = false
     public private(set) var didResumeDraft = false
 

@@ -137,6 +137,52 @@ struct CompletionMutationTests {
         #expect(sut.flow.isCompleted == false)
     }
 
+    // MARK: - FR-088: the last ten undo steps
+
+    @Test func aCompletionWithEditsCarriesItsUndoHistory() throws {
+        let steps = [makeCompletion().document, makeCompletion().document]
+
+        let plan = try CaptureFlowViewModel.syncPlan(
+            for: makeCompletion(), items: [], at: Date(), history: steps
+        )
+
+        #expect(plan.args.document.historyStepCount == 2)
+        let mediaID = try #require(plan.args.document.historyMediaObjectId)
+        let row = try #require(plan.uploads.first { $0.kind == .history })
+        #expect(row.id == mediaID, "the payload and the queue must name the same object")
+        #expect(row.contentType == "application/zlib")
+    }
+
+    @Test func aCompletionWithNoEditsCarriesNoHistory() throws {
+        let plan = try CaptureFlowViewModel.syncPlan(for: makeCompletion(), items: [], at: Date())
+
+        #expect(plan.args.document.historyMediaObjectId == nil)
+        #expect(plan.args.document.historyStepCount == nil)
+        #expect(!plan.uploads.contains { $0.kind == .history })
+    }
+
+    @Test func anOversizedHistoryIsDroppedWithoutHoldingTheCompletion() throws {
+        let steps = [makeCompletion().document]
+        #expect(UndoHistoryPayload.data(for: steps, cap: 4) == nil)
+
+        let plan = try CaptureFlowViewModel.syncPlan(
+            for: makeCompletion(), items: [], at: Date(), history: steps
+        )
+        #expect(plan.uploads.contains { $0.kind == .document }, "the completion itself still ships")
+    }
+
+    @Test func theHistoryPayloadRoundTrips() throws {
+        let steps = [makeCompletion().document, makeCompletion().document]
+        let compressed = try #require(UndoHistoryPayload.data(for: steps))
+
+        let restored = try JSONDecoder().decode(
+            [EditorDocument].self,
+            from: (compressed as NSData).decompressed(using: .zlib) as Data
+        )
+
+        #expect(restored == steps)
+    }
+
     // MARK: - Fixtures
 
     private func makeDefaults(_ name: String) throws -> UserDefaults {

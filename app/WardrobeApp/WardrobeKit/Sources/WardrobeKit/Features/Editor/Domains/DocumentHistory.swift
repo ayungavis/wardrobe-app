@@ -5,6 +5,7 @@ struct DocumentHistory: Equatable {
     // whole documents, because snapshots share the layer buffer until an edit
     // forces one copy. Measure before trusting it.
     static let maximumSteps = 50
+    static let uploadedStepLimit = 10
 
     private(set) var undoStack: [EditorDocument] = []
     private(set) var redoStack: [EditorDocument] = []

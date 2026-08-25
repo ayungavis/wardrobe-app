@@ -14,7 +14,7 @@ public struct EditorView: View {
     private let didResumeDraft: Bool
     private let makeCropViewModel: (UUID) -> CropViewModel
     private let onDiscard: () -> Void
-    private let onComplete: () -> Void
+    private let onComplete: ([EditorDocument]) -> Void
 
     public init(
         viewModel: EditorViewModel,
@@ -22,7 +22,7 @@ public struct EditorView: View {
         didResumeDraft: Bool,
         makeCropViewModel: @escaping (UUID) -> CropViewModel,
         onDiscard: @escaping () -> Void,
-        onComplete: @escaping () -> Void
+        onComplete: @escaping ([EditorDocument]) -> Void
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
@@ -184,7 +184,7 @@ public struct EditorView: View {
                     onLayers: { viewModel.isLayerPanelPresented = true },
                     onSave: viewModel.saveDirectly,
                     onShare: viewModel.beginExport,
-                    onComplete: onComplete
+                    onComplete: { onComplete(viewModel.recentUndoSteps) }
                 )
             }
 
