@@ -19,7 +19,7 @@ public final class AppContainer {
         activeChallengeRepository: ActiveChallengeRepository = FileActiveChallengeRepository(),
         completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
         photoRepository: PhotoRepository = FilePhotoRepository(),
-        preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
+        preferencesRepository: AccountPreferencesRepository? = nil,
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
         appleAccountRepository: AppleAccountRepository = StoredAppleAccountRepository(),
         session: SessionService? = nil,
@@ -30,6 +30,8 @@ public final class AppContainer {
         self.activeChallengeRepository = activeChallengeRepository
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
+        let preferencesRepository = preferencesRepository
+            ?? UserDefaultsAccountPreferencesRepository(outbox: Self.makeOutboxRepository())
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
         self.sessionTokenRepository = sessionTokenRepository
@@ -188,11 +190,15 @@ public final class AppContainer {
     private let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
 
     private func makeWardrobeItemRepository() -> WardrobeItemRepository {
-        SwiftDataWardrobeItemRepository(context: Self.wardrobeContext)
+        SwiftDataWardrobeItemRepository(context: Self.wardrobeContext, outbox: Self.makeOutboxRepository())
     }
 
     public func makeOutboxRepository() -> OutboxRepository {
-        StoredOutboxRepository(store: SwiftDataOutboxStore(context: Self.wardrobeContext))
+        Self.makeOutboxRepository()
+    }
+
+    static func makeOutboxRepository() -> OutboxRepository {
+        StoredOutboxRepository(store: SwiftDataOutboxStore(context: wardrobeContext))
     }
 
     @MainActor

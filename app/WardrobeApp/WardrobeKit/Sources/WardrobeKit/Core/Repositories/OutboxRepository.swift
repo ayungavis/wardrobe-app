@@ -16,6 +16,7 @@ public struct OutboxMutation: Sendable, Equatable {
 public protocol OutboxRepository: AnyObject {
     func stage(_ mutation: OutboxMutation, at date: Date)
     func enqueue(_ mutation: OutboxMutation, at date: Date) throws
+    func enqueueReplacing(_ mutation: OutboxMutation, at date: Date) throws
     func entries() throws -> [OutboxEnvelope]
     func due(at date: Date, limit: Int) throws -> [OutboxEnvelope]
     func acknowledge(id: UUID) throws
@@ -56,6 +57,16 @@ public final class StoredOutboxRepository: OutboxRepository {
 
     public func enqueue(_ mutation: OutboxMutation, at date: Date) throws {
         try store.append(Self.envelope(for: mutation, at: date))
+    }
+
+    // ponytail: only sound for a mutation that sends whole state, such as
+    // upsertPreferences, where an older queued copy says nothing the newer one
+    // does not. A per-field mutation must never use this.
+    public func enqueueReplacing(_ mutation: OutboxMutation, at date: Date) throws {
+        for superseded in try store.all() where superseded.name == mutation.name {
+            try store.remove(id: superseded.id)
+        }
+        try enqueue(mutation, at: date)
     }
 
     public func entries() throws -> [OutboxEnvelope] {

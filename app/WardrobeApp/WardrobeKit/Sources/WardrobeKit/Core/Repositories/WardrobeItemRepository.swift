@@ -18,9 +18,11 @@ public protocol WardrobeItemRepository: AnyObject {
 @MainActor
 public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     private let context: ModelContext
+    private let outbox: (any OutboxRepository)?
 
-    public init(context: ModelContext) {
+    public init(context: ModelContext, outbox: (any OutboxRepository)? = nil) {
         self.context = context
+        self.outbox = outbox
     }
 
     public static var schema: Schema {
@@ -32,13 +34,20 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
 
     public func items() throws -> [WardrobeItem] {
         let descriptor = FetchDescriptor<WardrobeItemEntity>(
+            predicate: #Predicate { $0.deletedAt == nil },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         return try context.fetch(descriptor).map(\.domain)
     }
 
+    // ponytail: filtered in Swift rather than by predicate because SwiftData
+    // cannot join a fingerprint to its item; the set is one row per item and the
+    // matcher already loads every fingerprint anyway.
     public func fingerprints() throws -> [ItemFingerprint] {
-        try context.fetch(FetchDescriptor<ItemFingerprintEntity>()).map(\.domain)
+        let buried = try buriedIdentifiers()
+        return try context.fetch(FetchDescriptor<ItemFingerprintEntity>())
+            .filter { !buried.contains($0.itemID) }
+            .map(\.domain)
     }
 
     public func wears(for itemID: UUID) throws -> [WearRecord] {
@@ -71,20 +80,54 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     public func update(_ item: WardrobeItem) throws {
         let itemID = item.id
         let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
-        guard let entity = try context.fetch(descriptor).first else {
+        guard let entity = try context.fetch(descriptor).first, entity.deletedAt == nil else {
             throw AppError.unexpected
         }
-        entity.name = item.name
-        entity.itemDescription = item.description
+
+        var args = UpsertItemArgsDTO(id: itemID)
+        if entity.category != item.category.rawValue {
+            entity.category = item.category.rawValue
+            entity.categoryRev += 1
+            args.category = ItemFieldDTO(value: item.category.rawValue, rev: entity.categoryRev)
+        }
+        if entity.name != item.name {
+            entity.name = item.name
+            entity.nameRev += 1
+            args.name = ItemFieldDTO(value: item.name, rev: entity.nameRev)
+        }
+        if entity.itemDescription != item.description {
+            entity.itemDescription = item.description
+            entity.descriptionRev += 1
+            args.description = ItemFieldDTO(value: item.description, rev: entity.descriptionRev)
+        }
+
+        guard args.category != nil || args.name != nil || args.description != nil else { return }
         entity.updatedAt = item.updatedAt
+        try stage(.upsertItem(args))
         try context.save()
     }
 
+    // ponytail: fingerprints and wears deliberately survive the tombstone. The
+    // server reconciles fingerprints by set union as immutable versions (FR-063),
+    // so erasing them locally would contradict the record it keeps.
     public func delete(itemID: UUID) throws {
-        try context.delete(model: WardrobeItemEntity.self, where: #Predicate { $0.id == itemID })
-        try context.delete(model: ItemFingerprintEntity.self, where: #Predicate { $0.itemID == itemID })
-        try context.delete(model: WearRecordEntity.self, where: #Predicate { $0.itemID == itemID })
+        let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+        guard let entity = try context.fetch(descriptor).first, entity.deletedAt == nil else {
+            return
+        }
+        entity.deletedAt = Date()
+        try stage(.deleteItem(DeleteItemArgsDTO(id: itemID)))
         try context.save()
+    }
+
+    private func stage(_ mutation: SyncMutation) throws {
+        guard let outbox else { return }
+        try outbox.stage(mutation.queued(), at: Date())
+    }
+
+    private func buriedIdentifiers() throws -> Set<UUID> {
+        let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.deletedAt != nil })
+        return try Set(context.fetch(descriptor).map(\.id))
     }
 
     public func deleteAll() throws {
@@ -114,6 +157,10 @@ final class WardrobeItemEntity {
     var styleVersion: String?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var deletedAt: Date?
+    var categoryRev: Int64 = 0
+    var nameRev: Int64 = 0
+    var descriptionRev: Int64 = 0
 
     init(_ item: WardrobeItem) {
         id = item.id

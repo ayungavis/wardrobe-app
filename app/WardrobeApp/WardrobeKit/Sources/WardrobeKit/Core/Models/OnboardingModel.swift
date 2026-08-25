@@ -45,7 +45,7 @@ public final class OnboardingModel {
 
     private func setCompleted(_ completed: Bool) {
         var stored = preferences.load()
-        stored.hasCompletedOnboarding = completed
+        stored.onboardingCompletedAt = completed ? (stored.onboardingCompletedAt ?? Date()) : nil
         preferences.save(stored)
         isCompleted = completed
     }

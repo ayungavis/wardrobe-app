@@ -59,7 +59,7 @@ struct OnboardingModelTests {
 
     @Test func itReadsWhatWasStoredBefore() {
         let preferences = InMemoryAccountPreferencesRepository()
-        preferences.stored = AccountPreferences(hasCompletedOnboarding: true)
+        preferences.stored = AccountPreferences(onboardingCompletedAt: Date())
 
         let model = OnboardingModel(
             preferences: preferences,
