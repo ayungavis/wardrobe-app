@@ -30,19 +30,14 @@
         }
       }
     },
-    "NSPhotoLibraryUsageDescription" : {
-      "comment" : "Privacy - Photo Library Usage Description",
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this."
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Menampilkan foto terbarumu di tombol galeri agar impor foto outfit lebih cepat. Kamu tetap bisa memilih foto tanpa memberi izin ini."
+            "state" : "new",
+            "value" : "Finds the development backend running on your Mac over Wi-Fi. Release builds talk to the hosted API and never use the local network."
           }
         }
       }
@@ -60,6 +55,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Memungkinkanmu menyimpan foto outfit hasil edit ke galeri fotomu."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription" : {
+      "comment" : "Privacy - Photo Library Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menampilkan foto terbarumu di tombol galeri agar impor foto outfit lebih cepat. Kamu tetap bisa memilih foto tanpa memberi izin ini."
           }
         }
       }

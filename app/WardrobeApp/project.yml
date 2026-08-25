@@ -64,6 +64,9 @@ targets:
         SentryDSN: $(SENTRY_DSN)
         SentryEnvironment: $(SENTRY_ENVIRONMENT)
         APIBaseURL: $(API_BASE_URL)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Finds the development backend running on your Mac over Wi-Fi. Release builds talk to the hosted API and never use the local network.
         NSCameraUsageDescription: The camera is used to photograph your outfit for the daily challenge. Photos stay on your device until you choose to share them.
         NSPhotoLibraryAddUsageDescription: Lets you save your edited outfit photo to your photo library.
         NSPhotoLibraryUsageDescription: Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this.

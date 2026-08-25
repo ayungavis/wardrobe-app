@@ -27,8 +27,15 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera is used to photograph your outfit for the daily challenge. Photos stay on your device until you choose to share them.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Finds the development backend running on your Mac over Wi-Fi. Release builds talk to the hosted API and never use the local network.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Lets you save your edited outfit photo to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
