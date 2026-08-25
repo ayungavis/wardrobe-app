@@ -215,7 +215,7 @@ public final class AppContainer {
         uploads: makeMediaUploadRepository(),
         media: makeMediaRepository(),
         preferences: preferencesRepository,
-        applier: makeChangeApplier()
+        applier: makeRestoreService()
     )
 
     private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
@@ -233,8 +233,8 @@ public final class AppContainer {
         )
     }
 
-    func makeChangeApplier() -> ChangeApplier {
-        StoreChangeApplier(
+    func makeRestoreService() -> RestoreService {
+        LocalRestoreService(
             wardrobe: SwiftDataWardrobeItemRepository(context: Self.wardrobeContext),
             preferences: preferencesRepository
         )
@@ -321,7 +321,7 @@ public extension AppContainer {
             diagnosticsStore: diagnostics,
             media: makeMediaRepository(),
             uploadQueue: makeMediaUploadRepository(),
-            applier: makeChangeApplier()
+            applier: makeRestoreService()
         )
     }
 }

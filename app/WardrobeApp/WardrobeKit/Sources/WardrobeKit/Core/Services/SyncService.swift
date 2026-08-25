@@ -36,7 +36,7 @@ final class ServerSyncService: SyncService {
     private let uploads: any MediaUploadRepository
     private let media: any MediaRepository
     private let preferences: any AccountPreferencesRepository
-    private let applier: any ChangeApplier
+    private let applier: any RestoreService
     private var inFlight: Task<ReconcileOutcome, Never>?
 
     init(
@@ -46,7 +46,7 @@ final class ServerSyncService: SyncService {
         uploads: any MediaUploadRepository,
         media: any MediaRepository,
         preferences: any AccountPreferencesRepository,
-        applier: any ChangeApplier = NoopChangeApplier()
+        applier: any RestoreService = NoopRestoreService()
     ) {
         self.client = client
         self.outbox = outbox

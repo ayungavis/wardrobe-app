@@ -38,7 +38,7 @@ public final class DevMenuViewModel {
     private let diagnosticsStore: any DiagnosticsStore
     private let media: any MediaRepository
     private let uploadQueue: any MediaUploadRepository
-    private let applier: any ChangeApplier
+    private let applier: any RestoreService
     private let calendar: Calendar
 
     init(
@@ -60,7 +60,7 @@ public final class DevMenuViewModel {
         diagnosticsStore: any DiagnosticsStore,
         media: any MediaRepository,
         uploadQueue: any MediaUploadRepository,
-        applier: any ChangeApplier = NoopChangeApplier(),
+        applier: any RestoreService = NoopRestoreService(),
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository

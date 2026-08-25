@@ -193,14 +193,11 @@ struct ConventionsTests {
     }
 
     /// C5: every file under `Core/Services/` is `<Name>Service.swift`, per the
-    /// layout table. The one named exception is the change applier pair — an
-    /// applier writes into local stores rather than wrapping something outside
-    /// the process, so it fits no table row and carries its reason here.
+    /// layout table. No exceptions.
     @Test func serviceFilesAreNamedService() throws {
-        let excepted = ["ChangeApplier.swift", "StoreChangeApplier.swift"]
         var offenders: [String] = []
         for file in try sources() where file.path.contains("/Core/Services/") {
-            guard !file.name.hasSuffix("Service.swift"), !excepted.contains(file.name) else { continue }
+            guard !file.name.hasSuffix("Service.swift") else { continue }
             offenders.append(file.name)
         }
         #expect(offenders.isEmpty, "\(offenders)")

@@ -297,7 +297,7 @@ private final class StubFeedClient: AuthenticatedAPIClient {
 }
 
 @MainActor
-private final class CollectingApplier: ChangeApplier {
+private final class CollectingApplier: RestoreService {
     private(set) var seen: [Int64] = []
 
     func apply(_ changes: [ChangeDTO]) throws {
@@ -306,7 +306,7 @@ private final class CollectingApplier: ChangeApplier {
 }
 
 @MainActor
-private final class ThrowingApplier: ChangeApplier {
+private final class ThrowingApplier: RestoreService {
     func apply(_: [ChangeDTO]) throws {
         throw AppError.unexpected
     }

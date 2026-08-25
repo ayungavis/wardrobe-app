@@ -4,7 +4,7 @@ import Testing
 @testable import WardrobeKit
 
 @MainActor
-struct ChangeApplierTests {
+struct RestoreServiceTests {
     // MARK: - Idempotence, which is what lets a page retry
 
     @Test func applyingTheSamePageTwiceDuplicatesNothing() throws {
@@ -88,7 +88,7 @@ struct ChangeApplierTests {
     private let wearID = UUID(uuid: (0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x0C))
 
     private struct SUT {
-        let applier: StoreChangeApplier
+        let applier: LocalRestoreService
         let repository: SwiftDataWardrobeItemRepository
         let preferences: CountingPreferencesRepository
     }
@@ -101,7 +101,7 @@ struct ChangeApplierTests {
         let repository = SwiftDataWardrobeItemRepository(context: ModelContext(container))
         let preferences = CountingPreferencesRepository()
         return SUT(
-            applier: StoreChangeApplier(wardrobe: repository, preferences: preferences),
+            applier: LocalRestoreService(wardrobe: repository, preferences: preferences),
             repository: repository,
             preferences: preferences
         )

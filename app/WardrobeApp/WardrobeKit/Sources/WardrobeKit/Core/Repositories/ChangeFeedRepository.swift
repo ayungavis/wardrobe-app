@@ -9,11 +9,11 @@ struct PullOutcome: Sendable, Equatable {
 @MainActor
 protocol ChangeFeedRepository: AnyObject {
     func position() throws -> Int64
-    func pull(limit: Int, applying applier: any ChangeApplier) async throws -> PullOutcome
+    func pull(limit: Int, applying applier: any RestoreService) async throws -> PullOutcome
 }
 
 extension ChangeFeedRepository {
-    func pull(applying applier: any ChangeApplier) async throws -> PullOutcome {
+    func pull(applying applier: any RestoreService) async throws -> PullOutcome {
         try await pull(limit: ServerChangeFeedRepository.defaultLimit, applying: applier)
     }
 }
@@ -34,7 +34,7 @@ final class ServerChangeFeedRepository: ChangeFeedRepository {
         try cursor.position()
     }
 
-    func pull(limit: Int, applying applier: any ChangeApplier) async throws -> PullOutcome {
+    func pull(limit: Int, applying applier: any RestoreService) async throws -> PullOutcome {
         var since = try cursor.position()
         var pages = 0
         var records = 0
