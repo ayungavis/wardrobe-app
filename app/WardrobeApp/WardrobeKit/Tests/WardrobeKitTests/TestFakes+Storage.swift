@@ -233,3 +233,10 @@ func makeInMemoryUploads() -> StoredMediaUploadRepository {
         thumbnails: InMemoryGarmentThumbnailRepository()
     )
 }
+
+@MainActor
+func makeGrantedPreferences() -> InMemoryAccountPreferencesRepository {
+    let preferences = InMemoryAccountPreferencesRepository()
+    preferences.stored = AccountPreferences(uploadConsentAt: Date())
+    return preferences
+}

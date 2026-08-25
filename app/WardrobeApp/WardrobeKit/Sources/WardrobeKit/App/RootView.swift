@@ -6,6 +6,7 @@ public struct RootView: View {
     @State private var challenge: ChallengeViewModel
     @State private var tab: RootTab = .challenge
     @State private var isDevMenuPresented = DevMode.opensOnLaunch
+    @State private var isConsentPresented = false
 
     private let container: AppContainer
 
@@ -36,6 +37,7 @@ public struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
+            presentConsentIfNeeded()
             Task { await container.syncCoordinator.reconcile(.foreground) }
         }
         .onChange(of: container.onboarding.isSignedIn) { _, signedIn in
@@ -43,6 +45,7 @@ public struct RootView: View {
             Task { await container.syncCoordinator.reconcile(.signedIn) }
         }
         .onChange(of: tab) { _, opened in
+            presentConsentIfNeeded()
             guard opened != .challenge else { return }
             Task { await container.syncCoordinator.reconcile(.tabOpened) }
         }
@@ -50,6 +53,12 @@ public struct RootView: View {
         // and History load in .task, which does not re-run on a tab switch, so a reset
         // made from those tabs reads stale until the tab is rebuilt. Give RootView
         // their view models too if that starts biting.
+        .sheet(isPresented: $isConsentPresented) {
+            ConsentView(viewModel: container.makeConsentViewModel()) {
+                isConsentPresented = false
+                Task { await container.syncCoordinator.reconcile(.manual) }
+            }
+        }
         .sheet(
             isPresented: $isDevMenuPresented,
             onDismiss: { challenge.refreshActiveChallenge() },
@@ -70,6 +79,11 @@ public struct RootView: View {
             }
         }
         #endif
+    }
+
+    private func presentConsentIfNeeded() {
+        guard !isConsentPresented, container.needsUploadConsentPrompt else { return }
+        isConsentPresented = true
     }
 
     private var tabs: some View {

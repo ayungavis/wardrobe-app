@@ -53,6 +53,7 @@ public final class UserDefaultsAccountPreferencesRepository: AccountPreferencesR
         do {
             let args = UpsertPreferencesArgsDTO(
                 onboardingCompletedAt: preferences.onboardingCompletedAt,
+                uploadConsentAt: preferences.uploadConsentAt,
                 recentStickerIds: preferences.recentStickerIDs
             )
             try outbox.enqueueReplacing(SyncMutation.upsertPreferences(args).queued(), at: Date())

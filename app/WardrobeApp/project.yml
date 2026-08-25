@@ -64,6 +64,7 @@ targets:
         SentryDSN: $(SENTRY_DSN)
         SentryEnvironment: $(SENTRY_ENVIRONMENT)
         APIBaseURL: $(API_BASE_URL)
+        ConsentAIProvider: $(CONSENT_AI_PROVIDER)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Finds the development backend running on your Mac over Wi-Fi. Release builds talk to the hosted API and never use the local network.

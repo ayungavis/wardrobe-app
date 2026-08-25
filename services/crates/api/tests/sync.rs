@@ -14,7 +14,7 @@ use tracing_subscriber::layer::{Context, Layer};
 use tracing_subscriber::prelude::*;
 use uuid::Uuid;
 
-use common::{body_json, call, session};
+use common::{body_json, call, get_with_auth, session};
 
 // ------------------------------------------------------------------- fixtures
 
@@ -265,6 +265,45 @@ async fn a_body_axum_itself_rejects_still_arrives_in_our_own_envelope(
 }
 
 // ----------------------------------------------------------------- preferences
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn upload_consent_survives_the_upsert_and_reaches_the_feed(pool: PgPool) -> sqlx::Result<()> {
+    let (token, _) = session(&pool, Duration::days(1), false).await?;
+
+    let result = sync(
+        &pool,
+        &token,
+        &batch(&[upsert_preferences(
+            &json!({ "uploadConsentAt": "2026-08-25T10:00:00Z" }),
+        )]),
+    )
+    .await;
+    let record = &result["results"][0]["record"];
+    assert!(
+        !record["uploadConsentAt"].is_null(),
+        "serde drops unknown fields silently; consent must not be one of them"
+    );
+
+    let feed = body_json(
+        call(
+            pool.clone(),
+            get_with_auth("/v1/changes?since=0", &format!("Bearer {token}")),
+        )
+        .await,
+    )
+    .await;
+    let preference = feed["changes"]
+        .as_array()
+        .expect("a changes array")
+        .iter()
+        .find(|change| change["kind"] == "accountPreference")
+        .expect("the preference record reaches the feed");
+    assert!(
+        !preference["record"]["uploadConsentAt"].is_null(),
+        "a second device reads consent from this record"
+    );
+    Ok(())
+}
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_later_mutation_keeps_the_fields_it_does_not_mention(pool: PgPool) -> sqlx::Result<()> {

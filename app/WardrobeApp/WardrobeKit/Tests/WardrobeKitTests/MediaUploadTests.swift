@@ -145,7 +145,8 @@ struct MediaUploadTests {
             coordinator: ServerSyncCoordinator(
                 client: client, outbox: outbox,
                 feed: ServerChangeFeedRepository(client: client, cursor: InMemoryCursorStore()),
-                uploads: uploads, media: media
+                uploads: uploads, media: media,
+                preferences: makeGrantedPreferences()
             ),
             client: client, outbox: outbox, uploads: uploads, media: media
         )

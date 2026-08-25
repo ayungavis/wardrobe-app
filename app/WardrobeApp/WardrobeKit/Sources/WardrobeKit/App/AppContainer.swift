@@ -212,7 +212,8 @@ public final class AppContainer {
         outbox: makeOutboxRepository(),
         feed: makeChangeFeedRepository(),
         uploads: makeMediaUploadRepository(),
-        media: makeMediaRepository()
+        media: makeMediaRepository(),
+        preferences: preferencesRepository
     )
 
     private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
@@ -309,6 +310,29 @@ public extension AppContainer {
             diagnosticsStore: diagnostics,
             media: makeMediaRepository(),
             uploadQueue: makeMediaUploadRepository()
+        )
+    }
+}
+
+// MARK: - Upload consent
+
+public extension AppContainer {
+    var needsUploadConsentPrompt: Bool {
+        let stored = preferencesRepository.load()
+        guard stored.uploadConsentAt == nil, stored.uploadConsentDeclinedAt == nil else {
+            return false
+        }
+        return !((try? makeMediaUploadRepository().entries()) ?? []).isEmpty
+    }
+
+    func makeConsentViewModel() -> ConsentViewModel {
+        // ponytail: the provider named in the disclosure comes from configuration
+        // (xcconfig -> Info.plist), per the ticket. Seedream is the model the
+        // generation spec names; swap the xcconfig value when the operator does.
+        ConsentViewModel(
+            preferences: preferencesRepository,
+            providerName: Bundle.main.object(forInfoDictionaryKey: "ConsentAIProvider") as? String
+                ?? "the configured AI provider"
         )
     }
 }

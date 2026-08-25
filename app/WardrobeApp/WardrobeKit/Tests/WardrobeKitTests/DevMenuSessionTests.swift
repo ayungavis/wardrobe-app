@@ -36,7 +36,8 @@ struct DevMenuSessionTests {
                 outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
                 feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore()),
                 uploads: makeInMemoryUploads(),
-                media: StubMediaRepository()
+                media: StubMediaRepository(),
+                preferences: makeGrantedPreferences()
             ),
             diagnosticsStore: InMemoryDiagnosticsStore(),
             media: ServerMediaRepository(

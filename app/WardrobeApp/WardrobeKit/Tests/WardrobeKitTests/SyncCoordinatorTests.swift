@@ -167,7 +167,8 @@ struct SyncCoordinatorTests {
         return SUT(
             coordinator: ServerSyncCoordinator(
                 client: client, outbox: outbox, feed: feed,
-                uploads: makeInMemoryUploads(), media: StubMediaRepository()
+                uploads: makeInMemoryUploads(), media: StubMediaRepository(),
+                preferences: makeGrantedPreferences()
             ),
             client: client, outbox: outbox, cursor: cursor
         )

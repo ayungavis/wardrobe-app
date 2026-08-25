@@ -35,6 +35,7 @@ final class ServerSyncCoordinator: SyncCoordinator {
     private let feed: any ChangeFeedRepository
     private let uploads: any MediaUploadRepository
     private let media: any MediaRepository
+    private let preferences: any AccountPreferencesRepository
     private let applier: any ChangeApplier
     private var inFlight: Task<ReconcileOutcome, Never>?
 
@@ -44,6 +45,7 @@ final class ServerSyncCoordinator: SyncCoordinator {
         feed: any ChangeFeedRepository,
         uploads: any MediaUploadRepository,
         media: any MediaRepository,
+        preferences: any AccountPreferencesRepository,
         applier: any ChangeApplier = NoopChangeApplier()
     ) {
         self.client = client
@@ -51,6 +53,7 @@ final class ServerSyncCoordinator: SyncCoordinator {
         self.feed = feed
         self.uploads = uploads
         self.media = media
+        self.preferences = preferences
         self.applier = applier
     }
 
@@ -106,6 +109,11 @@ final class ServerSyncCoordinator: SyncCoordinator {
     }
 
     private func uploadDueMedia() async -> (uploaded: Int, fatal: AppError?) {
+        // ponytail: §18 rule 4 — no byte leaves the device before the disclosure is
+        // accepted. Held rows also hold their completeChallenge through T37c's
+        // ownership rule, so the canvas text waits with its media for free.
+        guard preferences.load().uploadConsentAt != nil else { return (0, nil) }
+
         let due = (try? uploads.due(at: Date(), limit: SyncBatching.maxMutations)) ?? []
         var uploaded = 0
 

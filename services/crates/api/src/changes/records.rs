@@ -264,13 +264,15 @@ pub struct WearRecord {
 
 pub const ACCOUNT_PREFERENCE: &str = feed_query!(
     "account_preference",
-    "onboarding_completed_at, recent_sticker_ids, last_text_style, change_seq, deleted_at"
+    "onboarding_completed_at, upload_consent_at, recent_sticker_ids, last_text_style, change_seq,
+     deleted_at"
 );
 
 #[derive(Debug, Serialize, sqlx::FromRow, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountPreference {
     pub onboarding_completed_at: Option<DateTime<Utc>>,
+    pub upload_consent_at: Option<DateTime<Utc>>,
     pub recent_sticker_ids: Vec<String>,
     #[schema(value_type = Object)]
     pub last_text_style: Value,

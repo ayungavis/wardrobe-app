@@ -582,6 +582,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "uploadConsentAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
