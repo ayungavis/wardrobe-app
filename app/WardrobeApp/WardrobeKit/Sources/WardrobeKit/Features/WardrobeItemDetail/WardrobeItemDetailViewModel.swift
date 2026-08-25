@@ -109,7 +109,8 @@ public final class WardrobeItemDetailViewModel {
     }
 
     func thumbnailData(for item: WardrobeItem) -> Data? {
-        try? thumbnails.data(forFile: item.cutoutFile)
+        item.illustrationFile.flatMap { try? thumbnails.data(forFile: $0) }
+            ?? (try? thumbnails.data(forFile: item.cutoutFile))
     }
 
     // MARK: Deleting
@@ -119,6 +120,9 @@ public final class WardrobeItemDetailViewModel {
         do {
             try repository.delete(itemID: item.id)
             try? thumbnails.delete(file: item.cutoutFile)
+            if let illustration = item.illustrationFile {
+                try? thumbnails.delete(file: illustration)
+            }
             isDeleted = true
             Log.ui.info("Wardrobe: item deleted")
         } catch {
@@ -140,6 +144,9 @@ public final class WardrobeItemDetailViewModel {
         do {
             try repository.merge(winnerID: itemID, loserID: entry.item.id)
             try? thumbnails.delete(file: entry.item.cutoutFile)
+            if let illustration = entry.item.illustrationFile {
+                try? thumbnails.delete(file: illustration)
+            }
             Log.ui.info("Wardrobe: items merged")
             load()
         } catch {

@@ -144,6 +144,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         entity.name = pulled.item.name
         entity.itemDescription = pulled.item.description
         entity.category = pulled.item.category.rawValue
+        entity.currentIllustrationID = pulled.item.currentIllustrationID
         entity.deletedAt = pulled.deletedAt
         entity.categoryRev = pulled.revisions.category
         entity.nameRev = pulled.revisions.name
@@ -165,6 +166,10 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
 
     func stageInsert(fingerprint: ItemFingerprint) {
         context.insert(ItemFingerprintEntity(fingerprint))
+    }
+
+    func hasItem(_ itemID: UUID) -> Bool {
+        fetchItem(itemID).map { $0.deletedAt == nil } ?? false
     }
 
     func needsCutout(itemID: UUID) -> Bool {
@@ -291,6 +296,7 @@ final class WardrobeItemEntity {
     var cutoutPath: String = ""
     var illustrationURL: URL?
     var styleVersion: String?
+    var currentIllustrationID: UUID?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var deletedAt: Date?
@@ -307,6 +313,7 @@ final class WardrobeItemEntity {
         cutoutPath = item.cutoutFile
         illustrationURL = item.illustrationURL
         styleVersion = item.styleVersion
+        currentIllustrationID = item.currentIllustrationID
         createdAt = item.createdAt
         updatedAt = item.updatedAt
     }
@@ -321,6 +328,7 @@ final class WardrobeItemEntity {
             cutoutFile: cutoutPath,
             illustrationURL: illustrationURL,
             styleVersion: styleVersion,
+            currentIllustrationID: currentIllustrationID,
             createdAt: createdAt,
             updatedAt: updatedAt
         )

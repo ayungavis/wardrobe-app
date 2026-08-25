@@ -23,6 +23,25 @@ struct WardrobeViewModelTests {
         #expect(sut.items.map(\.id) == [newer.id, older.id])
     }
 
+    @Test func theIllustrationReplacesTheCutoutOnceItsFileExists() {
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        let illustrationID = UUID()
+        thumbnails.files["cut.png"] = Data([0x01])
+        let sut = WardrobeViewModel(thumbnails: thumbnails, repository: InMemoryWardrobeItemRepository())
+        let item = WardrobeItem(
+            category: .top, cutoutFile: "cut.png", currentIllustrationID: illustrationID,
+            createdAt: Date(), updatedAt: Date()
+        )
+
+        #expect(sut.thumbnailData(for: item) == Data([0x01]),
+                "until the illustration arrives the cut-out stays the representation (FR-081)")
+
+        thumbnails.files["\(illustrationID.uuidString).png"] = Data([0x02])
+
+        #expect(sut.thumbnailData(for: item) == Data([0x02]),
+                "the pointer plus a file on disk is all it takes to swap")
+    }
+
     @Test func thumbnailIsNilWhenTheImageIsMissing() {
         let thumbnails = InMemoryGarmentThumbnailRepository()
         let sut = WardrobeViewModel(thumbnails: thumbnails, repository: InMemoryWardrobeItemRepository())

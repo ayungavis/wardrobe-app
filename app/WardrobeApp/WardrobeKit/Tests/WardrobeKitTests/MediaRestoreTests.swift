@@ -179,6 +179,51 @@ struct MediaRestoreTests {
         #expect(rows.first?.attempts == 1, "a replayed feed page must not reset the backoff")
     }
 
+    // MARK: - Illustrations (FR-081)
+
+    @Test func aPulledItemKeepsItsIllustrationPointer() throws {
+        let sut = try makeSUT()
+        let illustrationID = UUID()
+
+        try sut.applier.apply(page([itemJSON(illustrationID: illustrationID)]))
+        try sut.repository.commitStaged()
+
+        #expect(try sut.repository.items().first?.currentIllustrationID == illustrationID,
+                "the pointer is what lets the wardrobe swap the cut-out for the illustration")
+    }
+
+    @Test func anIllustrationRecordStagesItsDownload() throws {
+        let sut = try makeSUT()
+        let illustrationID = UUID()
+        let mediaID = UUID()
+
+        try sut.applier.apply(page([
+            itemJSON(illustrationID: illustrationID),
+            illustrationJSON(id: illustrationID, mediaID: mediaID),
+        ]))
+        try sut.repository.commitStaged()
+
+        let staged = try sut.downloads.entries()
+        #expect(staged.map(\.id) == [mediaID])
+        #expect(staged.first?.destination == .itemIllustration(illustrationID: illustrationID))
+    }
+
+    @Test func aDownloadedIllustrationLandsUnderItsOwnId() async throws {
+        let sut = try makeSUT()
+        let illustrationID = UUID()
+        let mediaID = UUID()
+        sut.downloads.stage(MediaDownload(
+            id: mediaID, destination: .itemIllustration(illustrationID: illustrationID)
+        ))
+        try sut.repository.commitStaged()
+        sut.media.downloads[mediaID] = Data([0x89, 0x50])
+
+        _ = await sut.applier.restoreDueMedia(at: Date())
+
+        #expect(try sut.thumbnails.data(forFile: "\(illustrationID.uuidString).png") == Data([0x89, 0x50]))
+        #expect(try sut.downloads.entries().isEmpty)
+    }
+
     // MARK: - Rows the server moved in a merge (T46)
 
     @Test func aMovedFingerprintFollowsItsNewItem() throws {
@@ -285,12 +330,23 @@ private func conflictJSON(id: UUID, resolvedAt: String?) -> String {
 }
 
 @MainActor
-private func itemJSON() -> String {
-    #"""
+private func itemJSON(illustrationID: UUID? = nil) -> String {
+    let pointer = illustrationID.map { "\"\($0)\"" } ?? "null"
+    let state = illustrationID == nil ? "none" : "ready"
+    return #"""
     "kind":"wardrobeItem","record":{"id":"\#(itemID)","category":"top","name":"coat",
      "color":null,"garmentType":null,"description":null,
-     "attributeRevisions":{"name":{"rev":3}},"illustrationState":"none",
-     "currentIllustrationId":null,"changeSeq":1,"deletedAt":null}
+     "attributeRevisions":{"name":{"rev":3}},"illustrationState":"\#(state)",
+     "currentIllustrationId":\#(pointer),"changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func illustrationJSON(id: UUID, mediaID: UUID) -> String {
+    #"""
+    "kind":"itemIllustration","record":{"id":"\#(id)","itemId":"\#(itemID)",
+     "mediaObjectId":"\#(mediaID)","model":"m","promptVersion":"p1","styleVersion":"v1",
+     "changeSeq":1,"deletedAt":null}
     """#
 }
 

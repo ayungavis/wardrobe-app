@@ -88,8 +88,8 @@ final class LocalRestoreService: RestoreService {
             applyPhoto(record)
         case let .itemCutout(record):
             applyCutout(record)
-        case .itemIllustration:
-            break
+        case let .itemIllustration(record):
+            applyIllustration(record)
         case .activeChallenge:
             return "activeChallenge"
         case let .unrecognised(kind):
@@ -106,6 +106,7 @@ final class LocalRestoreService: RestoreService {
                 description: record.description ?? "",
                 category: GarmentCategory(rawValue: record.category) ?? .top,
                 cutoutFile: "",
+                currentIllustrationID: record.currentIllustrationId,
                 createdAt: Date(),
                 updatedAt: Date()
             ),
@@ -217,6 +218,18 @@ final class LocalRestoreService: RestoreService {
         ))
     }
 
+    private func applyIllustration(_ record: ItemIllustrationRecordDTO) {
+        guard record.deletedAt == nil, wardrobe.hasItem(record.itemId),
+              (try? thumbnails.data(forFile: "\(record.id.uuidString).png")) == nil
+        else {
+            return
+        }
+        downloads.stage(MediaDownload(
+            id: record.mediaObjectId,
+            destination: .itemIllustration(illustrationID: record.id)
+        ))
+    }
+
     private func applyCutout(_ record: ItemCutoutRecordDTO) {
         guard record.deletedAt == nil, wardrobe.needsCutout(itemID: record.itemId) else { return }
         downloads.stage(MediaDownload(
@@ -225,6 +238,26 @@ final class LocalRestoreService: RestoreService {
         ))
     }
 
+    private static let wornOnFormat: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private func applyPreference(_ record: AccountPreferenceRecordDTO) {
+        var stored = preferences.load()
+        stored.recentStickerIDs = record.recentStickerIds
+        stored.onboardingCompletedAt = record.onboardingCompletedAt ?? stored.onboardingCompletedAt
+        stored.uploadConsentAt = record.uploadConsentAt ?? stored.uploadConsentAt
+        preferences.applyRemote(stored)
+    }
+}
+
+// MARK: - The download phase
+
+extension LocalRestoreService {
     func restoreDueMedia(at date: Date) async -> (restored: Int, fatal: AppError?) {
         let due = (try? downloads.due(at: date, limit: SyncBatching.maxMutations)) ?? []
         var restored = 0
@@ -265,6 +298,8 @@ final class LocalRestoreService: RestoreService {
             let file = try thumbnails.save(bytes, id: itemID)
             wardrobe.stageCutout(itemID: itemID, path: file)
             try wardrobe.commitStaged()
+        case let .itemIllustration(illustrationID):
+            try thumbnails.save(bytes, id: illustrationID)
         }
     }
 
@@ -274,21 +309,5 @@ final class LocalRestoreService: RestoreService {
             try? completions.commitStaged()
         }
         try? downloads.acknowledge(id: row.id)
-    }
-
-    private static let wornOnFormat: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    private func applyPreference(_ record: AccountPreferenceRecordDTO) {
-        var stored = preferences.load()
-        stored.recentStickerIDs = record.recentStickerIds
-        stored.onboardingCompletedAt = record.onboardingCompletedAt ?? stored.onboardingCompletedAt
-        stored.uploadConsentAt = record.uploadConsentAt ?? stored.uploadConsentAt
-        preferences.applyRemote(stored)
     }
 }

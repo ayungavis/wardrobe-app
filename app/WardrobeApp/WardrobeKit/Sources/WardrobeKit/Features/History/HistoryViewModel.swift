@@ -108,7 +108,8 @@ public final class HistoryViewModel {
     }
 
     public func thumbnailData(for item: WardrobeItem) -> Data? {
-        try? thumbnails.data(forFile: item.cutoutFile)
+        item.illustrationFile.flatMap { try? thumbnails.data(forFile: $0) }
+            ?? (try? thumbnails.data(forFile: item.cutoutFile))
     }
 }
 

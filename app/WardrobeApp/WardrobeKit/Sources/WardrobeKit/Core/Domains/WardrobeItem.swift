@@ -9,8 +9,13 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
     public var cutoutFile: String
     public var illustrationURL: URL?
     public var styleVersion: String?
+    public var currentIllustrationID: UUID?
     public let createdAt: Date
     public var updatedAt: Date
+
+    public var illustrationFile: String? {
+        currentIllustrationID.map { "\($0.uuidString).png" }
+    }
 
     public init(
         id: UUID = UUID(),
@@ -21,6 +26,7 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
         cutoutFile: String,
         illustrationURL: URL? = nil,
         styleVersion: String? = nil,
+        currentIllustrationID: UUID? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -32,6 +38,7 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
         self.cutoutFile = cutoutFile
         self.illustrationURL = illustrationURL
         self.styleVersion = styleVersion
+        self.currentIllustrationID = currentIllustrationID
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

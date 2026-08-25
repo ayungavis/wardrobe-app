@@ -5,6 +5,7 @@ public enum MediaDownloadDestination: Sendable, Equatable, Hashable {
     case completionDocument(completionID: UUID)
     case photoOriginal(photoID: UUID)
     case itemCutout(itemID: UUID)
+    case itemIllustration(illustrationID: UUID)
 }
 
 public struct MediaDownload: Sendable, Equatable, Identifiable {
