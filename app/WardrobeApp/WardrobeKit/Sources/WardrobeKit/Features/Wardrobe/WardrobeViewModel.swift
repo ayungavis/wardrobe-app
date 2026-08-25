@@ -30,12 +30,22 @@ public final class WardrobeViewModel {
     private let repository: WardrobeItemRepository
     private(set) var loadTask: Task<Void, Never>?
 
-    public init(thumbnails: GarmentThumbnailRepository, repository: WardrobeItemRepository) {
+    private(set) var pendingSyncCount = 0
+    private(set) var failedSyncCount = 0
+    private let outbox: (any OutboxRepository)?
+
+    public init(
+        thumbnails: GarmentThumbnailRepository,
+        repository: WardrobeItemRepository,
+        outbox: (any OutboxRepository)? = nil
+    ) {
         self.thumbnails = thumbnails
         self.repository = repository
+        self.outbox = outbox
     }
 
     public func load() {
+        refreshSyncCounts()
         loadTask?.cancel()
         if case .loaded = state {} else {
             state = .loading
@@ -96,5 +106,24 @@ public final class WardrobeViewModel {
     public func wearCount(for item: WardrobeItem) -> Int {
         guard case let .loaded(wardrobe) = state else { return 0 }
         return wardrobe.wearCounts[item.id] ?? 0
+    }
+}
+
+// MARK: - Grouped sync state (FR-061)
+
+extension WardrobeViewModel {
+    // ponytail: grouped, not per record — item mutations queue under random ids,
+    // so tracing one to one item means parsing payloads. FR-061 allows a group.
+    func refreshSyncCounts() {
+        let entries = ((try? outbox?.entries()) ?? []).filter {
+            $0.name == "upsertItem" || $0.name == "deleteItem"
+        }
+        pendingSyncCount = entries.count { $0.state == .pending }
+        failedSyncCount = entries.count { $0.state == .failed }
+    }
+
+    func retryFailedSync() {
+        try? outbox?.retryFailed(at: Date())
+        refreshSyncCounts()
     }
 }

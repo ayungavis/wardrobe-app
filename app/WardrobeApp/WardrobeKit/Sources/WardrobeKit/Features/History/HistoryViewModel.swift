@@ -7,6 +7,9 @@ public final class HistoryViewModel {
     public private(set) var state: Loadable<[CompletedChallenge]> = .idle
 
     private let completedRepository: CompletedChallengeRepository
+    private(set) var syncStates: [UUID: SyncState] = [:]
+    private let outbox: any OutboxRepository
+    private let uploads: any MediaUploadRepository
     private let photoRepository: PhotoRepository
     private let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
@@ -15,12 +18,16 @@ public final class HistoryViewModel {
 
     public init(
         completedRepository: CompletedChallengeRepository,
+        outbox: any OutboxRepository,
+        uploads: any MediaUploadRepository,
         photoRepository: PhotoRepository,
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
         previews: CompletionPreviewRepository
     ) {
         self.completedRepository = completedRepository
+        self.outbox = outbox
+        self.uploads = uploads
         self.photoRepository = photoRepository
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
@@ -29,6 +36,7 @@ public final class HistoryViewModel {
 
     public func load() {
         state = .loaded(completedRepository.load().sorted { $0.completedAt > $1.completedAt })
+        refreshSyncStates()
         renderedPreviews = [:]
     }
 
@@ -84,5 +92,27 @@ public final class HistoryViewModel {
 
     public func thumbnailData(for item: WardrobeItem) -> Data? {
         try? thumbnails.data(forFile: item.cutoutFile)
+    }
+}
+
+// MARK: - Sync state (FR-061)
+
+extension HistoryViewModel {
+    func refreshSyncStates() {
+        let mutations = (try? outbox.entries()) ?? []
+        let rows = (try? uploads.entries()) ?? []
+        var states: [UUID: SyncState] = [:]
+        for completion in completions {
+            states[completion.id] = SyncState.derive(
+                queuedAt: completion.syncQueuedAt,
+                mutation: mutations.first { $0.id == completion.id },
+                mediaRows: rows.filter { $0.ownerID == completion.id }
+            )
+        }
+        syncStates = states
+    }
+
+    func syncState(for completion: CompletedChallenge) -> SyncState {
+        syncStates[completion.id] ?? .localOnly
     }
 }

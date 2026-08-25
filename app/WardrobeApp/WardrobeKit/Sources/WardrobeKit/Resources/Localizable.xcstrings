@@ -4864,6 +4864,74 @@
         }
       }
     },
+    "sync.state.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup failed"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pencadangan gagal"
+          }
+        }
+      }
+    },
+    "sync.state.localOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved on this phone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tersimpan di ponsel ini"
+          }
+        }
+      }
+    },
+    "sync.state.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backing up…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sedang dicadangkan…"
+          }
+        }
+      }
+    },
+    "sync.state.synced": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backed up"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sudah dicadangkan"
+          }
+        }
+      }
+    },
     "tab.challenge": {
       "localizations": {
         "en": {
@@ -5984,6 +6052,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "Paling Sering Digunakan"
+          }
+        }
+      }
+    },
+    "wardrobe.sync.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld wardrobe changes failed to back up"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld perubahan lemari gagal dicadangkan"
+          }
+        }
+      }
+    },
+    "wardrobe.sync.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld wardrobe changes backing up…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld perubahan lemari sedang dicadangkan…"
+          }
+        }
+      }
+    },
+    "wardrobe.sync.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coba lagi"
           }
         }
       }

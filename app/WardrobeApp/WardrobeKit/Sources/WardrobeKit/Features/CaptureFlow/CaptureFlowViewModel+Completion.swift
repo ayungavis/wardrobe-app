@@ -33,6 +33,7 @@ public extension CaptureFlowViewModel {
 
         do {
             let committed = try review.stageCommit(completionID: completion.id, at: now)
+            completion.syncQueuedAt = now
             completedRepository.stage(completion)
             let plan = try Self.syncPlan(
                 for: completion, items: committed, at: now, history: pendingUndoSteps

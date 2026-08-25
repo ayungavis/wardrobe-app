@@ -150,7 +150,8 @@ public final class AppContainer {
     public func makeWardrobeViewModel() -> WardrobeViewModel {
         WardrobeViewModel(
             thumbnails: garmentThumbnailRepository,
-            repository: makeWardrobeItemRepository()
+            repository: makeWardrobeItemRepository(),
+            outbox: makeOutboxRepository()
         )
     }
 
@@ -279,6 +280,8 @@ public final class AppContainer {
     public func makeHistoryViewModel() -> HistoryViewModel {
         HistoryViewModel(
             completedRepository: completedChallengeRepository,
+            outbox: makeOutboxRepository(),
+            uploads: makeMediaUploadRepository(),
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,

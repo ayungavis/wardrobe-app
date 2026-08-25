@@ -13,6 +13,8 @@ struct HistoryViewModelTests {
     ) -> HistoryViewModel {
         HistoryViewModel(
             completedRepository: completedRepository,
+            outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
+            uploads: makeInMemoryUploads(),
             photoRepository: photoRepository,
             wardrobeRepository: InMemoryWardrobeItemRepository(),
             thumbnails: InMemoryGarmentThumbnailRepository(),

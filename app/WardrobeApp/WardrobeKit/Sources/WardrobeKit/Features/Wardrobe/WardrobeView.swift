@@ -79,6 +79,15 @@ public struct WardrobeView: View {
                 .onDisappear { viewModel.load() }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.pendingSyncCount + viewModel.failedSyncCount > 0 {
+                WardrobeSyncBannerView(
+                    pending: viewModel.pendingSyncCount,
+                    failed: viewModel.failedSyncCount,
+                    onRetry: { viewModel.retryFailedSync() }
+                )
+            }
+        }
         .task { viewModel.load() }
     }
 

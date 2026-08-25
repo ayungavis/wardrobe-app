@@ -32,11 +32,17 @@ public struct HistoryView: View {
                                     Button {
                                         navigationPath.append(completion.id)
                                     } label: {
-                                        HistoryPolaroidCardView(
-                                            completion: completion,
-                                            previewData: viewModel.previewData(for: completion)
-                                        )
-                                        .task { await viewModel.renderMissingPreview(for: completion) }
+                                        VStack(spacing: Spacing.xs) {
+                                            HistoryPolaroidCardView(
+                                                completion: completion,
+                                                previewData: viewModel.previewData(for: completion)
+                                            )
+                                            .task { await viewModel.renderMissingPreview(for: completion) }
+
+                                            Text(verbatim: viewModel.syncState(for: completion).label)
+                                                .font(.caption2)
+                                                .foregroundStyle(AppColor.textSecondary)
+                                        }
                                     }
                                     .rotationEffect(.degrees(-3))
                                     .buttonStyle(.plain)

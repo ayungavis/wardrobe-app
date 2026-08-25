@@ -7,6 +7,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public let document: EditorDocument
     public let completedAt: Date
     public var previewFile: String?
+    public var syncQueuedAt: Date?
 
     public init(
         id: UUID = UUID(),

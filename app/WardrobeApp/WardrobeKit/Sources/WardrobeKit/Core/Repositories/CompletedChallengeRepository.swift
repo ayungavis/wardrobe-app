@@ -151,6 +151,7 @@ final class CompletionEntity {
     var photoID: UUID = UUID()
     var completedAt: Date = Date()
     var previewFile: String?
+    var syncQueuedAt: Date?
     var card: Data = Data()
     var document: Data = Data()
 
@@ -164,6 +165,7 @@ final class CompletionEntity {
         photoID = completion.photoID
         completedAt = completion.completedAt
         previewFile = completion.previewFile
+        syncQueuedAt = completion.syncQueuedAt
         self.card = card
         self.document = document
     }
@@ -174,10 +176,12 @@ final class CompletionEntity {
         else {
             return nil
         }
-        return CompletedChallenge(
+        var completion = CompletedChallenge(
             id: id, card: card, photoID: photoID, document: document,
             completedAt: completedAt, previewFile: previewFile
         )
+        completion.syncQueuedAt = syncQueuedAt
+        return completion
     }
 }
 
