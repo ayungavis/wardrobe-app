@@ -23,6 +23,16 @@ public enum ExportService {
             photos[content.photoID] = try await prepare(original: original, crop: content.crop)
         }
 
+        for layer in document.layers {
+            guard case let .sticker(content) = layer.content,
+                  let itemID = content.art.wardrobeItemID,
+                  let illustration = originals[itemID]
+            else {
+                continue
+            }
+            photos[itemID] = try await prepare(original: illustration, crop: nil)
+        }
+
         if case let .photo(id, crop) = document.background, let original = originals[id] {
             photos[id] = try await prepare(original: original, crop: crop)
         }

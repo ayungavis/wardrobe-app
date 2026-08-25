@@ -65,6 +65,17 @@ public extension CaptureFlowViewModel {
         for id in Set(completion.document.photoIDs) {
             originals[id] = try? photoRepository.loadOriginal(id: id)
         }
+        for layer in completion.document.layers {
+            guard case let .sticker(content) = layer.content,
+                  let itemID = content.art.wardrobeItemID,
+                  let file = ((try? wardrobeRepository.items()) ?? [])
+                  .first(where: { $0.id == itemID })?.illustrationFile,
+                  let data = try? thumbnails.data(forFile: file)
+            else {
+                continue
+            }
+            originals[itemID] = data
+        }
 
         do {
             let data = try await ExportService.render(originals: originals, document: completion.document)

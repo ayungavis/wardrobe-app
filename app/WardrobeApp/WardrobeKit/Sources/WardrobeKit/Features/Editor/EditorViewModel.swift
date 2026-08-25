@@ -48,7 +48,10 @@ public final class EditorViewModel {
     let activeRepository: ActiveChallengeRepository
     let photoRepository: PhotoRepository
     let librarySaver: PhotoLibrarySaveService
-    private let preferencesRepository: AccountPreferencesRepository
+    let preferencesRepository: AccountPreferencesRepository
+    let wardrobeRepository: WardrobeItemRepository?
+    let thumbnails: GarmentThumbnailRepository?
+    internal(set) var wardrobeStickers: [WardrobeSticker] = []
     var loadTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
     var saveTask: Task<Void, Never>?
@@ -59,17 +62,22 @@ public final class EditorViewModel {
         activeRepository: ActiveChallengeRepository,
         photoRepository: PhotoRepository,
         librarySaver: PhotoLibrarySaveService,
-        preferencesRepository: AccountPreferencesRepository
+        preferencesRepository: AccountPreferencesRepository,
+        wardrobeRepository: WardrobeItemRepository? = nil,
+        thumbnails: GarmentThumbnailRepository? = nil
     ) {
         self.challenge = challenge
         self.activeRepository = activeRepository
         self.photoRepository = photoRepository
         self.librarySaver = librarySaver
         self.preferencesRepository = preferencesRepository
+        self.wardrobeRepository = wardrobeRepository
+        self.thumbnails = thumbnails
         document = challenge.document
     }
 
     public func onAppear() {
+        loadWardrobeStickers()
         guard case .idle = originals else { return }
         load()
     }
@@ -284,25 +292,5 @@ public final class EditorViewModel {
             Log.report(error)
             alertError = .photoImportFailed
         }
-    }
-
-    // MARK: Stickers (PRD FR-019)
-
-    public var recentStickerIDs: [String] {
-        preferencesRepository.load().knownRecentStickerIDs
-    }
-
-    public func addSticker(_ entry: StickerCatalogueEntry) {
-        document.appendSticker(.catalogue(entry.id))
-        selectedLayerID = document.layers.last?.id
-        isStickerPickerPresented = false
-        persistDocument()
-        rememberSticker(entry.id)
-    }
-
-    private func rememberSticker(_ id: String) {
-        var preferences = preferencesRepository.load()
-        preferences.remember(stickerID: id)
-        preferencesRepository.save(preferences)
     }
 }

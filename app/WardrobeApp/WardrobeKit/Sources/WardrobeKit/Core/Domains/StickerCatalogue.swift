@@ -114,6 +114,7 @@ public enum StickerCatalogue {
     public static func entries(in category: StickerCategory, recentIDs: [String]) -> [StickerCatalogueEntry] {
         switch category {
         case .recent: recentIDs.compactMap { entry(id: $0) }
+        case .wardrobe: []
         case .emoji: emojis
         case .stickers: offlineStickers
         }
@@ -121,7 +122,7 @@ public enum StickerCatalogue {
 }
 
 public enum StickerCategory: String, CaseIterable, Identifiable, Sendable {
-    case recent, emoji, stickers
+    case recent, wardrobe, emoji, stickers
 
     public var id: String {
         rawValue
@@ -130,6 +131,7 @@ public enum StickerCategory: String, CaseIterable, Identifiable, Sendable {
     public var symbolName: String {
         switch self {
         case .recent: "clock"
+        case .wardrobe: "tshirt"
         case .emoji: "face.smiling"
         case .stickers: "sparkles"
         }

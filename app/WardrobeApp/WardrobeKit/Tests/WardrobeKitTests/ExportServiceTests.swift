@@ -7,6 +7,20 @@ import UniformTypeIdentifiers
 
 @MainActor
 struct ExportServiceTests {
+    @Test func anItemStickerReachesTheFlattenedImage() async throws {
+        let itemID = UUID()
+        var document = EditorDocument(id: UUID(), layers: [])
+        document.appendSticker(.item(itemID))
+
+        let blank = try await ExportService.render(originals: [:], document: document)
+        let drawn = try await ExportService.render(
+            originals: [itemID: SampleCameraService.makeSampleJPEG(width: 120, height: 120)],
+            document: document
+        )
+
+        #expect(blank != drawn, "an illustration nobody loaded exports as nothing at all")
+    }
+
     /// A JPEG deliberately stuffed with EXIF + GPS metadata.
     private func makeJPEGWithMetadata(width: Int = 100, height: Int = 200) throws -> Data {
         let base = try SampleCameraService.makeSampleJPEG(width: width, height: height)

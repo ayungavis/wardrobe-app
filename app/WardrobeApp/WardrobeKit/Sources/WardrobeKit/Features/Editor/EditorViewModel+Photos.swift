@@ -66,7 +66,7 @@ public extension EditorViewModel {
     }
 
     func preview(forPhoto photoID: UUID) -> CGImage? {
-        croppedPreviews[photoID]
+        croppedPreviews[photoID] ?? illustration(forItem: photoID)
     }
 
     func updateCroppedPreviews() {

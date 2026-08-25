@@ -49,12 +49,17 @@ public struct EditorView: View {
             ExportSheetView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.isStickerPickerPresented) {
-            StickerPickerView(recentIDs: viewModel.recentStickerIDs) { viewModel.addSticker($0) }
-                .presentationDetents([.fraction(0.48), .large])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(30)
-                .presentationBackground(AppColor.mediaSurface)
-                .preferredColorScheme(.dark)
+            StickerPickerView(
+                recentIDs: viewModel.recentStickerIDs,
+                wardrobe: viewModel.wardrobeStickers,
+                onPick: { viewModel.addSticker($0) },
+                onPickItem: { viewModel.addItemSticker($0) }
+            )
+            .presentationDetents([.fraction(0.48), .large])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(30)
+            .presentationBackground(AppColor.mediaSurface)
+            .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $viewModel.isLayerPanelPresented) {
             LayerPanelView(viewModel: viewModel)

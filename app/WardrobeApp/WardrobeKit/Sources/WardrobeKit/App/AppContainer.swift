@@ -142,7 +142,9 @@ public final class AppContainer {
             activeRepository: activeChallengeRepository,
             photoRepository: photoRepository,
             librarySaver: Self.defaultLibrarySaver(),
-            preferencesRepository: preferencesRepository
+            preferencesRepository: preferencesRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
         )
     }
 

@@ -17,10 +17,14 @@ public extension EditorViewModel {
         isExportPresented = true
 
         let document = document
+        let illustrations = illustrationBytes(in: document)
         exportTask = Task {
             do {
                 let start = ContinuousClock.now
-                let photo = try await ExportService.render(originals: originals, document: document)
+                let photo = try await ExportService.render(
+                    originals: originals.merging(illustrations) { current, _ in current },
+                    document: document
+                )
                 try Task.checkCancellation()
                 Log.ui.info(
                     "Export finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
@@ -40,9 +44,13 @@ public extension EditorViewModel {
         saveState = .saving
 
         let document = document
+        let illustrations = illustrationBytes(in: document)
         saveTask = Task {
             do {
-                let photo = try await ExportService.render(originals: originals, document: document)
+                let photo = try await ExportService.render(
+                    originals: originals.merging(illustrations) { current, _ in current },
+                    document: document
+                )
                 try Task.checkCancellation()
                 try await librarySaver.save(photo)
                 saveState = .saved

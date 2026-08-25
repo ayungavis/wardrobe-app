@@ -31,6 +31,8 @@ public final class CaptureFlowViewModel {
     public let review: GarmentReviewModel
 
     private let camera: CameraService
+    let wardrobeRepository: WardrobeItemRepository
+    let thumbnails: GarmentThumbnailRepository
     private let preferences: AccountPreferencesRepository
     let activeRepository: ActiveChallengeRepository
     let completedRepository: CompletedChallengeRepository
@@ -68,6 +70,8 @@ public final class CaptureFlowViewModel {
         self.photoRepository = photoRepository
         self.previews = previews
         self.library = library
+        self.wardrobeRepository = wardrobeRepository
+        self.thumbnails = thumbnails
         self.preferences = preferences
         self.outbox = outbox
         self.uploads = uploads

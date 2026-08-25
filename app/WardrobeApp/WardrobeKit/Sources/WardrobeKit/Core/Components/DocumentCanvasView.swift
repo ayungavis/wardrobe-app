@@ -11,7 +11,7 @@ struct DocumentCanvasView: View {
             CanvasBackgroundView(background: document.background, photo: photo)
 
             ForEach(Array(document.layers.enumerated()), id: \.element.id) { index, layer in
-                LayerContentView(content: layer.content, canvasSize: size, photo: photo)
+                LayerContentView(content: layer.content, canvasSize: size, image: photo)
                     .canvasLayerTransform(layer.transform, in: size)
                     .zIndex(Double(index))
             }

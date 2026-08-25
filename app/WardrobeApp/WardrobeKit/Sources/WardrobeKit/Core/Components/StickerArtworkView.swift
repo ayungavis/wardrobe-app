@@ -5,8 +5,33 @@ import SwiftUI
 struct StickerArtworkView: View {
     let art: StickerArt
     let size: CGFloat
+    var image: CGImage?
 
     var body: some View {
+        if art.wardrobeItemID != nil {
+            garment
+        } else {
+            catalogueArtwork
+        }
+    }
+
+    @ViewBuilder
+    private var garment: some View {
+        if let image {
+            Image(decorative: image, scale: 1)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .shadow(color: shadow.opacity(0.24), radius: size * 0.06, y: size * 0.04)
+        } else {
+            tile(symbol: "tshirt", colors: [
+                AppColor.onMedia.opacity(0.32), AppColor.onMedia.opacity(0.18),
+            ])
+        }
+    }
+
+    @ViewBuilder
+    private var catalogueArtwork: some View {
         switch art.design {
         case let .emoji(glyph):
             Text(verbatim: glyph)

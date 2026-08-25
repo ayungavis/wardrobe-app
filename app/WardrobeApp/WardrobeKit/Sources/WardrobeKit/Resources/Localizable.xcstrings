@@ -3279,6 +3279,23 @@
         }
       }
     },
+    "editor.sticker.category.wardrobe": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wardrobe"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lemari"
+          }
+        }
+      }
+    },
     "editor.sticker.emoji.airplane": {
       "extractionState": "manual",
       "localizations": {
@@ -4310,6 +4327,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stiker"
+          }
+        }
+      }
+    },
+    "editor.sticker.wardrobe.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your items appear here once their illustrations are ready."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Item-mu muncul di sini begitu ilustrasinya siap."
           }
         }
       }

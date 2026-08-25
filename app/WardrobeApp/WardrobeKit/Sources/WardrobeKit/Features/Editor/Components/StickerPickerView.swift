@@ -5,15 +5,24 @@ struct StickerPickerView: View {
     @Environment(\.dismiss) private var dismiss
 
     let recentIDs: [String]
+    let wardrobe: [WardrobeSticker]
     let onPick: (StickerCatalogueEntry) -> Void
+    let onPickItem: (WardrobeSticker) -> Void
 
     @State private var category: StickerCategory
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.sm), count: 4)
 
-    init(recentIDs: [String], onPick: @escaping (StickerCatalogueEntry) -> Void) {
+    init(
+        recentIDs: [String],
+        wardrobe: [WardrobeSticker] = [],
+        onPick: @escaping (StickerCatalogueEntry) -> Void,
+        onPickItem: @escaping (WardrobeSticker) -> Void = { _ in }
+    ) {
         self.recentIDs = recentIDs
+        self.wardrobe = wardrobe
         self.onPick = onPick
+        self.onPickItem = onPickItem
         _category = State(initialValue: recentIDs.isEmpty ? .emoji : .recent)
     }
 
@@ -101,7 +110,55 @@ struct StickerPickerView: View {
         .scrollIndicators(.hidden)
     }
 
+    @ViewBuilder
     private var grid: some View {
+        if category == .wardrobe {
+            wardrobeGrid
+        } else {
+            catalogueGrid
+        }
+    }
+
+    @ViewBuilder
+    private var wardrobeGrid: some View {
+        if wardrobe.isEmpty {
+            VStack {
+                Spacer()
+                Text("editor.sticker.wardrobe.empty", bundle: .module)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.onMedia.opacity(0.64))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.lg)
+                Spacer()
+            }
+        } else {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: Spacing.md) {
+                    ForEach(wardrobe) { sticker in
+                        Button {
+                            EditorHaptics.commit.play()
+                            onPickItem(sticker)
+                            dismiss()
+                        } label: {
+                            StickerArtworkView(
+                                art: .item(sticker.id), size: 64, image: sticker.image
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 70)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(verbatim: sticker.name))
+                        .accessibilityIdentifier("editor.sticker.item.\(sticker.id.uuidString)")
+                    }
+                }
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.lg)
+            }
+        }
+    }
+
+    private var catalogueGrid: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Spacing.md) {
                 ForEach(StickerCatalogue.entries(in: category, recentIDs: recentIDs)) { entry in
@@ -127,6 +184,12 @@ struct StickerPickerView: View {
     }
 
     private var availableCategories: [StickerCategory] {
-        recentIDs.isEmpty ? [.emoji, .stickers] : StickerCategory.allCases
+        StickerCategory.allCases.filter { category in
+            switch category {
+            case .recent: !recentIDs.isEmpty
+            case .wardrobe: !wardrobe.isEmpty
+            case .emoji, .stickers: true
+            }
+        }
     }
 }
