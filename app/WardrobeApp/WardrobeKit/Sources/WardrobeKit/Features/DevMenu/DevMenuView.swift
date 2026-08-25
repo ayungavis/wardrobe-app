@@ -40,6 +40,10 @@ struct DevMenuView: View {
                     onWhoami: { viewModel.loadSession(callingWhoami: true) },
                     onHealth: { viewModel.checkHealth() }
                 )
+                DevMediaSectionView(
+                    state: viewModel.mediaState,
+                    onRoundTrip: { viewModel.runMediaRoundTrip() }
+                )
                 DevDiagnosticsSectionView(
                     entries: viewModel.diagnostics,
                     onClear: { viewModel.clearDiagnostics() }

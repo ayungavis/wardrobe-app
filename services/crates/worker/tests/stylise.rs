@@ -12,11 +12,11 @@ fn store() -> Storage {
         std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
     }
     Storage::new(&Settings {
-        endpoint: env("S3_ENDPOINT", "http://localhost:9100"),
-        region: env("S3_REGION", "us-east-1"),
-        bucket: env("S3_BUCKET", "wardrobe"),
-        access_key_id: env("S3_ACCESS_KEY_ID", "wardrobe"),
-        secret_access_key: env("S3_SECRET_ACCESS_KEY", "wardrobe-dev-secret"),
+        endpoint: env("TEST_S3_ENDPOINT", "http://localhost:9100"),
+        region: env("TEST_S3_REGION", "us-east-1"),
+        bucket: env("TEST_S3_BUCKET", "wardrobe"),
+        access_key_id: env("TEST_S3_ACCESS_KEY_ID", "wardrobe"),
+        secret_access_key: env("TEST_S3_SECRET_ACCESS_KEY", "wardrobe-dev-secret"),
         path_style: true,
         presign_ttl: std::time::Duration::from_secs(300),
     })

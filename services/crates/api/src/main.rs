@@ -40,6 +40,26 @@ async fn serve(config: Config) -> ExitCode {
     }
 }
 
+async fn verified_storage(
+    settings: Option<&wardrobe_storage::Settings>,
+) -> Result<Option<std::sync::Arc<wardrobe_storage::Storage>>, Box<dyn std::error::Error>> {
+    let Some(settings) = settings else {
+        tracing::warn!("no object store configured; media endpoints will refuse");
+        return Ok(None);
+    };
+
+    let storage = std::sync::Arc::new(wardrobe_storage::Storage::new(settings));
+    storage.ensure_bucket().await.map_err(|error| {
+        format!(
+            "object store unreachable: bucket {:?} at {:?} ({error}). \
+             A path-style endpoint must not repeat the bucket name.",
+            settings.bucket, settings.endpoint
+        )
+    })?;
+    tracing::info!(bucket = %settings.bucket, "object store reachable");
+    Ok(Some(storage))
+}
+
 async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let pool = PgPoolOptions::new()
         .max_connections(10)
@@ -48,6 +68,8 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
 
     wardrobe_db::MIGRATOR.run(&pool).await?;
     tracing::info!("migrations applied");
+
+    let storage = verified_storage(config.storage.as_ref()).await?;
 
     let listener = TcpListener::bind(&config.bind_addr).await?;
     let contract = if config.serve_docs {
@@ -58,11 +80,6 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(addr = %config.bind_addr, contract, "listening");
 
     let apple = std::sync::Arc::new(apple::Verifier::new(config.apple_bundle_id.clone()));
-
-    let storage = config
-        .storage
-        .as_ref()
-        .map(|settings| std::sync::Arc::new(wardrobe_storage::Storage::new(settings)));
 
     let app = wardrobe_api::app_with(
         pool,

@@ -36,7 +36,10 @@ struct DevMenuSessionTests {
                 outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
                 feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore())
             ),
-            diagnosticsStore: InMemoryDiagnosticsStore()
+            diagnosticsStore: InMemoryDiagnosticsStore(),
+            media: ServerMediaRepository(
+                client: StubAuthenticatedClient(), cache: InMemoryMediaCacheStore()
+            )
         )
     }
 

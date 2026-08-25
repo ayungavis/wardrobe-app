@@ -151,3 +151,20 @@ final class InMemoryDiagnosticsStore: DiagnosticsStore {
         stored = []
     }
 }
+
+final class InMemoryMediaCacheStore: MediaCacheStore, @unchecked Sendable {
+    // @unchecked: tests drive it from one actor at a time.
+    private var stored: [UUID: Data] = [:]
+
+    func data(for id: UUID) -> Data? {
+        stored[id]
+    }
+
+    func store(_ data: Data, for id: UUID) throws {
+        stored[id] = data
+    }
+
+    func removeAll() throws {
+        stored = [:]
+    }
+}

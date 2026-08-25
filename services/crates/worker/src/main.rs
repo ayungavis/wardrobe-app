@@ -46,7 +46,7 @@ async fn run(database_url: String) -> Result<(), Box<dyn std::error::Error>> {
         .max_connections(5)
         .connect(&database_url)
         .await?;
-    let storage = wardrobe_storage::Settings::from_env().map(|settings| Storage::new(&settings));
+    let storage = verified_storage().await?;
     let provider = provider_from_env();
     let interval = Wait::from_secs(poll_seconds());
     tracing::info!(poll_seconds = interval.as_secs(), "worker started");
@@ -62,6 +62,24 @@ async fn run(database_url: String) -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("shutting down after finishing the job in hand");
     Ok(())
+}
+
+async fn verified_storage() -> Result<Option<Storage>, Box<dyn std::error::Error>> {
+    let Some(settings) = wardrobe_storage::Settings::from_env() else {
+        tracing::warn!("no object store configured; storage-backed kinds will wait");
+        return Ok(None);
+    };
+
+    let storage = Storage::new(&settings);
+    storage.ensure_bucket().await.map_err(|error| {
+        format!(
+            "object store unreachable: bucket {:?} at {:?} ({error}). \
+             A path-style endpoint must not repeat the bucket name.",
+            settings.bucket, settings.endpoint
+        )
+    })?;
+    tracing::info!(bucket = %settings.bucket, "object store reachable");
+    Ok(Some(storage))
 }
 
 fn provider_from_env() -> Option<Provider> {

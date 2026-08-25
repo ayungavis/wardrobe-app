@@ -211,6 +211,10 @@ public final class AppContainer {
 
     private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
 
+    public func makeMediaRepository() -> MediaRepository {
+        ServerMediaRepository(client: makeAuthenticatedClient(), cache: FileMediaCacheStore())
+    }
+
     func makeChangeFeedRepository() -> ChangeFeedRepository {
         ServerChangeFeedRepository(
             client: makeAuthenticatedClient(),
@@ -261,7 +265,8 @@ public final class AppContainer {
             outboxRepository: makeOutboxRepository(),
             feed: makeChangeFeedRepository(),
             coordinator: syncCoordinator,
-            diagnosticsStore: diagnostics
+            diagnosticsStore: diagnostics,
+            media: makeMediaRepository()
         )
     }
 

@@ -16,6 +16,8 @@ public final class DevMenuViewModel {
     private(set) var pullTask: Task<Void, Never>?
     private(set) var reconcileState: Loadable<ReconcileOutcome> = .idle
     private(set) var diagnostics: [DiagnosticEntry] = []
+    private(set) var mediaState: Loadable<String> = .idle
+    private(set) var mediaTask: Task<Void, Never>?
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -33,6 +35,7 @@ public final class DevMenuViewModel {
     private let feed: any ChangeFeedRepository
     private let coordinator: any SyncCoordinator
     private let diagnosticsStore: any DiagnosticsStore
+    private let media: any MediaRepository
     private let calendar: Calendar
 
     init(
@@ -52,6 +55,7 @@ public final class DevMenuViewModel {
         feed: any ChangeFeedRepository,
         coordinator: any SyncCoordinator,
         diagnosticsStore: any DiagnosticsStore,
+        media: any MediaRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -70,6 +74,7 @@ public final class DevMenuViewModel {
         self.feed = feed
         self.coordinator = coordinator
         self.diagnosticsStore = diagnosticsStore
+        self.media = media
         self.calendar = calendar
     }
 
@@ -129,6 +134,10 @@ public final class DevMenuViewModel {
         }
     }
 
+    func note(_ action: String) {
+        lastAction = action
+    }
+
     public func refresh() {
         outbox = (try? outboxRepository.entries()) ?? []
         cursor = (try? feed.position()) ?? 0
@@ -144,69 +153,6 @@ public final class DevMenuViewModel {
             hasCompletedOnboarding: onboarding.isCompleted,
             isSignedIn: onboarding.isSignedIn
         )
-    }
-
-    public func resetOnboarding() async {
-        do {
-            try await onboarding.reset()
-            Log.ui.info("Dev: onboarding reset")
-        } catch {
-            Log.report(error)
-        }
-        refresh()
-        lastAction = "Onboarding reset"
-    }
-
-    public func resetWardrobe() {
-        do {
-            try wardrobeRepository.deleteAll()
-            try thumbnails.deleteAll()
-            Log.ui.info("Dev: wardrobe reset")
-        } catch {
-            Log.report(error)
-        }
-        refresh()
-        lastAction = "Wardrobe cleared"
-    }
-
-    public func resetToday() {
-        let today = Date()
-
-        let todaysCompletions = completedRepository.load()
-            .filter { calendar.isDate($0.completedAt, inSameDayAs: today) }
-        for completion in todaysCompletions {
-            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
-            deletePreview(of: completion)
-        }
-        completedRepository.removeCompletions(on: today)
-
-        if let active = activeRepository.load() {
-            photoRepository.deleteOriginals(of: active.document, and: active.photoID)
-            photoRepository.deleteUnusedOriginals(
-                of: active.document, imported: active.importedPhotoIDs
-            )
-        }
-        activeRepository.clear()
-
-        refresh()
-        lastAction = "Today's challenge reset"
-        Log.ui.info("Dev: today's challenge reset")
-    }
-
-    public func resetHistory() {
-        for completion in completedRepository.load() {
-            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
-        }
-        do {
-            try previews.deleteAll()
-        } catch {
-            Log.report(error)
-        }
-        completedRepository.removeAll()
-
-        refresh()
-        lastAction = "History cleared"
-        Log.ui.info("Dev: history cleared")
     }
 
     func reconcileNow() {
@@ -234,6 +180,30 @@ public final class DevMenuViewModel {
             } catch {
                 Log.report(error, logger: Log.network)
                 pullState = .failed(AppError(wrapping: error))
+            }
+            refresh()
+        }
+    }
+
+    func runMediaRoundTrip() {
+        mediaTask?.cancel()
+        mediaState = .loading
+
+        mediaTask = Task { [media] in
+            let id = UUID()
+            let payload = Data("wardrobe round trip \(id.uuidString)".utf8)
+            do {
+                try await media.upload(payload, id: id, kind: .cutout, contentType: "text/plain")
+                try media.clearCache()
+                let read = try await media.data(for: id)
+                try Task.checkCancellation()
+                mediaState = read == payload
+                    ? .loaded("\(payload.count) bytes up and back, identical")
+                    : .failed(.serverRejected)
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, context: Log.Context(operation: "media.roundTrip"), logger: Log.network)
+                mediaState = .failed(AppError(wrapping: error))
             }
             refresh()
         }
@@ -267,6 +237,73 @@ public final class DevMenuViewModel {
         }
         refresh()
         lastAction = "Outbox cleared"
+    }
+}
+
+// MARK: - Resets
+
+public extension DevMenuViewModel {
+    func resetOnboarding() async {
+        do {
+            try await onboarding.reset()
+            Log.ui.info("Dev: onboarding reset")
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        note("Onboarding reset")
+    }
+
+    func resetWardrobe() {
+        do {
+            try wardrobeRepository.deleteAll()
+            try thumbnails.deleteAll()
+            Log.ui.info("Dev: wardrobe reset")
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        note("Wardrobe cleared")
+    }
+
+    func resetToday() {
+        let today = Date()
+
+        let todaysCompletions = completedRepository.load()
+            .filter { calendar.isDate($0.completedAt, inSameDayAs: today) }
+        for completion in todaysCompletions {
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
+            deletePreview(of: completion)
+        }
+        completedRepository.removeCompletions(on: today)
+
+        if let active = activeRepository.load() {
+            photoRepository.deleteOriginals(of: active.document, and: active.photoID)
+            photoRepository.deleteUnusedOriginals(
+                of: active.document, imported: active.importedPhotoIDs
+            )
+        }
+        activeRepository.clear()
+
+        refresh()
+        note("Today's challenge reset")
+        Log.ui.info("Dev: today's challenge reset")
+    }
+
+    func resetHistory() {
+        for completion in completedRepository.load() {
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
+        }
+        do {
+            try previews.deleteAll()
+        } catch {
+            Log.report(error)
+        }
+        completedRepository.removeAll()
+
+        refresh()
+        note("History cleared")
+        Log.ui.info("Dev: history cleared")
     }
 
     private func deletePreview(of completion: CompletedChallenge) {
