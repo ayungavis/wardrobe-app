@@ -25,6 +25,21 @@ pub struct Rendered {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Rejection {
+    pub failure: Failure,
+    pub http_status: Option<u16>,
+}
+
+impl Rejection {
+    fn plain(failure: Failure) -> Self {
+        Self {
+            failure,
+            http_status: None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Failure {
     Refused,
     Ineligible,
@@ -106,7 +121,7 @@ pub async fn render(
     base_url: &str,
     api_key: &str,
     ask: &Ask<'_>,
-) -> Result<Rendered, Failure> {
+) -> Result<Rendered, Rejection> {
     let payload = payload(ask);
 
     let response = client
@@ -115,24 +130,33 @@ pub async fn render(
         .json(&payload)
         .send()
         .await
-        .map_err(|_| Failure::Unavailable)?;
+        .map_err(|_| Rejection::plain(Failure::Unavailable))?;
 
     let status = response.status().as_u16();
     if !(200..300).contains(&status) {
-        return Err(classify(status));
+        return Err(Rejection {
+            failure: classify(status),
+            http_status: Some(status),
+        });
     }
 
-    let body: Body = response.json().await.map_err(|_| Failure::InvalidOutput)?;
+    let body: Body = response
+        .json()
+        .await
+        .map_err(|_| Rejection::plain(Failure::InvalidOutput))?;
     let [image] = body.data.as_slice() else {
-        return Err(Failure::InvalidOutput);
+        return Err(Rejection::plain(Failure::InvalidOutput));
     };
-    let encoded = image.b64_json.as_deref().ok_or(Failure::InvalidOutput)?;
+    let encoded = image
+        .b64_json
+        .as_deref()
+        .ok_or(Rejection::plain(Failure::InvalidOutput))?;
     let bytes = STANDARD
         .decode(encoded)
         .ok()
         .filter(|bytes| !bytes.is_empty())
-        .ok_or(Failure::InvalidOutput)?;
-    let content_type = sniff(&bytes).ok_or(Failure::InvalidOutput)?;
+        .ok_or(Rejection::plain(Failure::InvalidOutput))?;
+    let content_type = sniff(&bytes).ok_or(Rejection::plain(Failure::InvalidOutput))?;
 
     Ok(Rendered {
         image: bytes,

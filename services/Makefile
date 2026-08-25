@@ -10,7 +10,7 @@ S3_SECRET_ACCESS_KEY ?= wardrobe-dev-secret
 S3_FORCE_PATH_STYLE ?= true
 OPENROUTER_BASE_URL ?= https://openrouter.ai/api/v1
 
-.PHONY: up down migrate reset run worker openapi test fmt lint validate build image
+.PHONY: up down migrate reset run worker seed-ai openapi test fmt lint validate build image
 
 up:
 	docker compose up -d --wait
@@ -33,6 +33,12 @@ run: up
 
 worker: up
 	cargo run -p wardrobe-worker
+
+seed-ai: up
+	@test -n "$(OPENROUTER_TEST_MODEL)" || { echo "set OPENROUTER_TEST_MODEL in services/.env"; exit 1; }
+	docker compose exec -T postgres psql -U wardrobe -d wardrobe \
+		-c "insert into ai_provider_allowlist (provider_slug, forbids_training, retention_policy, approved_by) values ('openrouter', true, 'zero', 'local-dev') on conflict (provider_slug) do nothing;" \
+		-c "insert into ai_model_config (capability, model_class, active_model, prompt_version, updated_by) values ('illustration', 'image', '$(OPENROUTER_TEST_MODEL)', 'p1', 'local-dev') on conflict (capability) do update set active_model = excluded.active_model, updated_at = now(), updated_by = 'local-dev';"
 
 # Regenerated from the handlers, never hand-edited. A test fails when the
 # committed file drifts from the code.

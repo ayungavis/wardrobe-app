@@ -8,7 +8,7 @@ use uuid::Uuid;
 use wardrobe_db::ClaimedJob;
 use wardrobe_storage::Storage;
 
-use openrouter::{Ask, Failure};
+use openrouter::{Ask, Failure, Rejection};
 
 pub const STYLE_VERSION: &str = "v1";
 const CAPABILITY: &str = "illustration";
@@ -256,6 +256,7 @@ struct Accounting<'a> {
     latency_ms: Option<i32>,
     input_tokens: Option<i64>,
     output_tokens: Option<i64>,
+    http_status: Option<i32>,
 }
 
 async fn record(
@@ -269,8 +270,9 @@ async fn record(
     sqlx::query(
         "insert into ai_inference_attempt
              (id, account_id, job_id, capability, attempt_no, model, prompt_version,
-              provider_route, status, latency_ms, input_tokens, output_tokens, seed)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+              provider_route, status, latency_ms, input_tokens, output_tokens, seed,
+              http_status)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
     )
     .bind(Uuid::now_v7())
     .bind(account)
@@ -285,6 +287,7 @@ async fn record(
     .bind(accounting.input_tokens)
     .bind(accounting.output_tokens)
     .bind(pinned.seed)
+    .bind(accounting.http_status)
     .execute(pool)
     .await
     .map(|_| ())
@@ -355,6 +358,7 @@ pub async fn render_for(
                 latency_ms: None,
                 input_tokens: None,
                 output_tokens: None,
+                http_status: None,
             },
         )
         .await?;
@@ -411,13 +415,19 @@ pub async fn render_for(
 
 async fn settle(
     work: &Work<'_>,
-    outcome: Result<openrouter::Rendered, Failure>,
+    outcome: Result<openrouter::Rendered, Rejection>,
     latency_ms: Option<i32>,
     final_attempt: bool,
 ) -> Result<(), &'static str> {
     let rendered = match outcome {
         Ok(rendered) => rendered,
-        Err(failure) => {
+        Err(rejection) => {
+            let failure = rejection.failure;
+            tracing::warn!(
+                rejection = failure.status(),
+                provider.status = rejection.http_status,
+                "the provider declined the render"
+            );
             record(
                 work.pool,
                 work.job,
@@ -430,6 +440,7 @@ async fn settle(
                     latency_ms,
                     input_tokens: None,
                     output_tokens: None,
+                    http_status: rejection.http_status.map(i32::from),
                 },
             )
             .await?;
@@ -464,6 +475,7 @@ async fn settle(
             latency_ms,
             input_tokens: rendered.input_tokens,
             output_tokens: rendered.output_tokens,
+            http_status: None,
         },
     )
     .await?;

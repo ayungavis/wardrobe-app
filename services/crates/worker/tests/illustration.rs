@@ -374,6 +374,28 @@ async fn a_refusal_moves_to_the_alternate_as_its_own_pinned_attempt(
     Ok(())
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refusal_records_the_http_status(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(&server, ResponseTemplate::new(404)).await;
+
+    run(&pool, &server, true).await;
+
+    let status: Option<i32> =
+        sqlx::query_scalar("select http_status from ai_inference_attempt where job_id = $1")
+            .bind(scene.job)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(
+        status,
+        Some(404),
+        "401, 402, and 404 must be tellable apart from the ledger alone"
+    );
+    Ok(())
+}
+
 // ----------------------------------------------------------------- limits
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -737,7 +759,7 @@ async fn a_provider_that_never_answers_gives_up_instead_of_hanging() {
     .await;
 
     assert_eq!(
-        outcome.err(),
+        outcome.err().map(|rejection| rejection.failure),
         Some(illustration::openrouter::Failure::Unavailable),
         "a hung provider must be retryable, not a worker that stops claiming anything"
     );

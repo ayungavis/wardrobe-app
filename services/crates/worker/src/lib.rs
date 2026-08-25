@@ -4,6 +4,7 @@ use std::future::Future;
 
 use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
+use tracing::Instrument;
 use uuid::Uuid;
 use wardrobe_db::ClaimedJob;
 use wardrobe_storage::Storage;
@@ -81,6 +82,15 @@ where
     };
     drop(conn);
 
+    let span = tracing::info_span!("job", job.id = %job.id, job.kind = kind);
+    settle(pool, job, handle).instrument(span).await
+}
+
+async fn settle<F, Fut>(pool: &PgPool, job: ClaimedJob, handle: F) -> sqlx::Result<Option<Outcome>>
+where
+    F: FnOnce(ClaimedJob) -> Fut,
+    Fut: Future<Output = Result<(), &'static str>>,
+{
     let id = job.id;
     let attempts = job.attempts;
     let max_attempts: i32 = sqlx::query_scalar("select max_attempts from job where id = $1")

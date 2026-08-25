@@ -52,8 +52,13 @@ async fn run(database_url: String) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(poll_seconds = interval.as_secs(), "worker started");
 
     let mut stopping = std::pin::pin!(sigterm_or_ctrl_c());
+    let mut announced = None;
     loop {
-        tick(&pool, storage.as_ref(), provider.as_ref()).await;
+        let readiness = tick(&pool, storage.as_ref(), provider.as_ref()).await;
+        if announced != Some(readiness) {
+            announce(readiness, storage.is_some(), provider.is_some());
+            announced = Some(readiness);
+        }
         tokio::select! {
             () = &mut stopping => break,
             () = tokio::time::sleep(interval) => {}
@@ -107,23 +112,55 @@ fn poll_seconds() -> u64 {
         .unwrap_or(5)
 }
 
-async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provider>) {
+fn announce(readiness: Readiness, has_storage: bool, has_provider: bool) {
+    tracing::info!(
+        illustration = readiness.illustration,
+        sweep = has_storage,
+        "job kinds enabled"
+    );
+    if !readiness.illustration {
+        tracing::warn!(
+            provider = has_provider,
+            object_store = has_storage,
+            ai_config = readiness.config,
+            "illustration jobs are not being polled"
+        );
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Readiness {
+    illustration: bool,
+    config: bool,
+}
+
+async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provider>) -> Readiness {
     if let Err(error) = prepare(pool).await {
         tracing::error!(
             error.kind = "database",
             "could not prepare the queue: {error}"
         );
-        return;
+        return Readiness {
+            illustration: false,
+            config: false,
+        };
     }
 
-    let illustration_ready =
-        provider.is_some() && storage.is_some() && illustration::ready(pool).await.unwrap_or(false);
+    let config = illustration::ready(pool).await.unwrap_or(false);
+    let readiness = Readiness {
+        illustration: provider.is_some() && storage.is_some() && config,
+        config,
+    };
 
-    for kind in kinds(illustration_ready, storage.is_some()) {
+    let mut claimed = 0;
+    for kind in kinds(readiness.illustration, storage.is_some()) {
         let outcome =
             wardrobe_worker::run_one(pool, kind, |job| handle(pool, storage, provider, job)).await;
         match outcome {
-            Ok(Some(outcome)) => tracing::info!(job.kind = kind, ?outcome, "job finished"),
+            Ok(Some(outcome)) => {
+                claimed += 1;
+                tracing::info!(job.kind = kind, ?outcome, "job finished");
+            }
             Ok(None) => {}
             Err(error) => {
                 tracing::error!(
@@ -134,6 +171,10 @@ async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provid
             }
         }
     }
+    if claimed == 0 {
+        tracing::debug!("queue idle");
+    }
+    readiness
 }
 
 async fn prepare(pool: &PgPool) -> sqlx::Result<()> {
