@@ -121,7 +121,7 @@ extension WardrobeViewModel {
     // so tracing one to one item means parsing payloads. FR-061 allows a group.
     func refreshSyncCounts() {
         let entries = ((try? outbox?.entries()) ?? []).filter {
-            $0.name == "upsertItem" || $0.name == "deleteItem"
+            ["upsertItem", "deleteItem", "mergeItems"].contains($0.name)
         }
         pendingSyncCount = entries.count { $0.state == .pending }
         failedSyncCount = entries.count { $0.state == .failed }

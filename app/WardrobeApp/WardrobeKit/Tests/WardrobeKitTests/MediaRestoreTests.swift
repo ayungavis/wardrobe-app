@@ -179,106 +179,163 @@ struct MediaRestoreTests {
         #expect(rows.first?.attempts == 1, "a replayed feed page must not reset the backoff")
     }
 
-    // MARK: - Fixtures
+    // MARK: - Rows the server moved in a merge (T46)
 
-    private let itemID = UUID(uuid: (0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x2A))
+    @Test func aMovedFingerprintFollowsItsNewItem() throws {
+        let sut = try makeSUT()
+        let fingerprintID = UUID()
+        let newItemID = UUID()
+        try sut.applier.apply(page([fingerprintJSON(id: fingerprintID, itemID: itemID)]))
+        try sut.repository.commitStaged()
 
-    private struct SUT {
-        let applier: LocalRestoreService
-        let repository: SwiftDataWardrobeItemRepository
-        let completions: SwiftDataCompletedChallengeRepository
-        let downloads: StoredMediaDownloadRepository
-        let media: StubMediaRepository
-        let photos: SpyPhotoRepository
-        let previews: InMemoryCompletionPreviewRepository
-        let thumbnails: InMemoryGarmentThumbnailRepository
+        try sut.applier.apply(page([fingerprintJSON(id: fingerprintID, itemID: newItemID)]))
+        try sut.repository.commitStaged()
+
+        let owners = try sut.repository.fingerprints().map(\.itemID)
+        #expect(owners == [newItemID],
+                "a fingerprint the server moved must follow, or the survivor loses it forever")
     }
 
-    private func makeSUT() throws -> SUT {
-        let container = try ModelContainer(
-            for: SwiftDataWardrobeItemRepository.schema,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let context = ModelContext(container)
-        let repository = SwiftDataWardrobeItemRepository(context: context)
-        let completions = SwiftDataCompletedChallengeRepository(context: context)
-        let downloads = StoredMediaDownloadRepository(store: SwiftDataMediaDownloadStore(context: context))
-        let media = StubMediaRepository()
-        let photos = SpyPhotoRepository()
-        let previews = InMemoryCompletionPreviewRepository()
-        let thumbnails = InMemoryGarmentThumbnailRepository()
-        return SUT(
-            applier: LocalRestoreService(
-                wardrobe: repository, completions: completions,
-                preferences: CountingPreferencesRepository(),
-                downloads: downloads, media: media, photos: photos,
-                previews: previews, thumbnails: thumbnails
-            ),
-            repository: repository,
-            completions: completions,
-            downloads: downloads,
-            media: media,
-            photos: photos,
-            previews: previews,
-            thumbnails: thumbnails
-        )
-    }
+    @Test func aReplayedConflictCarriesItsResolution() throws {
+        let sut = try makeSUT()
+        let conflictID = UUID()
+        try sut.applier.apply(page([conflictJSON(id: conflictID, resolvedAt: nil)]))
+        try sut.repository.commitStaged()
+        #expect(try sut.repository.openConflicts().count == 1)
 
-    private func page(_ records: [String]) throws -> [ChangeDTO] {
-        let entries = records.enumerated().map { index, record in
-            "{\"changeSeq\":\(index + 1),\(record)}"
-        }
-        let json = "{\"changes\":[\(entries.joined(separator: ","))],\"nextSince\":\(records.count)}"
-        return try JSONDecoder.api.decode(GetChangesResponseDTO.self, from: Data(json.utf8)).changes
-    }
+        try sut.applier.apply(page([conflictJSON(id: conflictID, resolvedAt: "2026-08-25T12:00:00Z")]))
+        try sut.repository.commitStaged()
 
-    private func itemJSON() -> String {
-        #"""
-        "kind":"wardrobeItem","record":{"id":"\#(itemID)","category":"top","name":"coat",
-         "color":null,"garmentType":null,"description":null,
-         "attributeRevisions":{"name":{"rev":3}},"illustrationState":"none",
-         "currentIllustrationId":null,"changeSeq":1,"deletedAt":null}
-        """#
+        #expect(try sut.repository.openConflicts().isEmpty,
+                "the server said this conflict is settled; the client must not keep it open")
     }
+}
 
-    private func completionJSON(
-        id: UUID = UUID(), status: String = "canonical", derivativeID: UUID? = nil
-    ) -> String {
-        let derivative = derivativeID.map { "\"\($0)\"" } ?? "null"
-        return #"""
-        "kind":"challengeCompletion","record":{"id":"\#(id)","cardId":"\#(UUID())",
-         "status":"\#(status)","localDate":"2026-08-25","timeZone":"Asia/Makassar",
-         "completedAt":"2026-08-25T09:00:00Z","photoId":null,"currentDerivativeId":\#(derivative),
-         "changeSeq":1,"deletedAt":null}
-        """#
-    }
+// MARK: - Fixtures
 
-    private func canvasDocumentJSON(completionID: UUID, schemaVersion: Int = 1, mediaID: UUID = UUID()) -> String {
-        #"""
-        "kind":"canvasDocument","record":{"id":"\#(UUID())","completionId":"\#(completionID)",
-         "derivativeId":"\#(UUID())","schemaVersion":\#(schemaVersion),"mediaObjectId":"\#(mediaID)",
-         "historyMediaObjectId":null,"historyStepCount":null,"changeSeq":1,"deletedAt":null}
-        """#
-    }
+private let itemID: UUID = .init(uuid: (0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x2A))
 
-    private func derivativeJSON(id: UUID, mediaID: UUID = UUID()) -> String {
-        #"""
-        "kind":"photoDerivative","record":{"id":"\#(id)","photoId":"\#(UUID())",
-         "mediaObjectId":"\#(mediaID)","changeSeq":1,"deletedAt":null}
-        """#
-    }
+private struct SUT {
+    let applier: LocalRestoreService
+    let repository: SwiftDataWardrobeItemRepository
+    let completions: SwiftDataCompletedChallengeRepository
+    let downloads: StoredMediaDownloadRepository
+    let media: StubMediaRepository
+    let photos: SpyPhotoRepository
+    let previews: InMemoryCompletionPreviewRepository
+    let thumbnails: InMemoryGarmentThumbnailRepository
+}
 
-    private func photoJSON(id: UUID = UUID(), mediaID: UUID = UUID()) -> String {
-        #"""
-        "kind":"photo","record":{"id":"\#(id)","mediaObjectId":"\#(mediaID)","source":"camera",
-         "capturedAt":null,"changeSeq":1,"deletedAt":null}
-        """#
-    }
+@MainActor
+private func makeSUT() throws -> SUT {
+    let container = try ModelContainer(
+        for: SwiftDataWardrobeItemRepository.schema,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let context = ModelContext(container)
+    let repository = SwiftDataWardrobeItemRepository(context: context)
+    let completions = SwiftDataCompletedChallengeRepository(context: context)
+    let downloads = StoredMediaDownloadRepository(store: SwiftDataMediaDownloadStore(context: context))
+    let media = StubMediaRepository()
+    let photos = SpyPhotoRepository()
+    let previews = InMemoryCompletionPreviewRepository()
+    let thumbnails = InMemoryGarmentThumbnailRepository()
+    return SUT(
+        applier: LocalRestoreService(
+            wardrobe: repository, completions: completions,
+            preferences: CountingPreferencesRepository(),
+            downloads: downloads, media: media, photos: photos,
+            previews: previews, thumbnails: thumbnails
+        ),
+        repository: repository,
+        completions: completions,
+        downloads: downloads,
+        media: media,
+        photos: photos,
+        previews: previews,
+        thumbnails: thumbnails
+    )
+}
 
-    private func cutoutJSON(mediaID: UUID = UUID()) -> String {
-        #"""
-        "kind":"itemCutout","record":{"id":"\#(UUID())","itemId":"\#(itemID)",
-         "mediaObjectId":"\#(mediaID)","sourcePhotoId":null,"changeSeq":1,"deletedAt":null}
-        """#
+@MainActor
+private func page(_ records: [String]) throws -> [ChangeDTO] {
+    let entries = records.enumerated().map { index, record in
+        "{\"changeSeq\":\(index + 1),\(record)}"
     }
+    let json = "{\"changes\":[\(entries.joined(separator: ","))],\"nextSince\":\(records.count)}"
+    return try JSONDecoder.api.decode(GetChangesResponseDTO.self, from: Data(json.utf8)).changes
+}
+
+@MainActor
+private func fingerprintJSON(id: UUID, itemID: UUID) -> String {
+    #"""
+    "kind":"itemFingerprint","record":{"id":"\#(id)","itemId":"\#(itemID)",
+     "version":"v1","colorLab":[1,2,3],"aspectRatio":0.75,"featurePrint":"AP8=",
+     "maskQuality":0.9,"sourcePhotoId":null,"changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func conflictJSON(id: UUID, resolvedAt: String?) -> String {
+    let stamp = resolvedAt.map { "\"\($0)\"" } ?? "null"
+    return #"""
+    "kind":"wardrobeItemConflict","record":{"id":"\#(id)","itemId":"\#(itemID)",
+     "field":"name","value":"x","revision":1,"originDevice":null,"resolvedAt":\#(stamp),"changeSeq":1}
+    """#
+}
+
+@MainActor
+private func itemJSON() -> String {
+    #"""
+    "kind":"wardrobeItem","record":{"id":"\#(itemID)","category":"top","name":"coat",
+     "color":null,"garmentType":null,"description":null,
+     "attributeRevisions":{"name":{"rev":3}},"illustrationState":"none",
+     "currentIllustrationId":null,"changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func completionJSON(
+    id: UUID = UUID(), status: String = "canonical", derivativeID: UUID? = nil
+) -> String {
+    let derivative = derivativeID.map { "\"\($0)\"" } ?? "null"
+    return #"""
+    "kind":"challengeCompletion","record":{"id":"\#(id)","cardId":"\#(UUID())",
+     "status":"\#(status)","localDate":"2026-08-25","timeZone":"Asia/Makassar",
+     "completedAt":"2026-08-25T09:00:00Z","photoId":null,"currentDerivativeId":\#(derivative),
+     "changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func canvasDocumentJSON(completionID: UUID, schemaVersion: Int = 1, mediaID: UUID = UUID()) -> String {
+    #"""
+    "kind":"canvasDocument","record":{"id":"\#(UUID())","completionId":"\#(completionID)",
+     "derivativeId":"\#(UUID())","schemaVersion":\#(schemaVersion),"mediaObjectId":"\#(mediaID)",
+     "historyMediaObjectId":null,"historyStepCount":null,"changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func derivativeJSON(id: UUID, mediaID: UUID = UUID()) -> String {
+    #"""
+    "kind":"photoDerivative","record":{"id":"\#(id)","photoId":"\#(UUID())",
+     "mediaObjectId":"\#(mediaID)","changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func photoJSON(id: UUID = UUID(), mediaID: UUID = UUID()) -> String {
+    #"""
+    "kind":"photo","record":{"id":"\#(id)","mediaObjectId":"\#(mediaID)","source":"camera",
+     "capturedAt":null,"changeSeq":1,"deletedAt":null}
+    """#
+}
+
+@MainActor
+private func cutoutJSON(mediaID: UUID = UUID()) -> String {
+    #"""
+    "kind":"itemCutout","record":{"id":"\#(UUID())","itemId":"\#(itemID)",
+     "mediaObjectId":"\#(mediaID)","sourcePhotoId":null,"changeSeq":1,"deletedAt":null}
+    """#
 }

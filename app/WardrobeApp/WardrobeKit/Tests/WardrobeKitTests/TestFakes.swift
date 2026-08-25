@@ -84,6 +84,16 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedWears.filter { $0.itemID == itemID }
     }
 
+    func merge(winnerID: UUID, loserID: UUID) throws {
+        storedWears = storedWears.map { wear in
+            guard wear.itemID == loserID else { return wear }
+            return WearRecord(
+                id: wear.id, itemID: winnerID, completionID: wear.completionID, wornAt: wear.wornAt
+            )
+        }
+        storedItems.removeAll { $0.id == loserID }
+    }
+
     func openConflicts() throws -> [ItemConflict] {
         storedConflicts.filter { $0.resolvedAt == nil }
     }

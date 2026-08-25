@@ -8,6 +8,7 @@ public protocol WardrobeItemRepository: AnyObject {
     func wears(for itemID: UUID) throws -> [WearRecord]
     func openConflicts() throws -> [ItemConflict]
     func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws
+    func merge(winnerID: UUID, loserID: UUID) throws
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
     func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?)
     func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
@@ -152,11 +153,13 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
 
     func stageApply(fingerprint: ItemFingerprint) throws {
         let fingerprintID = fingerprint.id
-        var descriptor = FetchDescriptor<ItemFingerprintEntity>(
+        let descriptor = FetchDescriptor<ItemFingerprintEntity>(
             predicate: #Predicate { $0.id == fingerprintID }
         )
-        descriptor.fetchLimit = 1
-        guard try context.fetchCount(descriptor) == 0 else { return }
+        if let existing = try context.fetch(descriptor).first {
+            existing.itemID = fingerprint.itemID
+            return
+        }
         context.insert(ItemFingerprintEntity(fingerprint))
     }
 
@@ -253,7 +256,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         try outbox.stage(mutation.queued(), at: Date())
     }
 
-    private func buriedIdentifiers() throws -> Set<UUID> {
+    func buriedIdentifiers() throws -> Set<UUID> {
         let descriptor = FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.deletedAt != nil })
         return try Set(context.fetch(descriptor).map(\.id))
     }

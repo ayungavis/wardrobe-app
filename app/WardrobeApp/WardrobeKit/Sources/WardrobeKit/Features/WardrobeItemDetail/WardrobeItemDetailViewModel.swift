@@ -11,6 +11,7 @@ public final class WardrobeItemDetailViewModel {
     }
 
     public private(set) var isDeleted = false
+    private(set) var pendingMerge: SimilarItem?
     private(set) var state: Loadable<Detail> = .idle
     private(set) var loadTask: Task<Void, Never>?
 
@@ -120,6 +121,27 @@ public final class WardrobeItemDetailViewModel {
             try? thumbnails.delete(file: item.cutoutFile)
             isDeleted = true
             Log.ui.info("Wardrobe: item deleted")
+        } catch {
+            Log.report(error)
+        }
+    }
+
+    func requestMerge(_ entry: SimilarItem) {
+        pendingMerge = entry
+    }
+
+    func cancelMerge() {
+        pendingMerge = nil
+    }
+
+    func confirmMerge() {
+        guard let entry = pendingMerge else { return }
+        pendingMerge = nil
+        do {
+            try repository.merge(winnerID: itemID, loserID: entry.item.id)
+            try? thumbnails.delete(file: entry.item.cutoutFile)
+            Log.ui.info("Wardrobe: items merged")
+            load()
         } catch {
             Log.report(error)
         }

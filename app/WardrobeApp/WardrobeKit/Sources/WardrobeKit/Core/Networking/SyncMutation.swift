@@ -5,6 +5,7 @@ enum SyncMutation: Sendable {
 
     case upsertItem(UpsertItemArgsDTO)
     case deleteItem(DeleteItemArgsDTO)
+    case mergeItems(MergeItemsArgsDTO)
     case upsertPreferences(UpsertPreferencesArgsDTO)
     case resolveCompletion(ResolveCompletionArgsDTO)
     case completeChallenge(CompleteChallengeArgsDTO)
@@ -13,6 +14,7 @@ enum SyncMutation: Sendable {
         switch self {
         case .upsertItem: "upsertItem"
         case .deleteItem: "deleteItem"
+        case .mergeItems: "mergeItems"
         case .upsertPreferences: "upsertPreferences"
         case .resolveCompletion: "resolveCompletion"
         case .completeChallenge: Self.completeChallengeName
@@ -28,6 +30,7 @@ enum SyncMutation: Sendable {
         switch self {
         case let .upsertItem(args): return try encoder.encode(args)
         case let .deleteItem(args): return try encoder.encode(args)
+        case let .mergeItems(args): return try encoder.encode(args)
         case let .upsertPreferences(args): return try encoder.encode(args)
         case let .resolveCompletion(args): return try encoder.encode(args)
         case let .completeChallenge(args): return try encoder.encode(args)

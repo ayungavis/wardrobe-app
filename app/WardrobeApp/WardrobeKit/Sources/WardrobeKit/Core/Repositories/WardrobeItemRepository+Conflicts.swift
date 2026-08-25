@@ -12,9 +12,11 @@ extension SwiftDataWardrobeItemRepository {
         let siblings = try context.fetch(FetchDescriptor<ItemConflictEntity>(
             predicate: #Predicate { $0.itemID == itemID && $0.field == field && $0.revision == revision }
         ))
-        guard !siblings.contains(where: { $0.id == conflictID || $0.value == conflict.value }) else {
+        if let known = siblings.first(where: { $0.id == conflictID }) {
+            known.resolvedAt = known.resolvedAt ?? conflict.resolvedAt
             return
         }
+        guard !siblings.contains(where: { $0.value == conflict.value }) else { return }
         let entity = ItemConflictEntity(conflict)
         if try revision < localRev(of: conflict.field, itemID: itemID) {
             entity.resolvedAt = conflict.resolvedAt ?? Date()
@@ -39,7 +41,10 @@ extension SwiftDataWardrobeItemRepository {
             predicate: #Predicate { $0.resolvedAt == nil },
             sortBy: [SortDescriptor(\.revision)]
         )
-        return try context.fetch(descriptor).compactMap(\.domain)
+        let buried = try buriedIdentifiers()
+        return try context.fetch(descriptor)
+            .filter { !buried.contains($0.itemID) }
+            .compactMap(\.domain)
     }
 
     public func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws {

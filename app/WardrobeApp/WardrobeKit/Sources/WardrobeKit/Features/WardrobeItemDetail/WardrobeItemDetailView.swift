@@ -61,6 +61,14 @@ public struct WardrobeItemDetailView: View {
                         }
                         .padding(.horizontal, Spacing.lg)
                         .padding(.top, Spacing.md)
+
+                        timeline
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.top, Spacing.lg)
+
+                        similar
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.top, Spacing.lg)
                     }
                 }
                 .padding(.bottom, 100)
@@ -113,6 +121,27 @@ public struct WardrobeItemDetailView: View {
             } message: {
                 Text("wardrobe.detail.delete.message", bundle: .module)
             }
+            .confirmationDialog(
+                Text("wardrobe.detail.merge.title", bundle: .module),
+                isPresented: Binding(
+                    get: { viewModel.pendingMerge != nil },
+                    set: {
+                        if !$0 {
+                            viewModel.cancelMerge()
+                        }
+                    }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(role: .destructive) {
+                    viewModel.confirmMerge()
+                } label: {
+                    Text("wardrobe.detail.merge.action", bundle: .module)
+                }
+                Button(role: .cancel) {} label: { Text("common.cancel", bundle: .module) }
+            } message: {
+                Text("wardrobe.detail.merge.message", bundle: .module)
+            }
     }
 
     @ViewBuilder
@@ -136,7 +165,8 @@ public struct WardrobeItemDetailView: View {
                         ForEach(viewModel.similar) { entry in
                             SimilarItemCellView(
                                 entry: entry,
-                                data: viewModel.thumbnailData(for: entry.item)
+                                data: viewModel.thumbnailData(for: entry.item),
+                                onMerge: { viewModel.requestMerge(entry) }
                             )
                         }
                     }
@@ -146,26 +176,6 @@ public struct WardrobeItemDetailView: View {
     }
 
     // MARK: - Sections
-
-    private struct HeroView: View {
-        let data: Data?
-        let isEditing: Bool
-
-        var body: some View {
-            Group {
-                if let data {
-                    DownsampledPhotoView(data: data)
-                } else {
-                    Image(systemName: "tshirt")
-                        .font(.system(size: 48))
-                        .foregroundStyle(AppColor.textSecondary)
-                }
-            }
-            .frame(height: 240)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-    }
 
     private struct EditableInfoCardView: View {
         let isEditing: Bool

@@ -6103,6 +6103,86 @@
         }
       }
     },
+    "wardrobe.detail.merge.action": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge items"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gabungkan item"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.merge.button": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gabungkan"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.merge.hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge this duplicate into the item you are viewing"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gabungkan duplikat ini ke item yang sedang dilihat"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.merge.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The other item's wear history and matching data move here, and it leaves your wardrobe. This cannot be undone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riwayat pemakaian dan data pencocokan item satunya pindah ke sini, lalu item itu keluar dari lemari. Tidak bisa dibatalkan."
+          }
+        }
+      }
+    },
+    "wardrobe.detail.merge.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge these items?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gabungkan item ini?"
+          }
+        }
+      }
+    },
     "wardrobe.detail.name": {
       "extractionState": "manual",
       "localizations": {
