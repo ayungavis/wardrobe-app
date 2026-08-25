@@ -35,6 +35,7 @@ final class ServerChangeFeedRepository: ChangeFeedRepository {
     }
 
     func pull(limit: Int, applying applier: any RestoreService) async throws -> PullOutcome {
+        try cursor.align(interpretation: FeedInterpretation.version)
         var since = try cursor.position()
         var pages = 0
         var records = 0

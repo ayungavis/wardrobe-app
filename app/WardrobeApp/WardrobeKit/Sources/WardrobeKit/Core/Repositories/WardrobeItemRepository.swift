@@ -168,15 +168,6 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         context.insert(ItemFingerprintEntity(fingerprint))
     }
 
-    func hasItem(_ itemID: UUID) -> Bool {
-        fetchItem(itemID).map { $0.deletedAt == nil } ?? false
-    }
-
-    func needsCutout(itemID: UUID) -> Bool {
-        guard let entity = fetchItem(itemID) else { return false }
-        return entity.cutoutPath.isEmpty && entity.deletedAt == nil
-    }
-
     func stageCutout(itemID: UUID, path: String) {
         fetchItem(itemID)?.cutoutPath = path
     }

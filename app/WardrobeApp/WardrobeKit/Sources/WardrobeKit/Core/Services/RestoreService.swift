@@ -4,6 +4,14 @@ import Foundation
 // domain types yet — T45 owns that and will know which ones it needs. It must
 // write through the store's own ModelContext and never save; the cursor's save
 // is what makes the page and its position land together.
+// The feed is incremental: a record the client has already consumed never
+// arrives again. Raise this number in the same commit whenever the applier
+// starts reading a field or kind it used to drop — that rewinds every device's
+// cursor once so the old records are re-read under the new reading.
+enum FeedInterpretation {
+    static let version = 1
+}
+
 @MainActor
 protocol RestoreService: AnyObject {
     func apply(_ changes: [ChangeDTO]) throws
@@ -219,7 +227,7 @@ final class LocalRestoreService: RestoreService {
     }
 
     private func applyIllustration(_ record: ItemIllustrationRecordDTO) {
-        guard record.deletedAt == nil, wardrobe.hasItem(record.itemId),
+        guard record.deletedAt == nil,
               (try? thumbnails.data(forFile: "\(record.id.uuidString).png")) == nil
         else {
             return
@@ -231,7 +239,7 @@ final class LocalRestoreService: RestoreService {
     }
 
     private func applyCutout(_ record: ItemCutoutRecordDTO) {
-        guard record.deletedAt == nil, wardrobe.needsCutout(itemID: record.itemId) else { return }
+        guard record.deletedAt == nil else { return }
         downloads.stage(MediaDownload(
             id: record.mediaObjectId,
             destination: .itemCutout(itemID: record.itemId)

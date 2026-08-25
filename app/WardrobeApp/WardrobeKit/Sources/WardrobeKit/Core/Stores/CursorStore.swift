@@ -8,6 +8,7 @@ public protocol CursorStore: AnyObject {
     func commit() throws
     func discard()
     func reset() throws
+    func align(interpretation version: Int) throws
 }
 
 // MARK: - SwiftData
@@ -40,6 +41,18 @@ public final class SwiftDataCursorStore: CursorStore {
         context.rollback()
     }
 
+    public func align(interpretation version: Int) throws {
+        guard let entity = try entity() else {
+            context.insert(SyncCursorEntity(position: 0, interpretation: version))
+            try context.save()
+            return
+        }
+        guard entity.interpretation != version else { return }
+        entity.position = 0
+        entity.interpretation = version
+        try context.save()
+    }
+
     public func reset() throws {
         try context.delete(model: SyncCursorEntity.self)
         try context.save()
@@ -57,9 +70,11 @@ final class SyncCursorEntity {
     #Unique<SyncCursorEntity>([\.name])
     private(set) var name: String = "changes"
     var position: Int64 = 0
+    var interpretation: Int = 0
 
-    init(position: Int64) {
+    init(position: Int64, interpretation: Int = 0) {
         name = "changes"
         self.position = position
+        self.interpretation = interpretation
     }
 }

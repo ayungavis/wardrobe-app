@@ -114,8 +114,21 @@ final class InMemoryOutboxStore: OutboxStore {
 
 @MainActor
 final class InMemoryCursorStore: CursorStore {
-    private var committed: Int64 = 0
+    private(set) var committed: Int64 = 0
+    private(set) var interpretation = 0
     private var staged: Int64?
+
+    func align(interpretation version: Int) throws {
+        guard interpretation != version else { return }
+        interpretation = version
+        committed = 0
+        staged = nil
+    }
+
+    func seed(position: Int64, interpretation version: Int) {
+        committed = position
+        interpretation = version
+    }
 
     func position() throws -> Int64 {
         committed

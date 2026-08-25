@@ -5,6 +5,31 @@ import Testing
 
 @MainActor
 struct ChangeFeedTests {
+    @Test func aNewInterpretationRewindsTheCursorOnce() async throws {
+        let client = StubFeedClient()
+        client.pages = Array(repeating: #"{"changes":[],"nextSince":0}"#, count: 2)
+        let cursor = InMemoryCursorStore()
+        cursor.seed(position: 18, interpretation: 0)
+        let feed = ServerChangeFeedRepository(client: client, cursor: cursor)
+
+        _ = try await feed.pull(applying: NoopRestoreService())
+
+        #expect(client.requested == [0],
+                "records the old build consumed and dropped never come back on their own")
+    }
+
+    @Test func anUnchangedInterpretationKeepsTheCursorWhereItIs() async throws {
+        let client = StubFeedClient()
+        client.pages = [#"{"changes":[],"nextSince":18}"#]
+        let cursor = InMemoryCursorStore()
+        cursor.seed(position: 18, interpretation: FeedInterpretation.version)
+        let feed = ServerChangeFeedRepository(client: client, cursor: cursor)
+
+        _ = try await feed.pull(applying: NoopRestoreService())
+
+        #expect(client.requested == [18], "a rewind on every launch would re-pull the world")
+    }
+
     // MARK: - The cursor rule
 
     @Test func aFailedApplyLeavesTheCursorWhereItWas() async throws {
