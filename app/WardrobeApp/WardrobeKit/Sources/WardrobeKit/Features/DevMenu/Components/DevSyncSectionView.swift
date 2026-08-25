@@ -38,7 +38,7 @@ struct DevSyncSectionView: View {
         case .idle: "never"
         case .loading: "reconciling…"
         case let .loaded(outcome):
-            "sent \(outcome.pushed), rejected \(outcome.rejected), pulled \(outcome.pulled)"
+            "sent \(outcome.pushed), rejected \(outcome.rejected), pulled \(outcome.pulled), fetched \(outcome.downloaded)"
         case let .failed(error): "FAILED — \(error)"
         }
     }

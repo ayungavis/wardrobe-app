@@ -149,6 +149,47 @@ public final class SwiftDataCompletedChallengeRepository: CompletedChallengeRepo
         try context.save()
     }
 
+    func stageRestore(_ restored: RestoredCompletion, card: ChallengeCard) {
+        if let entity = stored().first(where: { $0.id == restored.id }) {
+            entity.status = restored.status.rawValue
+            entity.currentDerivativeID = restored.derivativeID
+            return
+        }
+        guard let cardData = try? JSONEncoder().encode(card) else {
+            Log.report(AppError.unexpected)
+            return
+        }
+        let entity = CompletionEntity.restored(restored, cardData: cardData)
+        context.insert(entity)
+    }
+
+    func needsDocument(id: UUID) -> Bool {
+        guard let entity = stored().first(where: { $0.id == id }) else { return false }
+        return entity.documentState != DocumentState.available.rawValue || entity.document.isEmpty
+    }
+
+    func completionID(forDerivative derivativeID: UUID) -> UUID? {
+        stored().first { $0.currentDerivativeID == derivativeID && $0.previewFile == nil }?.id
+    }
+
+    func stagePreview(id: UUID, file: String) {
+        stored().first { $0.id == id }?.previewFile = file
+    }
+
+    func stageDocument(id: UUID, _ document: EditorDocument) {
+        guard let entity = stored().first(where: { $0.id == id }),
+              let data = try? JSONEncoder().encode(document)
+        else {
+            return
+        }
+        entity.document = data
+        entity.documentState = DocumentState.available.rawValue
+    }
+
+    func stageDocumentState(id: UUID, _ state: DocumentState) {
+        stored().first { $0.id == id }?.documentState = state.rawValue
+    }
+
     public func removeCompletions(on date: Date) {
         for entity in stored() where calendar.isDate(entity.completedAt, inSameDayAs: date) {
             context.delete(entity)
@@ -185,6 +226,8 @@ final class CompletionEntity {
     var previewFile: String?
     var syncQueuedAt: Date?
     var status: String = CompletionStatus.canonical.rawValue
+    var documentState: String = DocumentState.available.rawValue
+    var currentDerivativeID: UUID?
     var card: Data = Data()
     var document: Data = Data()
 
@@ -200,15 +243,37 @@ final class CompletionEntity {
         previewFile = completion.previewFile
         syncQueuedAt = completion.syncQueuedAt
         status = completion.status.rawValue
+        documentState = completion.documentState.rawValue
         self.card = card
         self.document = document
     }
 
+    private init() {}
+
+    static func restored(_ restored: RestoredCompletion, cardData: Data) -> CompletionEntity {
+        let entity = CompletionEntity()
+        entity.id = restored.id
+        entity.photoID = restored.photoID ?? restored.id
+        entity.completedAt = restored.completedAt
+        entity.status = restored.status.rawValue
+        entity.documentState = DocumentState.pending.rawValue
+        entity.currentDerivativeID = restored.derivativeID
+        entity.card = cardData
+        entity.document = Data()
+        return entity
+    }
+
     var domain: CompletedChallenge? {
-        guard let card = try? JSONDecoder().decode(ChallengeCard.self, from: card),
-              let document = try? JSONDecoder().decode(EditorDocument.self, from: document)
-        else {
-            return nil
+        guard let card = try? JSONDecoder().decode(ChallengeCard.self, from: card) else { return nil }
+        let state = DocumentState(rawValue: documentState) ?? .available
+        let document: EditorDocument
+        if state == .available {
+            guard let decoded = try? JSONDecoder().decode(EditorDocument.self, from: self.document) else {
+                return nil
+            }
+            document = decoded
+        } else {
+            document = EditorDocument(id: id, layers: [])
         }
         var completion = CompletedChallenge(
             id: id, card: card, photoID: photoID, document: document,
@@ -216,6 +281,7 @@ final class CompletionEntity {
         )
         completion.syncQueuedAt = syncQueuedAt
         completion.status = CompletionStatus(rawValue: status) ?? .canonical
+        completion.documentState = state
         return completion
     }
 }

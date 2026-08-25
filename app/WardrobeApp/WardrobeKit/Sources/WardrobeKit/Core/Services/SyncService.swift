@@ -13,6 +13,7 @@ struct ReconcileOutcome: Sendable, Equatable {
     var pushed = 0
     var rejected = 0
     var pulled = 0
+    var downloaded = 0
     var pushError: AppError?
     var pullError: AppError?
 }
@@ -96,6 +97,11 @@ final class ServerSyncService: SyncService {
 
         do {
             outcome.pulled = try await feed.pull(applying: applier).records
+            let fetched = await applier.restoreDueMedia(at: Date())
+            outcome.downloaded = fetched.restored
+            if let fatal = fetched.fatal, outcome.pullError == nil {
+                outcome.pullError = fatal
+            }
         } catch {
             Log.report(
                 error,

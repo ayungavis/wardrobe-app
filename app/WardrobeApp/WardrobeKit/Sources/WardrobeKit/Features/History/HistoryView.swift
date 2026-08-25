@@ -75,10 +75,18 @@ public struct HistoryView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if viewModel.openConflictCount > 0 {
-                ConflictsBannerView(count: viewModel.openConflictCount) {
-                    isConflictsPresented = true
+            VStack(spacing: 0) {
+                if viewModel.mediaRestoreRemaining > 0 {
+                    RestoreBannerView(
+                        remaining: viewModel.mediaRestoreRemaining,
+                        failed: viewModel.mediaRestoreFailed,
+                        onRetry: {
+                            viewModel.retryFailedRestores()
+                            Task { await container.syncCoordinator.reconcile(.manual) }
+                        }
+                    )
                 }
+                conflictsBanner
             }
         }
         .sheet(
@@ -87,6 +95,15 @@ public struct HistoryView: View {
             content: { ConflictsView(viewModel: container.makeConflictsViewModel()) }
         )
         .task { viewModel.load() }
+    }
+
+    @ViewBuilder
+    private var conflictsBanner: some View {
+        if viewModel.openConflictCount > 0 {
+            ConflictsBannerView(count: viewModel.openConflictCount) {
+                isConflictsPresented = true
+            }
+        }
     }
 
     private var header: some View {

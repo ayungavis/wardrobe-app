@@ -147,6 +147,11 @@ struct RestoreServiceTests {
         let repository: SwiftDataWardrobeItemRepository
         let completions: SwiftDataCompletedChallengeRepository
         let preferences: CountingPreferencesRepository
+        let downloads: StoredMediaDownloadRepository
+        let media: StubMediaRepository
+        let photos: SpyPhotoRepository
+        let previews: InMemoryCompletionPreviewRepository
+        let thumbnails: InMemoryGarmentThumbnailRepository
     }
 
     private func makeSUT() throws -> SUT {
@@ -158,13 +163,25 @@ struct RestoreServiceTests {
         let repository = SwiftDataWardrobeItemRepository(context: context)
         let completions = SwiftDataCompletedChallengeRepository(context: context)
         let preferences = CountingPreferencesRepository()
+        let downloads = StoredMediaDownloadRepository(store: SwiftDataMediaDownloadStore(context: context))
+        let media = StubMediaRepository()
+        let photos = SpyPhotoRepository()
+        let previews = InMemoryCompletionPreviewRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
         return SUT(
             applier: LocalRestoreService(
-                wardrobe: repository, completions: completions, preferences: preferences
+                wardrobe: repository, completions: completions, preferences: preferences,
+                downloads: downloads, media: media, photos: photos,
+                previews: previews, thumbnails: thumbnails
             ),
             repository: repository,
             completions: completions,
-            preferences: preferences
+            preferences: preferences,
+            downloads: downloads,
+            media: media,
+            photos: photos,
+            previews: previews,
+            thumbnails: thumbnails
         )
     }
 
@@ -210,12 +227,44 @@ struct RestoreServiceTests {
         """#
     }
 
-    private func completionJSON(id: UUID = UUID(), status: String = "canonical") -> String {
-        #"""
+    private func completionJSON(
+        id: UUID = UUID(), status: String = "canonical", derivativeID: UUID? = nil
+    ) -> String {
+        let derivative = derivativeID.map { "\"\($0)\"" } ?? "null"
+        return #"""
         "kind":"challengeCompletion","record":{"id":"\#(id)","cardId":"\#(UUID())",
          "status":"\#(status)","localDate":"2026-08-25","timeZone":"Asia/Makassar",
-         "completedAt":"2026-08-25T09:00:00Z","photoId":null,"currentDerivativeId":null,
+         "completedAt":"2026-08-25T09:00:00Z","photoId":null,"currentDerivativeId":\#(derivative),
          "changeSeq":1,"deletedAt":null}
+        """#
+    }
+
+    private func canvasDocumentJSON(completionID: UUID, schemaVersion: Int = 1, mediaID: UUID = UUID()) -> String {
+        #"""
+        "kind":"canvasDocument","record":{"id":"\#(UUID())","completionId":"\#(completionID)",
+         "derivativeId":"\#(UUID())","schemaVersion":\#(schemaVersion),"mediaObjectId":"\#(mediaID)",
+         "historyMediaObjectId":null,"historyStepCount":null,"changeSeq":1,"deletedAt":null}
+        """#
+    }
+
+    private func derivativeJSON(id: UUID, mediaID: UUID = UUID()) -> String {
+        #"""
+        "kind":"photoDerivative","record":{"id":"\#(id)","photoId":"\#(UUID())",
+         "mediaObjectId":"\#(mediaID)","changeSeq":1,"deletedAt":null}
+        """#
+    }
+
+    private func photoJSON(id: UUID = UUID(), mediaID: UUID = UUID()) -> String {
+        #"""
+        "kind":"photo","record":{"id":"\#(id)","mediaObjectId":"\#(mediaID)","source":"camera",
+         "capturedAt":null,"changeSeq":1,"deletedAt":null}
+        """#
+    }
+
+    private func cutoutJSON(mediaID: UUID = UUID()) -> String {
+        #"""
+        "kind":"itemCutout","record":{"id":"\#(UUID())","itemId":"\#(itemID)",
+         "mediaObjectId":"\#(mediaID)","sourcePhotoId":null,"changeSeq":1,"deletedAt":null}
         """#
     }
 

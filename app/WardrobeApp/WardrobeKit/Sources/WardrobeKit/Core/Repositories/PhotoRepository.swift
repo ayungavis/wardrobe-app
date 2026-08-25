@@ -3,6 +3,8 @@ import Foundation
 public protocol PhotoRepository: Sendable {
     @discardableResult
     func saveOriginal(_ data: Data) throws -> UUID
+    func saveOriginal(_ data: Data, id: UUID) throws
+    func hasOriginal(id: UUID) -> Bool
     func loadOriginal(id: UUID) throws -> Data
     func deleteOriginal(id: UUID) throws
 }
@@ -36,14 +38,22 @@ public final class FilePhotoRepository: PhotoRepository, @unchecked Sendable {
     }
 
     public func saveOriginal(_ data: Data) throws -> UUID {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let id = UUID.v7()
+        try saveOriginal(data, id: id)
+        return id
+    }
+
+    public func saveOriginal(_ data: Data, id: UUID) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var options: Data.WritingOptions = [.atomic]
         #if os(iOS)
             options.insert(.completeFileProtection)
         #endif
         try data.write(to: fileURL(id), options: options)
-        return id
+    }
+
+    public func hasOriginal(id: UUID) -> Bool {
+        FileManager.default.fileExists(atPath: fileURL(id).path)
     }
 
     public func loadOriginal(id: UUID) throws -> Data {

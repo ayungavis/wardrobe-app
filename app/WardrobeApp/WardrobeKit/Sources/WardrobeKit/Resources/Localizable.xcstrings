@@ -4919,6 +4919,38 @@
         }
       }
     },
+    "history.detail.document.pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only — the edited version is still being restored."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya-lihat — versi suntingan masih dipulihkan."
+          }
+        }
+      }
+    },
+    "history.detail.document.unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only — this was edited in a newer version of the app."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hanya-lihat — ini disunting di versi aplikasi yang lebih baru."
+          }
+        }
+      }
+    },
     "history.detail.garments.empty": {
       "extractionState": "manual",
       "localizations": {
@@ -4982,6 +5014,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada\noutfit tercatat"
+          }
+        }
+      }
+    },
+    "history.restore.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d media downloads failed"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d unduhan media gagal"
+          }
+        }
+      }
+    },
+    "history.restore.remaining": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restoring media — %d left"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memulihkan media — %d tersisa"
+          }
+        }
+      }
+    },
+    "history.restore.retry": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coba lagi"
+          }
+        }
+      }
+    },
+    "history.restored.prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A restored challenge"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tantangan yang dipulihkan"
           }
         }
       }

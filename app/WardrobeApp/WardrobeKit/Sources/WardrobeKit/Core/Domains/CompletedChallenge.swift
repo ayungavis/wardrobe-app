@@ -6,6 +6,37 @@ public enum CompletionStatus: String, Codable, Sendable {
     case superseded
 }
 
+public enum DocumentState: String, Codable, Sendable {
+    case available
+    case pending
+    case unsupported
+}
+
+public struct RestoredCompletion: Sendable, Equatable {
+    public let id: UUID
+    public let cardID: UUID
+    public let status: CompletionStatus
+    public let completedAt: Date
+    public let photoID: UUID?
+    public let derivativeID: UUID?
+
+    public init(
+        id: UUID,
+        cardID: UUID,
+        status: CompletionStatus,
+        completedAt: Date,
+        photoID: UUID?,
+        derivativeID: UUID?
+    ) {
+        self.id = id
+        self.cardID = cardID
+        self.status = status
+        self.completedAt = completedAt
+        self.photoID = photoID
+        self.derivativeID = derivativeID
+    }
+}
+
 public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let card: ChallengeCard
@@ -15,6 +46,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public var previewFile: String?
     public var syncQueuedAt: Date?
     public var status: CompletionStatus = .canonical
+    public var documentState: DocumentState = .available
 
     public init(
         id: UUID = UUID(),
@@ -33,7 +65,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, card, photoID, document, completedAt, previewFile, status
+        case id, card, photoID, document, completedAt, previewFile, status, documentState
         case draft
     }
 
@@ -45,6 +77,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
         completedAt = try container.decode(Date.self, forKey: .completedAt)
         previewFile = try container.decodeIfPresent(String.self, forKey: .previewFile)
         status = try container.decodeIfPresent(CompletionStatus.self, forKey: .status) ?? .canonical
+        documentState = try container.decodeIfPresent(DocumentState.self, forKey: .documentState) ?? .available
 
         if let document = try container.decodeIfPresent(EditorDocument.self, forKey: .document) {
             self.document = document
@@ -63,5 +96,6 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
         try container.encode(completedAt, forKey: .completedAt)
         try container.encodeIfPresent(previewFile, forKey: .previewFile)
         try container.encode(status, forKey: .status)
+        try container.encode(documentState, forKey: .documentState)
     }
 }

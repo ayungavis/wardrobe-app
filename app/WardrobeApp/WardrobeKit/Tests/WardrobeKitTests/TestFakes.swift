@@ -225,6 +225,17 @@ final class SpyPhotoRepository: PhotoRepository, @unchecked Sendable {
         return id
     }
 
+    func saveOriginal(_ data: Data, id: UUID) throws {
+        if let saveError {
+            throw saveError
+        }
+        saved[id] = data
+    }
+
+    func hasOriginal(id: UUID) -> Bool {
+        saved[id] != nil
+    }
+
     func loadOriginal(id: UUID) throws -> Data {
         guard let data = saved[id] else { throw AppError.unexpected }
         return data

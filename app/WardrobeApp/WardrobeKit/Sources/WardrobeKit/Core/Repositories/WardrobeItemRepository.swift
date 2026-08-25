@@ -36,6 +36,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
             WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self,
             OutboxEntryEntity.self, SyncCursorEntity.self, DiagnosticEntryEntity.self,
             CompletionEntity.self, MediaUploadEntity.self, ItemConflictEntity.self,
+            MediaDownloadEntity.self,
         ])
     }
 
@@ -161,6 +162,21 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
 
     func stageInsert(fingerprint: ItemFingerprint) {
         context.insert(ItemFingerprintEntity(fingerprint))
+    }
+
+    func needsCutout(itemID: UUID) -> Bool {
+        let entity = try? context.fetch(
+            FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+        ).first
+        guard let entity else { return false }
+        return entity.cutoutPath.isEmpty && entity.deletedAt == nil
+    }
+
+    func stageCutout(itemID: UUID, path: String) {
+        let entity = try? context.fetch(
+            FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+        ).first
+        entity?.cutoutPath = path
     }
 
     func stageInsert(wear: WearRecord) {

@@ -228,6 +228,10 @@ final class RefusingThumbnailRepository: GarmentThumbnailRepository, @unchecked 
         throw AppError.unexpected
     }
 
+    func save(_: Data, id _: UUID) throws -> String {
+        throw AppError.unexpected
+    }
+
     func data(forFile _: String) throws -> Data {
         throw AppError.unexpected
     }

@@ -25,6 +25,7 @@ public extension AppContainer {
             active: activeChallengeRepository,
             media: makeMediaRepository(),
             uploads: makeMediaUploadRepository(),
+            downloads: makeMediaDownloadRepository(),
             outbox: makeOutboxRepository(),
             diagnostics: diagnostics,
             cursor: SwiftDataCursorStore(context: Self.wardrobeContext)

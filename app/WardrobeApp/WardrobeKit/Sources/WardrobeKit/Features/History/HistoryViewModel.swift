@@ -9,12 +9,15 @@ public final class HistoryViewModel {
     private let completedRepository: CompletedChallengeRepository
     private(set) var syncStates: [UUID: SyncState] = [:]
     private(set) var openConflictCount = 0
+    private(set) var mediaRestoreRemaining = 0
+    private(set) var mediaRestoreFailed = 0
     private let outbox: any OutboxRepository
     private let uploads: any MediaUploadRepository
     private let photoRepository: PhotoRepository
     private let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
     private let previews: CompletionPreviewRepository
+    private let downloads: (any MediaDownloadRepository)?
     private var renderedPreviews: [UUID: Data] = [:]
 
     public init(
@@ -24,7 +27,8 @@ public final class HistoryViewModel {
         photoRepository: PhotoRepository,
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
-        previews: CompletionPreviewRepository
+        previews: CompletionPreviewRepository,
+        downloads: (any MediaDownloadRepository)? = nil
     ) {
         self.completedRepository = completedRepository
         self.outbox = outbox
@@ -33,6 +37,12 @@ public final class HistoryViewModel {
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
         self.previews = previews
+        self.downloads = downloads
+    }
+
+    public func retryFailedRestores() {
+        try? downloads?.retryFailed(at: Date())
+        load()
     }
 
     public func load() {
@@ -41,6 +51,9 @@ public final class HistoryViewModel {
         openConflictCount = ConflictCounting.openCount(
             wardrobe: wardrobeRepository, completions: completedRepository
         )
+        let queued = (try? downloads?.entries()) ?? []
+        mediaRestoreFailed = queued.count { $0.state == .failed }
+        mediaRestoreRemaining = queued.count
         renderedPreviews = [:]
     }
 

@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 public protocol GarmentThumbnailRepository: Sendable {
     @discardableResult
     func save(_ image: CGImage, id: UUID) throws -> String
+    @discardableResult
+    func save(_ data: Data, id: UUID) throws -> String
     func data(forFile file: String) throws -> Data
     func delete(file: String) throws
     func deleteAll() throws
@@ -20,6 +22,13 @@ public final class FileGarmentThumbnailRepository: GarmentThumbnailRepository, @
     }
 
     @discardableResult
+    public func save(_ data: Data, id: UUID) throws -> String {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = "\(id.uuidString).png"
+        try data.write(to: directory.appending(path: file), options: [.atomic])
+        return file
+    }
+
     public func save(_ image: CGImage, id: UUID) throws -> String {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let file = "\(id.uuidString).png"

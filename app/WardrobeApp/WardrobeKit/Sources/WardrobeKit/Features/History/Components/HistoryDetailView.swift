@@ -65,6 +65,17 @@ public struct HistoryDetailView: View {
                         Text(completion.completedAt, format: .dateTime.day().month(.wide).year())
                     }
 
+                    if completion.documentState != .available {
+                        Text(
+                            completion.documentState == .pending
+                                ? "history.detail.document.pending"
+                                : "history.detail.document.unsupported",
+                            bundle: .module
+                        )
+                        .font(AppFont.caption)
+                        .foregroundColor(AppColor.textSecondary)
+                    }
+
                     VStack(alignment: .leading, spacing: 6) {
                         label("history.detail.description")
                         Text(completion.card.prompt)

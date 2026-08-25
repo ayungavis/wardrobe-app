@@ -46,6 +46,12 @@ final class InMemoryGarmentThumbnailRepository: GarmentThumbnailRepository, @unc
         return file
     }
 
+    func save(_ data: Data, id: UUID) throws -> String {
+        let file = "\(id.uuidString).png"
+        files[file] = data
+        return file
+    }
+
     func data(forFile file: String) throws -> Data {
         guard let data = files[URL(filePath: file).lastPathComponent] else { throw AppError.unexpected }
         return data
@@ -222,7 +228,16 @@ final class StubMediaRepository: MediaRepository {
         uploadedIDs.append(id)
     }
 
-    func data(for _: UUID) async throws -> Data {
+    var downloads: [UUID: Data] = [:]
+    var failingIDs: Set<UUID> = []
+
+    func data(for id: UUID) async throws -> Data {
+        if failingIDs.contains(id) {
+            throw AppError.unavailable
+        }
+        if let data = downloads[id] {
+            return data
+        }
         throw AppError.unexpected
     }
 

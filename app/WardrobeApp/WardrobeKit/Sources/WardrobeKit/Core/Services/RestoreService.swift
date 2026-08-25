@@ -7,6 +7,7 @@ import Foundation
 @MainActor
 protocol RestoreService: AnyObject {
     func apply(_ changes: [ChangeDTO]) throws
+    func restoreDueMedia(at date: Date) async -> (restored: Int, fatal: AppError?)
 }
 
 // ponytail: T38 reads the feed and moves the cursor; nothing applies yet. T45
@@ -15,22 +16,41 @@ protocol RestoreService: AnyObject {
 @MainActor
 final class NoopRestoreService: RestoreService {
     func apply(_: [ChangeDTO]) throws {}
+
+    func restoreDueMedia(at _: Date) async -> (restored: Int, fatal: AppError?) {
+        (0, nil)
+    }
 }
 
 @MainActor
 final class LocalRestoreService: RestoreService {
     private let wardrobe: SwiftDataWardrobeItemRepository
-    private let completions: any CompletedChallengeRepository
+    private let completions: SwiftDataCompletedChallengeRepository
     private let preferences: any AccountPreferencesRepository
+    private let downloads: any MediaDownloadRepository
+    private let media: any MediaRepository
+    private let photos: any PhotoRepository
+    private let previews: any CompletionPreviewRepository
+    private let thumbnails: any GarmentThumbnailRepository
 
     init(
         wardrobe: SwiftDataWardrobeItemRepository,
-        completions: any CompletedChallengeRepository,
-        preferences: any AccountPreferencesRepository
+        completions: SwiftDataCompletedChallengeRepository,
+        preferences: any AccountPreferencesRepository,
+        downloads: any MediaDownloadRepository,
+        media: any MediaRepository,
+        photos: any PhotoRepository,
+        previews: any CompletionPreviewRepository,
+        thumbnails: any GarmentThumbnailRepository
     ) {
         self.wardrobe = wardrobe
         self.completions = completions
         self.preferences = preferences
+        self.downloads = downloads
+        self.media = media
+        self.photos = photos
+        self.previews = previews
+        self.thumbnails = thumbnails
     }
 
     func apply(_ changes: [ChangeDTO]) throws {
@@ -45,6 +65,7 @@ final class LocalRestoreService: RestoreService {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func apply(_ change: ChangeDTO) throws -> String? {
         switch change.record {
         case let .wardrobeItem(record):
@@ -56,11 +77,19 @@ final class LocalRestoreService: RestoreService {
         case let .accountPreference(record):
             applyPreference(record)
         case let .challengeCompletion(record):
-            return applyStatus(record) ? nil : "completion-pending-media"
+            return applyCompletion(record)
         case let .wardrobeItemConflict(record):
             return try applyConflict(record) ? nil : "conflict-field"
-        case .canvasDocument, .photo, .photoDerivative, .itemCutout, .itemIllustration:
-            return "media-backed"
+        case let .canvasDocument(record):
+            applyDocument(record)
+        case let .photoDerivative(record):
+            applyDerivative(record)
+        case let .photo(record):
+            applyPhoto(record)
+        case let .itemCutout(record):
+            applyCutout(record)
+        case .itemIllustration:
+            break
         case .activeChallenge:
             return "activeChallenge"
         case let .unrecognised(kind):
@@ -133,9 +162,118 @@ final class LocalRestoreService: RestoreService {
         return true
     }
 
-    private func applyStatus(_ record: ChallengeCompletionRecordDTO) -> Bool {
-        guard let status = CompletionStatus(rawValue: record.status) else { return false }
-        return completions.stageStatus(id: record.id, status: status)
+    private func applyCompletion(_ record: ChallengeCompletionRecordDTO) -> String? {
+        guard record.deletedAt == nil else { return "completion-tombstone" }
+        guard let status = CompletionStatus(rawValue: record.status) else { return "completion-status" }
+        completions.stageRestore(
+            RestoredCompletion(
+                id: record.id, cardID: record.cardId, status: status,
+                completedAt: record.completedAt, photoID: record.photoId,
+                derivativeID: record.currentDerivativeId
+            ),
+            card: Self.card(for: record.cardId)
+        )
+        return nil
+    }
+
+    private static func card(for id: UUID) -> ChallengeCard {
+        guard id != ChallengeCard.freestyle.id else { return .freestyle }
+        return ChallengeCard(
+            id: id,
+            prompt: String(localized: "history.restored.prompt", bundle: .module)
+        )
+    }
+
+    private func applyDocument(_ record: CanvasDocumentRecordDTO) {
+        guard record.deletedAt == nil else { return }
+        guard record.schemaVersion <= Int32(EditorDocument.currentSchemaVersion) else {
+            completions.stageDocumentState(id: record.completionId, .unsupported)
+            return
+        }
+        guard completions.needsDocument(id: record.completionId) else { return }
+        downloads.stage(MediaDownload(
+            id: record.mediaObjectId,
+            destination: .completionDocument(completionID: record.completionId)
+        ))
+    }
+
+    private func applyDerivative(_ record: PhotoDerivativeRecordDTO) {
+        guard record.deletedAt == nil,
+              let completionID = completions.completionID(forDerivative: record.id)
+        else {
+            return
+        }
+        downloads.stage(MediaDownload(
+            id: record.mediaObjectId,
+            destination: .completionPreview(completionID: completionID)
+        ))
+    }
+
+    private func applyPhoto(_ record: PhotoRecordDTO) {
+        guard record.deletedAt == nil, !photos.hasOriginal(id: record.id) else { return }
+        downloads.stage(MediaDownload(
+            id: record.mediaObjectId,
+            destination: .photoOriginal(photoID: record.id)
+        ))
+    }
+
+    private func applyCutout(_ record: ItemCutoutRecordDTO) {
+        guard record.deletedAt == nil, wardrobe.needsCutout(itemID: record.itemId) else { return }
+        downloads.stage(MediaDownload(
+            id: record.mediaObjectId,
+            destination: .itemCutout(itemID: record.itemId)
+        ))
+    }
+
+    func restoreDueMedia(at date: Date) async -> (restored: Int, fatal: AppError?) {
+        let due = (try? downloads.due(at: date, limit: SyncBatching.maxMutations)) ?? []
+        var restored = 0
+        for row in due {
+            do {
+                let bytes = try await media.data(for: row.id)
+                try write(bytes, to: row.destination)
+                try downloads.acknowledge(id: row.id)
+                restored += 1
+            } catch is CancellationError {
+                return (restored, nil)
+            } catch AppError.sessionExpired {
+                return (restored, .sessionExpired)
+            } catch AppError.documentFromNewerApp {
+                markUnsupported(row)
+            } catch {
+                let failure = AppError(wrapping: error)
+                Log.report(failure, context: Log.Context(operation: "restore.download"), logger: Log.network)
+                try? downloads.recordFailure(of: row.id, error: failure, code: nil, at: date)
+            }
+        }
+        return (restored, nil)
+    }
+
+    private func write(_ bytes: Data, to destination: MediaDownloadDestination) throws {
+        switch destination {
+        case let .completionPreview(completionID):
+            let file = try previews.save(bytes, id: completionID)
+            completions.stagePreview(id: completionID, file: file)
+            try completions.commitStaged()
+        case let .completionDocument(completionID):
+            let document = try JSONDecoder().decode(EditorDocument.self, from: bytes)
+            completions.stageDocument(id: completionID, document)
+            try completions.commitStaged()
+        case let .photoOriginal(photoID):
+            try photos.saveOriginal(bytes, id: photoID)
+        case let .itemCutout(itemID):
+            let file = try thumbnails.save(bytes, id: itemID)
+            wardrobe.stageCutout(itemID: itemID, path: file)
+            try wardrobe.commitStaged()
+        }
+    }
+
+    private func markUnsupported(_ row: MediaDownload) {
+        if case let .completionDocument(completionID) = row.destination {
+            completions.stageDocumentState(id: completionID, .unsupported)
+            try? completions.commitStaged()
+        }
+        try? downloads.acknowledge(id: row.id)
     }
 
     private static let wornOnFormat: DateFormatter = {

@@ -15,6 +15,7 @@ public final class LocalPurgeService: PurgeService {
     private let active: ActiveChallengeRepository
     private let media: MediaRepository
     private let uploads: any MediaUploadRepository
+    private let downloads: any MediaDownloadRepository
     private let outbox: any OutboxRepository
     private let diagnostics: any DiagnosticsStore
     private let cursor: any CursorStore
@@ -28,6 +29,7 @@ public final class LocalPurgeService: PurgeService {
         active: ActiveChallengeRepository,
         media: MediaRepository,
         uploads: any MediaUploadRepository,
+        downloads: any MediaDownloadRepository,
         outbox: any OutboxRepository,
         diagnostics: any DiagnosticsStore,
         cursor: any CursorStore
@@ -40,6 +42,7 @@ public final class LocalPurgeService: PurgeService {
         self.active = active
         self.media = media
         self.uploads = uploads
+        self.downloads = downloads
         self.outbox = outbox
         self.diagnostics = diagnostics
         self.cursor = cursor
@@ -56,6 +59,7 @@ public final class LocalPurgeService: PurgeService {
         try thumbnails.deleteAll()
         try media.clearCache()
         try uploads.removeAll()
+        try downloads.removeAll()
         try outbox.removeAll()
         try diagnostics.removeAll()
         try cursor.reset()

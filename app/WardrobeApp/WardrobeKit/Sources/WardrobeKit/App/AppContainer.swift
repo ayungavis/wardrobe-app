@@ -227,21 +227,6 @@ public final class AppContainer {
         )
     }
 
-    func makeRestoreService() -> RestoreService {
-        LocalRestoreService(
-            wardrobe: SwiftDataWardrobeItemRepository(context: Self.wardrobeContext),
-            completions: SwiftDataCompletedChallengeRepository(context: Self.wardrobeContext),
-            preferences: preferencesRepository
-        )
-    }
-
-    func makeChangeFeedRepository() -> ChangeFeedRepository {
-        ServerChangeFeedRepository(
-            client: makeAuthenticatedClient(),
-            cursor: SwiftDataCursorStore(context: Self.wardrobeContext)
-        )
-    }
-
     @MainActor
     static let wardrobeContext = ModelContext(wardrobeContainer)
 
@@ -288,7 +273,8 @@ public final class AppContainer {
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
-            previews: completionPreviewRepository
+            previews: completionPreviewRepository,
+            downloads: makeMediaDownloadRepository()
         )
     }
 }

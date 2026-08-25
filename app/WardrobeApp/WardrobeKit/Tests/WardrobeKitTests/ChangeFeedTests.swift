@@ -298,6 +298,10 @@ private final class StubFeedClient: AuthenticatedAPIClient {
 
 @MainActor
 private final class CollectingApplier: RestoreService {
+    func restoreDueMedia(at _: Date) async -> (restored: Int, fatal: AppError?) {
+        (0, nil)
+    }
+
     private(set) var seen: [Int64] = []
 
     func apply(_ changes: [ChangeDTO]) throws {
@@ -307,6 +311,10 @@ private final class CollectingApplier: RestoreService {
 
 @MainActor
 private final class ThrowingApplier: RestoreService {
+    func restoreDueMedia(at _: Date) async -> (restored: Int, fatal: AppError?) {
+        (0, nil)
+    }
+
     func apply(_: [ChangeDTO]) throws {
         throw AppError.unexpected
     }
