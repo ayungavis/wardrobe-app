@@ -5184,6 +5184,326 @@
         }
       }
     },
+    "profile.account.header": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akun"
+          }
+        }
+      }
+    },
+    "profile.anonymous": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Using this device anonymously"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memakai perangkat ini secara anonim"
+          }
+        }
+      }
+    },
+    "profile.delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete account"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus akun"
+          }
+        }
+      }
+    },
+    "profile.delete.confirm.action": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete everything"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus semuanya"
+          }
+        }
+      }
+    },
+    "profile.delete.confirm.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this account?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus akun ini?"
+          }
+        }
+      }
+    },
+    "profile.delete.disclosure": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permanently removes your History, edited photos and their documents, cut-outs, illustrations, item fingerprints, and wear history. There is no undo."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ini menghapus permanen Riwayatmu, foto suntingan beserta dokumennya, cut-out, ilustrasi, sidik jari item, dan riwayat pemakaian. Tidak bisa dibatalkan."
+          }
+        }
+      }
+    },
+    "profile.delete.footer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deletes your account and everything in it from the server and this device."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menghapus akunmu beserta seluruh isinya dari server dan perangkat ini."
+          }
+        }
+      }
+    },
+    "profile.delete.header": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danger zone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zona berbahaya"
+          }
+        }
+      }
+    },
+    "profile.delete.retry": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry deletion"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ulangi penghapusan"
+          }
+        }
+      }
+    },
+    "profile.delete.retryable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last deletion attempt could not finish. Nothing was removed; you can retry."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Percobaan penghapusan terakhir tidak selesai. Tidak ada yang terhapus; kamu bisa mengulang."
+          }
+        }
+      }
+    },
+    "profile.entry": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile and settings"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil dan pengaturan"
+          }
+        }
+      }
+    },
+    "profile.error.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ada yang salah"
+          }
+        }
+      }
+    },
+    "profile.signOut": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign out on this device"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keluar di perangkat ini"
+          }
+        }
+      }
+    },
+    "profile.signOut.footer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removes your Apple sign-in and cached data from this device only. Your data stays on the server."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menghapus masuk-Apple dan data cache dari perangkat ini saja. Datamu tetap di server."
+          }
+        }
+      }
+    },
+    "profile.signOut.pending.discard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard changes and sign out"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buang perubahan dan keluar"
+          }
+        }
+      }
+    },
+    "profile.signOut.pending.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d changes have not reached the server yet. Sync them first, or discard them and sign out."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d perubahan belum sampai ke server. Sinkronkan dulu, atau buang lalu keluar."
+          }
+        }
+      }
+    },
+    "profile.signOut.pending.sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync now"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sinkronkan sekarang"
+          }
+        }
+      }
+    },
+    "profile.signOut.pending.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsynced changes"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perubahan belum tersinkron"
+          }
+        }
+      }
+    },
+    "profile.signedIn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed in with Apple"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masuk dengan Apple"
+          }
+        }
+      }
+    },
+    "profile.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil"
+          }
+        }
+      }
+    },
     "sync.state.failed": {
       "extractionState": "manual",
       "localizations": {

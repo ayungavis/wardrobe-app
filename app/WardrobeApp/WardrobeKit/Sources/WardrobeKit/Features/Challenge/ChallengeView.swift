@@ -5,6 +5,7 @@ import SwiftUI
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
     @State private var hasSwiped = false
+    @State private var isProfilePresented = false
 
     private let container: AppContainer
 
@@ -46,6 +47,16 @@ public struct ChallengeView: View {
                 }
             }
             .appBackgroundStickers()
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        isProfilePresented = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel(Text("profile.entry", bundle: .module))
+                }
+            }
             .simultaneousGesture(
                 DragGesture().onChanged { _ in
                     if !hasSwiped {
@@ -57,6 +68,11 @@ public struct ChallengeView: View {
             )
         }
         .task { viewModel.onAppear() }
+        .sheet(
+            isPresented: $isProfilePresented,
+            onDismiss: { viewModel.refreshActiveChallenge() },
+            content: { ProfileView(viewModel: container.makeProfileViewModel()) }
+        )
         .confirmationDialog(
             Text("challenge.abandon.confirm.title", bundle: .module),
             isPresented: $viewModel.isAbandonConfirmationPresented,

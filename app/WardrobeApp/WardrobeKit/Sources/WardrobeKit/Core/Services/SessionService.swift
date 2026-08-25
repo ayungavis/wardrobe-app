@@ -63,6 +63,9 @@ public actor ServerSessionService: SessionService {
     public func signOut() async throws {
         inFlight?.cancel()
         inFlight = nil
+        if let stored = tokens.load() {
+            _ = try? await client.send(DeleteSessionsCurrentEndpoint(), authorization: stored.accessToken)
+        }
         try tokens.clear()
     }
 

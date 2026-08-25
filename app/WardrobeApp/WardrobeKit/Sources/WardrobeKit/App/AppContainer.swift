@@ -4,11 +4,12 @@ import SwiftData
 @MainActor
 public final class AppContainer {
     private let challengeRepository: ChallengeRepository
-    private let activeChallengeRepository: ActiveChallengeRepository
-    private let completedChallengeRepository: CompletedChallengeRepository
-    private let photoRepository: PhotoRepository
+    let activeChallengeRepository: ActiveChallengeRepository
+    let completedChallengeRepository: CompletedChallengeRepository
+    let photoRepository: PhotoRepository
+    let appleAccountRepository: AppleAccountRepository
     let preferencesRepository: AccountPreferencesRepository
-    private let completionPreviewRepository: CompletionPreviewRepository
+    let completionPreviewRepository: CompletionPreviewRepository
     let onboarding: OnboardingModel
     private let session: SessionService
     private let sessionTokenRepository: SessionTokenRepository
@@ -36,6 +37,7 @@ public final class AppContainer {
             ?? UserDefaultsAccountPreferencesRepository(outbox: Self.makeOutboxRepository())
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
+        self.appleAccountRepository = appleAccountRepository
         self.sessionTokenRepository = sessionTokenRepository
         let session = session ?? Self.defaultSession(tokens: sessionTokenRepository)
         self.session = session
@@ -184,9 +186,9 @@ public final class AppContainer {
         )
     }
 
-    private let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
+    let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
 
-    private func makeWardrobeItemRepository() -> WardrobeItemRepository {
+    func makeWardrobeItemRepository() -> WardrobeItemRepository {
         SwiftDataWardrobeItemRepository(context: Self.wardrobeContext, outbox: Self.makeOutboxRepository())
     }
 
@@ -241,7 +243,7 @@ public final class AppContainer {
     }
 
     @MainActor
-    private static let wardrobeContext = ModelContext(wardrobeContainer)
+    static let wardrobeContext = ModelContext(wardrobeContainer)
 
     private static let wardrobeContainer: ModelContainer = {
         do {

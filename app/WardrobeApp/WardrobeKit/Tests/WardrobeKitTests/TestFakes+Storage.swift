@@ -129,6 +129,11 @@ final class InMemoryCursorStore: CursorStore {
     func discard() {
         staged = nil
     }
+
+    func reset() throws {
+        committed = 0
+        staged = nil
+    }
 }
 
 @MainActor

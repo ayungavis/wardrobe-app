@@ -7,6 +7,7 @@ public protocol CursorStore: AnyObject {
     func stage(position: Int64) throws
     func commit() throws
     func discard()
+    func reset() throws
 }
 
 // MARK: - SwiftData
@@ -37,6 +38,11 @@ public final class SwiftDataCursorStore: CursorStore {
 
     public func discard() {
         context.rollback()
+    }
+
+    public func reset() throws {
+        try context.delete(model: SyncCursorEntity.self)
+        try context.save()
     }
 
     private func entity() throws -> SyncCursorEntity? {

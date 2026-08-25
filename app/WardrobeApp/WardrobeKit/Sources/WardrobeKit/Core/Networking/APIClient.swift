@@ -60,6 +60,9 @@ public struct URLSessionAPIClient: APIClient {
             throw failure
         }
 
+        if data.isEmpty, let empty = EmptyResponseDTO() as? Route.Response {
+            return empty
+        }
         do {
             return try JSONDecoder.api.decode(Route.Response.self, from: data)
         } catch {

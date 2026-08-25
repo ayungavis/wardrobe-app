@@ -56,7 +56,26 @@ private struct PostProbeEndpoint: RequestEndpoint {
     }
 }
 
+private struct DeleteProbeEndpoint: Endpoint {
+    typealias Response = EmptyResponseDTO
+
+    var path: String {
+        "probe"
+    }
+
+    var method: HTTPMethod {
+        .delete
+    }
+}
+
 struct APIClientTests {
+    @Test func aNoContentSuccessDecodesAsEmpty() async throws {
+        let server = StubServer()
+        server.stub("/probe", StubbedReply(status: 204))
+
+        _ = try await client(server).send(DeleteProbeEndpoint())
+    }
+
     @Test func fractionalSecondsDecodeBecauseThatIsWhatTheServerSends() async throws {
         let server = StubServer()
         server.stub("/probe", .json(#"{"stampedAt":"2026-08-24T03:14:15.926535897Z"}"#))
