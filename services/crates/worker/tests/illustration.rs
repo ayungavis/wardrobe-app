@@ -794,6 +794,56 @@ fn live_base_url() -> String {
         .unwrap_or_else(|_| illustration::openrouter::DEFAULT_BASE_URL.to_owned())
 }
 
+#[tokio::test]
+#[ignore = "needs OPENROUTER_API_KEY and OPENROUTER_TEST_MODEL; optional OPENROUTER_TEST_CUTOUT (png path)"]
+async fn a_real_cutout_renders_end_to_end() {
+    let api_key = std::env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY");
+    let model = std::env::var("OPENROUTER_TEST_MODEL").expect("OPENROUTER_TEST_MODEL");
+    let cutout = match std::env::var("OPENROUTER_TEST_CUTOUT") {
+        Ok(path) => std::fs::read(&path).expect("the cutout file"),
+        Err(_) => cutout_bytes(),
+    };
+
+    let ask = live_ask(&model, &cutout);
+    let payload = illustration::openrouter::payload(&ask);
+    let body = serde_json::to_vec(&payload).expect("a payload");
+    println!(
+        "payload bytes: {} (cutout bytes: {})",
+        body.len(),
+        cutout.len()
+    );
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!(
+            "{}/images",
+            illustration::openrouter::DEFAULT_BASE_URL
+        ))
+        .bearer_auth(&api_key)
+        .json(&payload)
+        .send()
+        .await
+        .expect("a response");
+    let status = response.status();
+    let text = response.text().await.unwrap_or_default();
+
+    if status.is_success() {
+        let parsed: Value = serde_json::from_str(&text).expect("a json body");
+        let encoded = parsed["data"][0]["b64_json"].as_str().expect("an image");
+        let image = STANDARD.decode(encoded).expect("decodable image bytes");
+        let out = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("live-sticker.png");
+        std::fs::write(&out, &image).expect("writable target dir");
+        println!("sticker written: {} ({} bytes)", out.display(), image.len());
+    } else {
+        let shown: String = text.chars().take(4000).collect();
+        println!("provider said {status}:\n{shown}");
+    }
+    assert!(
+        status.is_success(),
+        "the provider refused; its verbatim answer is printed above"
+    );
+}
+
 fn live_ask<'a>(model: &'a str, cutout: &'a [u8]) -> illustration::openrouter::Ask<'a> {
     illustration::openrouter::Ask {
         model,
