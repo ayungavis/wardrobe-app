@@ -14,6 +14,7 @@ public final class DevMenuViewModel {
     private(set) var cursor: Int64 = 0
     private(set) var pullState: Loadable<PullOutcome> = .idle
     private(set) var pullTask: Task<Void, Never>?
+    private(set) var reconcileState: Loadable<ReconcileOutcome> = .idle
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -29,6 +30,7 @@ public final class DevMenuViewModel {
     private let tokens: any SessionTokenRepository
     private let outboxRepository: any OutboxRepository
     private let feed: any ChangeFeedRepository
+    private let coordinator: any SyncCoordinator
     private let calendar: Calendar
 
     init(
@@ -46,6 +48,7 @@ public final class DevMenuViewModel {
         tokens: any SessionTokenRepository,
         outboxRepository: any OutboxRepository,
         feed: any ChangeFeedRepository,
+        coordinator: any SyncCoordinator,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -62,6 +65,7 @@ public final class DevMenuViewModel {
         self.tokens = tokens
         self.outboxRepository = outboxRepository
         self.feed = feed
+        self.coordinator = coordinator
         self.calendar = calendar
     }
 
@@ -198,6 +202,18 @@ public final class DevMenuViewModel {
         refresh()
         lastAction = "History cleared"
         Log.ui.info("Dev: history cleared")
+    }
+
+    func reconcileNow() {
+        pullTask?.cancel()
+        reconcileState = .loading
+
+        pullTask = Task { [coordinator] in
+            let outcome = await coordinator.reconcile(.manual)
+            guard !Task.isCancelled else { return }
+            reconcileState = .loaded(outcome)
+            refresh()
+        }
     }
 
     func pullChanges() {

@@ -32,7 +32,12 @@ func makeDevMenuViewModel(
         baseURL: URL(string: "https://stub.invalid")!,
         tokens: tokens,
         outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore()),
-        feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore())
+        feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore()),
+        coordinator: ServerSyncCoordinator(
+            client: StubAuthenticatedClient(),
+            outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
+            feed: ServerChangeFeedRepository(client: StubAuthenticatedClient(), cursor: InMemoryCursorStore())
+        )
     )
 }
 

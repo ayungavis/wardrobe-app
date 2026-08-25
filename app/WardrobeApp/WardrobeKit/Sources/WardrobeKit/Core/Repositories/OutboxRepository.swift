@@ -20,12 +20,16 @@ public protocol OutboxRepository: AnyObject {
     func entries() throws -> [OutboxEnvelope]
     func due(at date: Date, limit: Int) throws -> [OutboxEnvelope]
     func acknowledge(id: UUID) throws
-    func recordFailure(of id: UUID, error: AppError, at date: Date) throws
+    func recordFailure(of id: UUID, error: AppError, code: String?, at date: Date) throws
     func retryFailed(at date: Date) throws
     func removeAll() throws
 }
 
 public extension OutboxRepository {
+    func recordFailure(of id: UUID, error: AppError, at date: Date) throws {
+        try recordFailure(of: id, error: error, code: nil, at: date)
+    }
+
     func stage(_ mutation: OutboxMutation) {
         stage(mutation, at: Date())
     }
@@ -81,13 +85,13 @@ public final class StoredOutboxRepository: OutboxRepository {
         try store.remove(id: id)
     }
 
-    public func recordFailure(of id: UUID, error: AppError, at date: Date) throws {
+    public func recordFailure(of id: UUID, error: AppError, code: String?, at date: Date) throws {
         guard var envelope = try store.all().first(where: { $0.id == id }) else {
             throw AppError.unexpected
         }
 
         envelope.attempts += 1
-        envelope.lastErrorCode = Self.code(for: error)
+        envelope.lastErrorCode = code ?? Self.code(for: error)
         if envelope.attempts >= Self.maxAttempts {
             envelope.state = .failed
         } else {

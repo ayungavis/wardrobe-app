@@ -43,7 +43,9 @@ struct DevMenuView: View {
                 DevSyncSectionView(
                     cursor: viewModel.cursor,
                     state: viewModel.pullState,
-                    onPull: { viewModel.pullChanges() }
+                    reconcile: viewModel.reconcileState,
+                    onPull: { viewModel.pullChanges() },
+                    onReconcile: { viewModel.reconcileNow() }
                 )
                 DevOutboxSectionView(
                     entries: viewModel.outbox,

@@ -201,6 +201,16 @@ public final class AppContainer {
         StoredOutboxRepository(store: SwiftDataOutboxStore(context: wardrobeContext))
     }
 
+    // ponytail: one instance, deliberately. A coordinator built per call would
+    // hold its own inFlight and the single-flight guarantee would be a no-op.
+    private(set) lazy var syncCoordinator: any SyncCoordinator = ServerSyncCoordinator(
+        client: makeAuthenticatedClient(),
+        outbox: makeOutboxRepository(),
+        feed: makeChangeFeedRepository()
+    )
+
+    private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
+
     func makeChangeFeedRepository() -> ChangeFeedRepository {
         ServerChangeFeedRepository(
             client: makeAuthenticatedClient(),
@@ -249,7 +259,8 @@ public final class AppContainer {
             baseURL: Self.apiBaseURL,
             tokens: sessionTokenRepository,
             outboxRepository: makeOutboxRepository(),
-            feed: makeChangeFeedRepository()
+            feed: makeChangeFeedRepository(),
+            coordinator: syncCoordinator
         )
     }
 

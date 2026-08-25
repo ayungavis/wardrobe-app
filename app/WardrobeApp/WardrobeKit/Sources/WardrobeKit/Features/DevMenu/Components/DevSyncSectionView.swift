@@ -3,7 +3,9 @@ import SwiftUI
 struct DevSyncSectionView: View {
     let cursor: Int64
     let state: Loadable<PullOutcome>
+    let reconcile: Loadable<ReconcileOutcome>
     let onPull: () -> Void
+    let onReconcile: () -> Void
 
     var body: some View {
         Section {
@@ -18,9 +20,26 @@ struct DevSyncSectionView: View {
                 Text(verbatim: "Last pull")
             }
 
+            LabeledContent {
+                Text(verbatim: Self.summary(reconcile)).font(.caption.monospaced())
+            } label: {
+                Text(verbatim: "Last reconcile")
+            }
+
+            Button(action: onReconcile) { Text(verbatim: "Reconcile now") }
             Button(action: onPull) { Text(verbatim: "Pull GET /v1/changes") }
         } header: {
             Text(verbatim: "Sync")
+        }
+    }
+
+    private static func summary(_ state: Loadable<ReconcileOutcome>) -> String {
+        switch state {
+        case .idle: "never"
+        case .loading: "reconciling…"
+        case let .loaded(outcome):
+            "sent \(outcome.pushed), rejected \(outcome.rejected), pulled \(outcome.pulled)"
+        case let .failed(error): "FAILED — \(error)"
         }
     }
 

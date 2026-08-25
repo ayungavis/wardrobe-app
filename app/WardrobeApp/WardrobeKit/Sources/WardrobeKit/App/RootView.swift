@@ -2,7 +2,9 @@ import DesignSystem
 import SwiftUI
 
 public struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var challenge: ChallengeViewModel
+    @State private var tab: RootTab = .challenge
     @State private var isDevMenuPresented = DevMode.opensOnLaunch
 
     private let container: AppContainer
@@ -25,7 +27,24 @@ public struct RootView: View {
             }
         }
         .preferredColorScheme(.light)
-        .task { await container.startSession() }
+        .task {
+            await container.startSession()
+            container.reachability.observe {
+                Task { await container.syncCoordinator.reconcile(.connectivityRestored) }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await container.syncCoordinator.reconcile(.foreground) }
+        }
+        .onChange(of: container.onboarding.isSignedIn) { _, signedIn in
+            guard signedIn else { return }
+            Task { await container.syncCoordinator.reconcile(.signedIn) }
+        }
+        .onChange(of: tab) { _, opened in
+            guard opened != .challenge else { return }
+            Task { await container.syncCoordinator.reconcile(.tabOpened) }
+        }
         // ponytail: only the Challenge screen is refreshed after a dev reset. Wardrobe
         // and History load in .task, which does not re-run on a tab switch, so a reset
         // made from those tabs reads stale until the tab is rebuilt. Give RootView
@@ -53,8 +72,8 @@ public struct RootView: View {
     }
 
     private var tabs: some View {
-        TabView {
-            Tab {
+        TabView(selection: $tab) {
+            Tab(value: RootTab.challenge) {
                 ZStack {}
                 ChallengeView(viewModel: challenge, container: container)
 
@@ -66,7 +85,7 @@ public struct RootView: View {
                 }
             }
 
-            Tab {
+            Tab(value: RootTab.wardrobe) {
                 WardrobeView(viewModel: container.makeWardrobeViewModel(), container: container)
             } label: {
                 Label {
@@ -76,7 +95,7 @@ public struct RootView: View {
                 }
             }
 
-            Tab {
+            Tab(value: RootTab.history) {
                 HistoryView(viewModel: container.makeHistoryViewModel(), container: container)
             } label: {
                 Label {
@@ -91,6 +110,12 @@ public struct RootView: View {
         #endif
         .background(.clear)
     }
+}
+
+enum RootTab: Hashable {
+    case challenge
+    case wardrobe
+    case history
 }
 
 #Preview {
