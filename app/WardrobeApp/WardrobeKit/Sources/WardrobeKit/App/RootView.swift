@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct RootView: View {
     private let container: AppContainer
+    @State private var isShowingSplash = true
     
     public init(container: AppContainer) {
         self.container = container
@@ -13,11 +14,20 @@ public struct RootView: View {
             Image("appBG", bundle: .module)
                 .resizable()
                 .ignoresSafeArea()
-
+            
             if container.onboarding.isCompleted {
                 tabs
             } else {
                 OnboardingView(viewModel: container.makeOnboardingViewModel())
+            }
+            if isShowingSplash {
+                SplashScreenView {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isShowingSplash = false
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(10)
             }
             
         }
