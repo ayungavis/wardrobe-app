@@ -51,7 +51,13 @@ public struct URLSessionAPIClient: APIClient {
 
         guard let http = response as? HTTPURLResponse else { throw AppError.network }
         guard (200 ..< 300).contains(http.statusCode) else {
-            throw Self.failure(status: http.statusCode, body: data, headers: http)
+            let failure = Self.failure(status: http.statusCode, body: data, headers: http)
+            Log.trail(failure, context: Log.Context(
+                endpoint: endpoint.path,
+                requestID: http.value(forHTTPHeaderField: "x-request-id"),
+                status: http.statusCode
+            ))
+            throw failure
         }
 
         do {

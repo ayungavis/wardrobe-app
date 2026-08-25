@@ -28,7 +28,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     public static var schema: Schema {
         Schema([
             WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self,
-            OutboxEntryEntity.self, SyncCursorEntity.self,
+            OutboxEntryEntity.self, SyncCursorEntity.self, DiagnosticEntryEntity.self,
         ])
     }
 

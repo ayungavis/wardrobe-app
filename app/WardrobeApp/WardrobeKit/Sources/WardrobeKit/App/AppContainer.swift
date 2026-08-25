@@ -260,7 +260,8 @@ public final class AppContainer {
             tokens: sessionTokenRepository,
             outboxRepository: makeOutboxRepository(),
             feed: makeChangeFeedRepository(),
-            coordinator: syncCoordinator
+            coordinator: syncCoordinator,
+            diagnosticsStore: diagnostics
         )
     }
 
@@ -285,4 +286,25 @@ public final class AppContainer {
             previews: completionPreviewRepository
         )
     }
+}
+
+// MARK: - Diagnostics
+
+extension AppContainer {
+    var diagnostics: any DiagnosticsStore {
+        Self.diagnosticsStore
+    }
+
+    func startDiagnostics() {
+        let store = diagnostics
+        Log.diagnosticsSink = { error, context in
+            Task { @MainActor in
+                try? store.record(error, context: context, at: Date())
+            }
+        }
+    }
+
+    @MainActor
+    private static let diagnosticsStore: any DiagnosticsStore =
+        SwiftDataDiagnosticsStore(container: wardrobeContainer)
 }

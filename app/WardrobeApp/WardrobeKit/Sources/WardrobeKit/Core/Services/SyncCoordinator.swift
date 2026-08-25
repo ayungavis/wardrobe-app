@@ -53,13 +53,13 @@ final class ServerSyncCoordinator: SyncCoordinator {
             return await running.value
         }
 
-        let work = Task { await run() }
+        let work = Task { await run(trigger) }
         inFlight = work
         defer { inFlight = nil }
         return await work.value
     }
 
-    private func run() async -> ReconcileOutcome {
+    private func run(_ trigger: SyncTrigger) async -> ReconcileOutcome {
         var outcome = ReconcileOutcome()
 
         do {
@@ -68,14 +68,22 @@ final class ServerSyncCoordinator: SyncCoordinator {
             outcome.rejected = sent.rejected
             outcome.pushError = sent.error
         } catch {
-            Log.report(error, logger: Log.network)
+            Log.report(
+                error,
+                context: Log.Context(operation: "sync.push.\(trigger.rawValue)"),
+                logger: Log.network
+            )
             outcome.pushError = AppError(wrapping: error)
         }
 
         do {
             outcome.pulled = try await feed.pull(applying: applier).records
         } catch {
-            Log.report(error, logger: Log.network)
+            Log.report(
+                error,
+                context: Log.Context(operation: "sync.pull.\(trigger.rawValue)"),
+                logger: Log.network
+            )
             outcome.pullError = AppError(wrapping: error)
         }
 

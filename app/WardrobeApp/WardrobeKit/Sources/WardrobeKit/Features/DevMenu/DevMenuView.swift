@@ -40,6 +40,10 @@ struct DevMenuView: View {
                     onWhoami: { viewModel.loadSession(callingWhoami: true) },
                     onHealth: { viewModel.checkHealth() }
                 )
+                DevDiagnosticsSectionView(
+                    entries: viewModel.diagnostics,
+                    onClear: { viewModel.clearDiagnostics() }
+                )
                 DevSyncSectionView(
                     cursor: viewModel.cursor,
                     state: viewModel.pullState,

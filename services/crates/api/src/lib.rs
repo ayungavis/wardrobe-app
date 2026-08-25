@@ -18,7 +18,8 @@ use axum::Router;
 use sqlx::PgPool;
 use tower_http::ServiceBuilderExt;
 use tower_http::request_id::MakeRequestUuid;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultOnResponse, TraceLayer};
+use tracing::Level;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -26,6 +27,20 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::openapi::ApiDoc;
 use crate::state::AppState;
+
+fn request_span(request: &axum::http::Request<axum::body::Body>) -> tracing::Span {
+    let request_id = request
+        .headers()
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("-");
+    tracing::info_span!(
+        "http",
+        request_id = %request_id,
+        method = %request.method(),
+        path = %request.uri().path(),
+    )
+}
 
 fn api_router() -> OpenApiRouter<AppState> {
     unauthenticated_router().merge(authenticated_router())
@@ -97,7 +112,11 @@ pub fn app_with(
     let observability = tower::ServiceBuilder::new()
         .set_x_request_id(MakeRequestUuid)
         .layer(sentry::integrations::tower::NewSentryLayer::new_from_top())
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(request_span)
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
         .propagate_x_request_id();
 
     let hardening = tower::ServiceBuilder::new()

@@ -28,6 +28,7 @@ public struct RootView: View {
         }
         .preferredColorScheme(.light)
         .task {
+            container.startDiagnostics()
             await container.startSession()
             container.reachability.observe {
                 Task { await container.syncCoordinator.reconcile(.connectivityRestored) }

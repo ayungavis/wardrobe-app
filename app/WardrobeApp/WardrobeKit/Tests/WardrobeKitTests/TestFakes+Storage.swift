@@ -130,3 +130,24 @@ final class InMemoryCursorStore: CursorStore {
         staged = nil
     }
 }
+
+@MainActor
+final class InMemoryDiagnosticsStore: DiagnosticsStore {
+    private var stored: [DiagnosticEntry] = []
+
+    func record(_ error: Error, context: Log.Context, at date: Date) throws {
+        stored.insert(DiagnosticEntry(
+            id: UUID(), at: date, message: String(describing: error),
+            operation: context.operation, endpoint: context.endpoint,
+            requestID: context.requestID, status: context.status
+        ), at: 0)
+    }
+
+    func entries() throws -> [DiagnosticEntry] {
+        stored
+    }
+
+    func removeAll() throws {
+        stored = []
+    }
+}

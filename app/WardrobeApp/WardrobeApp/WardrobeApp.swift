@@ -37,6 +37,21 @@ struct WardrobeAppApp: App {
             options.environment = Bundle.main
                 .object(forInfoDictionaryKey: "SentryEnvironment") as? String ?? "development"
         }
-        Log.errorReporter = { SentrySDK.capture(error: $0) }
+        Log.errorReporter = { error, context in
+            SentrySDK.capture(error: error) { scope in
+                if let operation = context.operation {
+                    scope.setTag(value: operation, key: "operation")
+                }
+                if let endpoint = context.endpoint {
+                    scope.setTag(value: endpoint, key: "endpoint")
+                }
+                if let requestID = context.requestID {
+                    scope.setTag(value: requestID, key: "request_id")
+                }
+                if let status = context.status {
+                    scope.setTag(value: "\(status)", key: "status")
+                }
+            }
+        }
     }
 }

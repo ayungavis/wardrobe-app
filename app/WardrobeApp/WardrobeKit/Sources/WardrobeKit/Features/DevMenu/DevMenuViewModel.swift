@@ -15,6 +15,7 @@ public final class DevMenuViewModel {
     private(set) var pullState: Loadable<PullOutcome> = .idle
     private(set) var pullTask: Task<Void, Never>?
     private(set) var reconcileState: Loadable<ReconcileOutcome> = .idle
+    private(set) var diagnostics: [DiagnosticEntry] = []
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -31,6 +32,7 @@ public final class DevMenuViewModel {
     private let outboxRepository: any OutboxRepository
     private let feed: any ChangeFeedRepository
     private let coordinator: any SyncCoordinator
+    private let diagnosticsStore: any DiagnosticsStore
     private let calendar: Calendar
 
     init(
@@ -49,6 +51,7 @@ public final class DevMenuViewModel {
         outboxRepository: any OutboxRepository,
         feed: any ChangeFeedRepository,
         coordinator: any SyncCoordinator,
+        diagnosticsStore: any DiagnosticsStore,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -66,6 +69,7 @@ public final class DevMenuViewModel {
         self.outboxRepository = outboxRepository
         self.feed = feed
         self.coordinator = coordinator
+        self.diagnosticsStore = diagnosticsStore
         self.calendar = calendar
     }
 
@@ -128,6 +132,7 @@ public final class DevMenuViewModel {
     public func refresh() {
         outbox = (try? outboxRepository.entries()) ?? []
         cursor = (try? feed.position()) ?? 0
+        diagnostics = (try? diagnosticsStore.entries()) ?? []
         let active = activeRepository.load()
         summary = DevStateSummary(
             completionCount: completedRepository.load().count,
@@ -232,6 +237,16 @@ public final class DevMenuViewModel {
             }
             refresh()
         }
+    }
+
+    func clearDiagnostics() {
+        do {
+            try diagnosticsStore.removeAll()
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Diagnostics cleared"
     }
 
     public func retryFailedOutbox() {
