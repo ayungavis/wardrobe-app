@@ -199,9 +199,8 @@ struct Pinned {
 
 fn fresh_seed() -> i64 {
     let bytes = Uuid::now_v7().into_bytes();
-    i64::from(u32::from_be_bytes([
-        bytes[8], bytes[9], bytes[10], bytes[11],
-    ]))
+    let raw = u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
+    i64::from(raw & 0x7FFF_FFFF)
 }
 
 async fn pin(pool: &PgPool, job: Uuid, settings: &Settings) -> Result<Pinned, &'static str> {
@@ -680,4 +679,20 @@ async fn publish(
     .map_err(|_| "database")?;
 
     tx.commit().await.map_err(|_| "database")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fresh_seed;
+
+    #[test]
+    fn a_seed_always_fits_the_providers_int32() {
+        for _ in 0..100 {
+            assert!(
+                fresh_seed() <= i64::from(i32::MAX),
+                "the provider refuses any seed above 2147483647, and the uuid \
+                 variant byte would otherwise set the top bit every single time"
+            );
+        }
+    }
 }

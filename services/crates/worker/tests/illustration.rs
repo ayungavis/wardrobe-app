@@ -804,7 +804,16 @@ async fn a_real_cutout_renders_end_to_end() {
         Err(_) => cutout_bytes(),
     };
 
-    let ask = live_ask(&model, &cutout);
+    let seed = std::env::var("OPENROUTER_TEST_SEED")
+        .ok()
+        .and_then(|raw| raw.parse().ok())
+        .unwrap_or(184_726);
+    let prompt = std::env::var("OPENROUTER_TEST_PROMPT").ok();
+    let mut ask = live_ask(&model, &cutout);
+    ask.seed = seed;
+    if let Some(prompt) = prompt.as_deref() {
+        ask.prompt = prompt;
+    }
     let payload = illustration::openrouter::payload(&ask);
     let body = serde_json::to_vec(&payload).expect("a payload");
     println!(
