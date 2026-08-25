@@ -10,7 +10,7 @@ S3_SECRET_ACCESS_KEY ?= wardrobe-dev-secret
 S3_FORCE_PATH_STYLE ?= true
 OPENROUTER_BASE_URL ?= https://openrouter.ai/api/v1
 
-.PHONY: up down migrate reset run openapi test fmt lint validate build image
+.PHONY: up down migrate reset run worker openapi test fmt lint validate build image
 
 up:
 	docker compose up -d --wait
@@ -30,6 +30,9 @@ reset:
 
 run: up
 	cargo run -p wardrobe-api --bin wardrobe-api
+
+worker: up
+	cargo run -p wardrobe-worker
 
 # Regenerated from the handlers, never hand-edited. A test fails when the
 # committed file drifts from the code.

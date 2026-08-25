@@ -10,7 +10,7 @@ TEST_FLAGS ?=
 
 .PHONY: help validate \
         ios-generate ios-format ios-lint ios-test ios-build ios-run ios-validate \
-        backend-up backend-down backend-migrate backend-reset backend-run backend-openapi \
+        backend-up backend-down backend-migrate backend-reset backend-run backend-worker backend-openapi \
         backend-fmt backend-lint backend-test backend-build backend-image backend-validate backend-live-ai
 
 ## Descriptions come from the `##` comments below, so this list cannot go stale.
@@ -71,6 +71,9 @@ backend-reset: services/.env ## Drop and rebuild the database from empty
 
 backend-run: services/.env ## Run the API (Swagger UI at http://localhost:8080/docs)
 	$(MAKE) -C services run
+
+backend-worker: services/.env ## Run the job worker against the local containers
+	$(MAKE) -C services worker
 
 backend-openapi: ## Regenerate services/openapi.json from the handlers
 	$(MAKE) -C services openapi
