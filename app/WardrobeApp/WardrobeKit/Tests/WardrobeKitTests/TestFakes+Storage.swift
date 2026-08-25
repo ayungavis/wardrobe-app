@@ -60,3 +60,48 @@ final class InMemoryGarmentThumbnailRepository: GarmentThumbnailRepository, @unc
         files.removeAll()
     }
 }
+
+@MainActor
+final class InMemoryOutboxStore: OutboxStore {
+    private var staged: [OutboxEnvelope] = []
+    private var saved: [OutboxEnvelope] = []
+
+    func stage(_ envelope: OutboxEnvelope) {
+        staged.append(envelope)
+    }
+
+    func append(_ envelope: OutboxEnvelope) throws {
+        stage(envelope)
+        saved = ordered(staged)
+    }
+
+    func all() throws -> [OutboxEnvelope] {
+        saved
+    }
+
+    func due(at date: Date, limit: Int) throws -> [OutboxEnvelope] {
+        saved.filter { $0.state == .pending && $0.nextAttemptAt <= date }.prefix(limit).map(\.self)
+    }
+
+    func update(_ envelope: OutboxEnvelope) throws {
+        guard let index = saved.firstIndex(where: { $0.id == envelope.id }) else {
+            throw AppError.unexpected
+        }
+        saved[index] = envelope
+        staged = saved
+    }
+
+    func remove(id: UUID) throws {
+        saved.removeAll { $0.id == id }
+        staged = saved
+    }
+
+    func removeAll() throws {
+        saved = []
+        staged = []
+    }
+
+    private func ordered(_ envelopes: [OutboxEnvelope]) -> [OutboxEnvelope] {
+        envelopes.sorted { $0.createdAt < $1.createdAt }
+    }
+}

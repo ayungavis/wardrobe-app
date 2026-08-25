@@ -28,7 +28,8 @@ struct DevMenuSessionTests {
             client: client,
             plainClient: plainClient,
             baseURL: healthBase,
-            tokens: tokens
+            tokens: tokens,
+            outboxRepository: StoredOutboxRepository(store: InMemoryOutboxStore())
         )
     }
 

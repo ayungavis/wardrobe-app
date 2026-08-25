@@ -188,8 +188,15 @@ public final class AppContainer {
     private let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
 
     private func makeWardrobeItemRepository() -> WardrobeItemRepository {
-        SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
+        SwiftDataWardrobeItemRepository(context: Self.wardrobeContext)
     }
+
+    public func makeOutboxRepository() -> OutboxRepository {
+        StoredOutboxRepository(store: SwiftDataOutboxStore(context: Self.wardrobeContext))
+    }
+
+    @MainActor
+    private static let wardrobeContext = ModelContext(wardrobeContainer)
 
     private static let wardrobeContainer: ModelContainer = {
         do {
@@ -227,7 +234,8 @@ public final class AppContainer {
             client: makeAuthenticatedClient(),
             plainClient: makeUnauthenticatedClient(),
             baseURL: Self.apiBaseURL,
-            tokens: sessionTokenRepository
+            tokens: sessionTokenRepository,
+            outboxRepository: makeOutboxRepository()
         )
     }
 

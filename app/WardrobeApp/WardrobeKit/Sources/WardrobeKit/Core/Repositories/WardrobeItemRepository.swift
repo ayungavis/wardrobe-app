@@ -19,12 +19,15 @@ public protocol WardrobeItemRepository: AnyObject {
 public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     private let context: ModelContext
 
-    public init(container: ModelContainer) {
-        context = ModelContext(container)
+    public init(context: ModelContext) {
+        self.context = context
     }
 
     public static var schema: Schema {
-        Schema([WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self])
+        Schema([
+            WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self,
+            OutboxEntryEntity.self,
+        ])
     }
 
     public func items() throws -> [WardrobeItem] {

@@ -10,6 +10,7 @@ public final class DevMenuViewModel {
     private(set) var sessionTask: Task<Void, Never>?
     private(set) var healthState: Loadable<String> = .idle
     private(set) var healthTask: Task<Void, Never>?
+    private(set) var outbox: [OutboxEnvelope] = []
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -23,6 +24,7 @@ public final class DevMenuViewModel {
     private let plainClient: any APIClient
     let baseURL: URL
     private let tokens: any SessionTokenRepository
+    private let outboxRepository: any OutboxRepository
     private let calendar: Calendar
 
     public init(
@@ -38,6 +40,7 @@ public final class DevMenuViewModel {
         plainClient: any APIClient,
         baseURL: URL,
         tokens: any SessionTokenRepository,
+        outboxRepository: any OutboxRepository,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -52,6 +55,7 @@ public final class DevMenuViewModel {
         self.plainClient = plainClient
         self.baseURL = baseURL
         self.tokens = tokens
+        self.outboxRepository = outboxRepository
         self.calendar = calendar
     }
 
@@ -112,6 +116,7 @@ public final class DevMenuViewModel {
     }
 
     public func refresh() {
+        outbox = (try? outboxRepository.entries()) ?? []
         let active = activeRepository.load()
         summary = DevStateSummary(
             completionCount: completedRepository.load().count,
@@ -186,6 +191,26 @@ public final class DevMenuViewModel {
         refresh()
         lastAction = "History cleared"
         Log.ui.info("Dev: history cleared")
+    }
+
+    public func retryFailedOutbox() {
+        do {
+            try outboxRepository.retryFailed(at: Date())
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Outbox retry requested"
+    }
+
+    public func clearOutbox() {
+        do {
+            try outboxRepository.removeAll()
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Outbox cleared"
     }
 
     private func deletePreview(of completion: CompletedChallenge) {

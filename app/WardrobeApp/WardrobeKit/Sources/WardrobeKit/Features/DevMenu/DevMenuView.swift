@@ -40,6 +40,11 @@ struct DevMenuView: View {
                     onWhoami: { viewModel.loadSession(callingWhoami: true) },
                     onHealth: { viewModel.checkHealth() }
                 )
+                DevOutboxSectionView(
+                    entries: viewModel.outbox,
+                    onRetryFailed: { viewModel.retryFailedOutbox() },
+                    onClear: { viewModel.clearOutbox() }
+                )
                 DevTodaySectionView(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
                 }

@@ -4,51 +4,13 @@ import Testing
 
 @MainActor
 struct DevMenuViewModelTests {
-    private func makeSUT(
-        activeRepository: InMemoryActiveChallengeRepository = InMemoryActiveChallengeRepository(),
-        completedRepository: InMemoryCompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
-        photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
-        wardrobeRepository: InMemoryWardrobeItemRepository = InMemoryWardrobeItemRepository(),
-        thumbnails: InMemoryGarmentThumbnailRepository = InMemoryGarmentThumbnailRepository(),
-        previews: InMemoryCompletionPreviewRepository = InMemoryCompletionPreviewRepository(),
-        onboarding: OnboardingModel = OnboardingModel(
-            preferences: InMemoryAccountPreferencesRepository(),
-            accounts: StoredAppleAccountRepository(store: InMemorySecureStore()),
-            session: FakeSessionService()
-        ),
-        session: FakeSessionService = FakeSessionService(),
-        client: any AuthenticatedAPIClient = StubAuthenticatedClient(),
-        tokens: SessionTokenRepository = StoredSessionTokenRepository(store: InMemorySecureStore())
-    ) -> DevMenuViewModel {
-        DevMenuViewModel(
-            activeRepository: activeRepository,
-            completedRepository: completedRepository,
-            photoRepository: photoRepository,
-            wardrobeRepository: wardrobeRepository,
-            thumbnails: thumbnails,
-            previews: previews,
-            onboarding: onboarding,
-            session: session,
-            client: client,
-            plainClient: URLSessionAPIClient(baseURL: URL(string: "https://stub.invalid")!),
-            baseURL: URL(string: "https://stub.invalid")!,
-            tokens: tokens
-        )
-    }
-
-    private func makeWardrobeItem() -> WardrobeItem {
-        let id = UUID()
-        return WardrobeItem(id: id, category: .top, cutoutFile: "\(id.uuidString).png",
-                            createdAt: Date(), updatedAt: Date())
-    }
-
     @Test func resetWardrobeClearsItemsAndTheirImages() throws {
         let wardrobe = InMemoryWardrobeItemRepository()
         let thumbnails = InMemoryGarmentThumbnailRepository()
-        let item = makeWardrobeItem()
+        let item = makeDevMenuWardrobeItem()
         try wardrobe.insert(item, fingerprint: nil, wear: WearRecord(itemID: item.id, wornAt: Date()))
         thumbnails.files[item.cutoutFile] = Data([0x01])
-        let sut = makeSUT(wardrobeRepository: wardrobe, thumbnails: thumbnails)
+        let sut = makeDevMenuViewModel(wardrobeRepository: wardrobe, thumbnails: thumbnails)
 
         sut.resetWardrobe()
 
@@ -66,7 +28,7 @@ struct DevMenuViewModelTests {
         try await onboarding.signIn(
             identityToken: "jwt", nonce: "raw", profile: AppleProfile(fullName: nil, email: nil)
         )
-        let sut = makeSUT(onboarding: onboarding)
+        let sut = makeDevMenuViewModel(onboarding: onboarding)
 
         await sut.resetOnboarding()
 
@@ -87,7 +49,7 @@ struct DevMenuViewModelTests {
         try await onboarding.signIn(
             identityToken: "jwt", nonce: "raw", profile: AppleProfile(fullName: nil, email: nil)
         )
-        let sut = makeSUT(onboarding: onboarding)
+        let sut = makeDevMenuViewModel(onboarding: onboarding)
 
         sut.refresh()
 
@@ -97,9 +59,9 @@ struct DevMenuViewModelTests {
 
     @Test func summaryCountsWardrobeItems() throws {
         let wardrobe = InMemoryWardrobeItemRepository()
-        let item = makeWardrobeItem()
+        let item = makeDevMenuWardrobeItem()
         try wardrobe.insert(item, fingerprint: nil, wear: WearRecord(itemID: item.id, wornAt: Date()))
-        let sut = makeSUT(wardrobeRepository: wardrobe)
+        let sut = makeDevMenuViewModel(wardrobeRepository: wardrobe)
 
         sut.refresh()
 
@@ -138,7 +100,7 @@ struct DevMenuViewModelTests {
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [makeCompletion(at: Date(), named: "done-photo")]
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(
+        let sut = makeDevMenuViewModel(
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository
@@ -158,7 +120,7 @@ struct DevMenuViewModelTests {
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [makeCompletion(at: yesterday, named: "old"), makeCompletion(at: Date())]
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(completedRepository: completedRepository, photoRepository: photoRepository)
+        let sut = makeDevMenuViewModel(completedRepository: completedRepository, photoRepository: photoRepository)
 
         sut.resetToday()
 
@@ -171,7 +133,7 @@ struct DevMenuViewModelTests {
 
     @Test func resetTodayIsSafeWhenNothingToReset() {
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(photoRepository: photoRepository)
+        let sut = makeDevMenuViewModel(photoRepository: photoRepository)
 
         sut.resetToday()
 
@@ -187,7 +149,7 @@ struct DevMenuViewModelTests {
             makeCompletion(at: Date(), named: "today"),
         ]
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(completedRepository: completedRepository, photoRepository: photoRepository)
+        let sut = makeDevMenuViewModel(completedRepository: completedRepository, photoRepository: photoRepository)
 
         sut.resetHistory()
 
@@ -209,7 +171,7 @@ struct DevMenuViewModelTests {
         var completion = makeCompletion(at: Date(), named: "done")
         completion.previewFile = file
         completedRepository.stored = [completion]
-        let sut = makeSUT(completedRepository: completedRepository, previews: previews)
+        let sut = makeDevMenuViewModel(completedRepository: completedRepository, previews: previews)
 
         sut.resetHistory()
 
@@ -228,7 +190,7 @@ struct DevMenuViewModelTests {
         old.previewFile = oldFile
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [old, today]
-        let sut = makeSUT(completedRepository: completedRepository, previews: previews)
+        let sut = makeDevMenuViewModel(completedRepository: completedRepository, previews: previews)
 
         sut.resetToday()
 
@@ -241,7 +203,7 @@ struct DevMenuViewModelTests {
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [makeCompletion(at: Date(), named: "done")]
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(
+        let sut = makeDevMenuViewModel(
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository
@@ -256,7 +218,7 @@ struct DevMenuViewModelTests {
 
     @Test func resetHistoryIsSafeWhenThereIsNoHistory() {
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(photoRepository: photoRepository)
+        let sut = makeDevMenuViewModel(photoRepository: photoRepository)
 
         sut.resetHistory()
 
@@ -278,7 +240,7 @@ struct DevMenuViewModelTests {
             makeCompletion(at: Date(), named: "done", extraPhotoIDs: [id("done-extra")]),
         ]
         let photoRepository = SpyPhotoRepository()
-        let sut = makeSUT(
+        let sut = makeDevMenuViewModel(
             activeRepository: activeRepository,
             completedRepository: completedRepository,
             photoRepository: photoRepository
@@ -297,7 +259,7 @@ struct DevMenuViewModelTests {
         activeRepository.stored = makeActive(photoID: nil)
         let completedRepository = InMemoryCompletedChallengeRepository()
         completedRepository.stored = [makeCompletion(at: Date())]
-        let sut = makeSUT(activeRepository: activeRepository, completedRepository: completedRepository)
+        let sut = makeDevMenuViewModel(activeRepository: activeRepository, completedRepository: completedRepository)
 
         sut.refresh()
 
