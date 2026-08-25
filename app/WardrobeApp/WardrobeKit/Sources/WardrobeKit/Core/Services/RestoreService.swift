@@ -20,41 +20,53 @@ final class NoopRestoreService: RestoreService {
 @MainActor
 final class LocalRestoreService: RestoreService {
     private let wardrobe: SwiftDataWardrobeItemRepository
+    private let completions: any CompletedChallengeRepository
     private let preferences: any AccountPreferencesRepository
 
-    init(wardrobe: SwiftDataWardrobeItemRepository, preferences: any AccountPreferencesRepository) {
+    init(
+        wardrobe: SwiftDataWardrobeItemRepository,
+        completions: any CompletedChallengeRepository,
+        preferences: any AccountPreferencesRepository
+    ) {
         self.wardrobe = wardrobe
+        self.completions = completions
         self.preferences = preferences
     }
 
     func apply(_ changes: [ChangeDTO]) throws {
         var skipped: [String: Int] = [:]
-
         for change in changes {
-            switch change.record {
-            case let .wardrobeItem(record):
-                try applyItem(record)
-            case let .itemFingerprint(record):
-                try applyFingerprint(record)
-            case let .wearRecord(record):
-                try applyWear(record)
-            case let .accountPreference(record):
-                applyPreference(record)
-            case .challengeCompletion, .canvasDocument, .photo, .photoDerivative,
-                 .itemCutout, .itemIllustration:
-                skipped["media-backed", default: 0] += 1
-            case .wardrobeItemConflict:
-                skipped["conflict", default: 0] += 1
-            case .activeChallenge:
-                skipped["activeChallenge", default: 0] += 1
-            case let .unrecognised(kind):
-                skipped[kind, default: 0] += 1
+            if let label = try apply(change) {
+                skipped[label, default: 0] += 1
             }
         }
-
         if !skipped.isEmpty {
             Log.network.info("Feed kinds not applied yet: \(skipped.description, privacy: .public)")
         }
+    }
+
+    private func apply(_ change: ChangeDTO) throws -> String? {
+        switch change.record {
+        case let .wardrobeItem(record):
+            try applyItem(record)
+        case let .itemFingerprint(record):
+            try applyFingerprint(record)
+        case let .wearRecord(record):
+            try applyWear(record)
+        case let .accountPreference(record):
+            applyPreference(record)
+        case let .challengeCompletion(record):
+            return applyStatus(record) ? nil : "completion-pending-media"
+        case let .wardrobeItemConflict(record):
+            return try applyConflict(record) ? nil : "conflict-field"
+        case .canvasDocument, .photo, .photoDerivative, .itemCutout, .itemIllustration:
+            return "media-backed"
+        case .activeChallenge:
+            return "activeChallenge"
+        case let .unrecognised(kind):
+            return kind
+        }
+        return nil
     }
 
     private func applyItem(_ record: WardrobeItemRecordDTO) throws {
@@ -102,11 +114,37 @@ final class LocalRestoreService: RestoreService {
     }
 
     private func applyWear(_ record: WearRecordRecordDTO) throws {
-        wardrobe.stageInsert(wear: WearRecord(
-            id: record.id, itemID: record.itemId,
-            completionID: record.completionId, wornAt: Date()
-        ))
+        let wornAt = Self.wornOnFormat.date(from: record.wornOn) ?? Date()
+        try wardrobe.stageApply(
+            wear: WearRecord(
+                id: record.id, itemID: record.itemId,
+                completionID: record.completionId, wornAt: wornAt
+            ),
+            deletedAt: record.deletedAt
+        )
     }
+
+    private func applyConflict(_ record: WardrobeItemConflictRecordDTO) throws -> Bool {
+        guard let field = ConflictField(rawValue: record.field) else { return false }
+        try wardrobe.stageApply(conflict: ItemConflict(
+            id: record.id, itemID: record.itemId, field: field,
+            value: record.value, revision: record.revision, resolvedAt: record.resolvedAt
+        ))
+        return true
+    }
+
+    private func applyStatus(_ record: ChallengeCompletionRecordDTO) -> Bool {
+        guard let status = CompletionStatus(rawValue: record.status) else { return false }
+        return completions.stageStatus(id: record.id, status: status)
+    }
+
+    private static let wornOnFormat: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     private func applyPreference(_ record: AccountPreferenceRecordDTO) {
         var stored = preferences.load()

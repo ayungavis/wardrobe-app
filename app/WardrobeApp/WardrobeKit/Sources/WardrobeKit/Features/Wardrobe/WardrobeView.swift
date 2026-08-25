@@ -4,6 +4,7 @@ import SwiftUI
 public struct WardrobeView: View {
     @State private var isBulkScanPresented = false
     @State private var isCameraScanPresented = false
+    @State private var isConflictsPresented = false
 
     @State private var viewModel: WardrobeViewModel
     @State private var expandedCategory: GarmentCategory?
@@ -80,14 +81,26 @@ public struct WardrobeView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if viewModel.pendingSyncCount + viewModel.failedSyncCount > 0 {
-                WardrobeSyncBannerView(
-                    pending: viewModel.pendingSyncCount,
-                    failed: viewModel.failedSyncCount,
-                    onRetry: { viewModel.retryFailedSync() }
-                )
+            VStack(spacing: 0) {
+                if viewModel.openConflictCount > 0 {
+                    ConflictsBannerView(count: viewModel.openConflictCount) {
+                        isConflictsPresented = true
+                    }
+                }
+                if viewModel.pendingSyncCount + viewModel.failedSyncCount > 0 {
+                    WardrobeSyncBannerView(
+                        pending: viewModel.pendingSyncCount,
+                        failed: viewModel.failedSyncCount,
+                        onRetry: { viewModel.retryFailedSync() }
+                    )
+                }
             }
         }
+        .sheet(
+            isPresented: $isConflictsPresented,
+            onDismiss: { viewModel.load() },
+            content: { ConflictsView(viewModel: container.makeConflictsViewModel()) }
+        )
         .task { viewModel.load() }
     }
 

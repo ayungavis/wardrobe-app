@@ -6,6 +6,9 @@ public protocol CompletedChallengeRepository: Sendable {
     func load() -> [CompletedChallenge]
     func append(_ completion: CompletedChallenge)
     func stage(_ completion: CompletedChallenge)
+    @discardableResult
+    func stageStatus(id: UUID, status: CompletionStatus) -> Bool
+    func commitStaged() throws
     func removeCompletions(on date: Date)
     func removeAll()
 }
@@ -14,6 +17,11 @@ public protocol CompletedChallengeRepository: Sendable {
 public extension CompletedChallengeRepository {
     func stage(_ completion: CompletedChallenge) {
         append(completion)
+    }
+
+    func applyStatus(id: UUID, status: CompletionStatus) throws {
+        stageStatus(id: id, status: status)
+        try commitStaged()
     }
 
     func hasCompletion(on date: Date, calendar: Calendar = .current) -> Bool {
@@ -58,6 +66,19 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         completions.append(completion)
         save(completions)
     }
+
+    // ponytail: the JSON blob has no staging area, so stage lands immediately
+    // and commit has nothing to do; the SwiftData repository is the real one.
+    @discardableResult
+    public func stageStatus(id: UUID, status: CompletionStatus) -> Bool {
+        var completions = load()
+        guard let index = completions.firstIndex(where: { $0.id == id }) else { return false }
+        completions[index].status = status
+        save(completions)
+        return true
+    }
+
+    public func commitStaged() {}
 
     public func removeCompletions(on date: Date) {
         let kept = load().filter { !calendar.isDate($0.completedAt, inSameDayAs: date) }
@@ -117,6 +138,17 @@ public final class SwiftDataCompletedChallengeRepository: CompletedChallengeRepo
         context.insert(entity)
     }
 
+    @discardableResult
+    public func stageStatus(id: UUID, status: CompletionStatus) -> Bool {
+        guard let entity = stored().first(where: { $0.id == id }) else { return false }
+        entity.status = status.rawValue
+        return true
+    }
+
+    public func commitStaged() throws {
+        try context.save()
+    }
+
     public func removeCompletions(on date: Date) {
         for entity in stored() where calendar.isDate(entity.completedAt, inSameDayAs: date) {
             context.delete(entity)
@@ -152,6 +184,7 @@ final class CompletionEntity {
     var completedAt: Date = Date()
     var previewFile: String?
     var syncQueuedAt: Date?
+    var status: String = CompletionStatus.canonical.rawValue
     var card: Data = Data()
     var document: Data = Data()
 
@@ -166,6 +199,7 @@ final class CompletionEntity {
         completedAt = completion.completedAt
         previewFile = completion.previewFile
         syncQueuedAt = completion.syncQueuedAt
+        status = completion.status.rawValue
         self.card = card
         self.document = document
     }
@@ -181,6 +215,7 @@ final class CompletionEntity {
             completedAt: completedAt, previewFile: previewFile
         )
         completion.syncQueuedAt = syncQueuedAt
+        completion.status = CompletionStatus(rawValue: status) ?? .canonical
         return completion
     }
 }

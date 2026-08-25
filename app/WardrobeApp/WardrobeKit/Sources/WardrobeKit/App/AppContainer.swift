@@ -147,14 +147,6 @@ public final class AppContainer {
         CropViewModel(photoID: photoID, photoRepository: photoRepository)
     }
 
-    public func makeWardrobeViewModel() -> WardrobeViewModel {
-        WardrobeViewModel(
-            thumbnails: garmentThumbnailRepository,
-            repository: makeWardrobeItemRepository(),
-            outbox: makeOutboxRepository()
-        )
-    }
-
     public func makeWardrobeItemDetailViewModel(itemID: UUID) -> WardrobeItemDetailViewModel {
         WardrobeItemDetailViewModel(
             itemID: itemID,
@@ -236,6 +228,7 @@ public final class AppContainer {
     func makeRestoreService() -> RestoreService {
         LocalRestoreService(
             wardrobe: SwiftDataWardrobeItemRepository(context: Self.wardrobeContext),
+            completions: SwiftDataCompletedChallengeRepository(context: Self.wardrobeContext),
             preferences: preferencesRepository
         )
     }
@@ -375,4 +368,26 @@ extension AppContainer {
     @MainActor
     private static let diagnosticsStore: any DiagnosticsStore =
         SwiftDataDiagnosticsStore(container: wardrobeContainer)
+}
+
+// MARK: - Wardrobe and its conflicts
+
+public extension AppContainer {
+    func makeWardrobeViewModel() -> WardrobeViewModel {
+        WardrobeViewModel(
+            thumbnails: garmentThumbnailRepository,
+            repository: makeWardrobeItemRepository(),
+            outbox: makeOutboxRepository(),
+            completions: completedChallengeRepository
+        )
+    }
+
+    func makeConflictsViewModel() -> ConflictsViewModel {
+        ConflictsViewModel(
+            wardrobe: makeWardrobeItemRepository(),
+            completions: completedChallengeRepository,
+            outbox: makeOutboxRepository(),
+            previews: completionPreviewRepository
+        )
+    }
 }

@@ -6,6 +6,8 @@ public struct HistoryView: View {
     @State private var navigationPath = NavigationPath()
     private let container: AppContainer
 
+    @State private var isConflictsPresented = false
+
     public init(viewModel: HistoryViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
@@ -72,6 +74,18 @@ public struct HistoryView: View {
                 )
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.openConflictCount > 0 {
+                ConflictsBannerView(count: viewModel.openConflictCount) {
+                    isConflictsPresented = true
+                }
+            }
+        }
+        .sheet(
+            isPresented: $isConflictsPresented,
+            onDismiss: { viewModel.load() },
+            content: { ConflictsView(viewModel: container.makeConflictsViewModel()) }
+        )
         .task { viewModel.load() }
     }
 

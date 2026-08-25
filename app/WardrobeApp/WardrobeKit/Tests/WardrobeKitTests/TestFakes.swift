@@ -47,6 +47,15 @@ final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, 
         stored.removeAll { Calendar.current.isDate($0.completedAt, inSameDayAs: date) }
     }
 
+    @discardableResult
+    func stageStatus(id: UUID, status: CompletionStatus) -> Bool {
+        guard let index = stored.firstIndex(where: { $0.id == id }) else { return false }
+        stored[index].status = status
+        return true
+    }
+
+    func commitStaged() {}
+
     func removeAll() {
         stored = []
     }
@@ -57,6 +66,7 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
     var storedItems: [WardrobeItem] = []
     var storedFingerprints: [ItemFingerprint] = []
     var storedWears: [WearRecord] = []
+    var storedConflicts: [ItemConflict] = []
     var itemsError: Error?
 
     func items() throws -> [WardrobeItem] {
@@ -72,6 +82,24 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
 
     func wears(for itemID: UUID) throws -> [WearRecord] {
         storedWears.filter { $0.itemID == itemID }
+    }
+
+    func openConflicts() throws -> [ItemConflict] {
+        storedConflicts.filter { $0.resolvedAt == nil }
+    }
+
+    func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws {
+        let index = storedItems.firstIndex { $0.id == conflict.itemID }
+        if choice == .useIncoming, conflict.field == .name, let value = conflict.value, let index {
+            storedItems[index].name = value
+        }
+        storedConflicts = storedConflicts.map { row in
+            guard row.itemID == conflict.itemID, row.field == conflict.field else { return row }
+            return ItemConflict(
+                id: row.id, itemID: row.itemID, field: row.field,
+                value: row.value, revision: row.revision, resolvedAt: Date()
+            )
+        }
     }
 
     func update(_ item: WardrobeItem) throws {

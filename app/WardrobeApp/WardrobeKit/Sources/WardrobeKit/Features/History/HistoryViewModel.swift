@@ -8,6 +8,7 @@ public final class HistoryViewModel {
 
     private let completedRepository: CompletedChallengeRepository
     private(set) var syncStates: [UUID: SyncState] = [:]
+    private(set) var openConflictCount = 0
     private let outbox: any OutboxRepository
     private let uploads: any MediaUploadRepository
     private let photoRepository: PhotoRepository
@@ -37,6 +38,9 @@ public final class HistoryViewModel {
     public func load() {
         state = .loaded(completedRepository.load().sorted { $0.completedAt > $1.completedAt })
         refreshSyncStates()
+        openConflictCount = ConflictCounting.openCount(
+            wardrobe: wardrobeRepository, completions: completedRepository
+        )
         renderedPreviews = [:]
     }
 

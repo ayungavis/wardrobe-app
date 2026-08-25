@@ -247,6 +247,12 @@ private final class RefusingCompletionStore: CompletedChallengeRepository {
 
     func append(_: CompletedChallenge) {}
 
+    func stageStatus(id _: UUID, status _: CompletionStatus) -> Bool {
+        false
+    }
+
+    func commitStaged() {}
+
     func removeCompletions(on _: Date) {}
 
     func removeAll() {}

@@ -81,6 +81,61 @@ struct RestoreServiceTests {
         #expect(try sut.repository.items().count == 1)
     }
 
+    // MARK: - Conflicts and statuses (T43)
+
+    @Test func aPulledConflictIsStoredForTheUser() throws {
+        let sut = try makeSUT()
+
+        try sut.applier.apply(page([conflictJSON()]))
+        try sut.repository.commitStaged()
+
+        let open = try sut.repository.openConflicts()
+        #expect(open.count == 1)
+        #expect(open.first?.field == .name)
+        #expect(open.first?.value == "x")
+    }
+
+    @Test func aPulledStatusLandsOnAnExistingCompletion() throws {
+        let sut = try makeSUT()
+        let completion = CompletedChallenge(
+            card: ChallengeCard(id: UUID(), prompt: "p"),
+            photoID: UUID(),
+            document: EditorDocument(id: UUID(), layers: []),
+            completedAt: Date()
+        )
+        sut.completions.append(completion)
+
+        try sut.applier.apply(page([completionJSON(id: completion.id, status: "superseded")]))
+        try sut.completions.commitStaged()
+
+        #expect(sut.completions.load().first?.status == .superseded)
+    }
+
+    @Test func aPulledWearCarriesItsWornOnDay() throws {
+        let sut = try makeSUT()
+
+        try sut.applier.apply(page([wearJSON(wornOn: "2026-01-05")]))
+        try sut.repository.commitStaged()
+
+        let worn = try #require(try sut.repository.wears(for: itemID).first?.wornAt)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone.current
+        let day = calendar.dateComponents([.year, .month, .day], from: worn)
+        #expect(day.year == 2026 && day.month == 1 && day.day == 5)
+    }
+
+    @Test func aPulledWearTombstoneRemovesTheLocalWear() throws {
+        let sut = try makeSUT()
+        try sut.applier.apply(page([wearJSON()]))
+        try sut.repository.commitStaged()
+        #expect(try sut.repository.wears(for: itemID).count == 1)
+
+        try sut.applier.apply(page([wearJSON(deleted: true)]))
+        try sut.repository.commitStaged()
+
+        #expect(try sut.repository.wears(for: itemID).isEmpty)
+    }
+
     // MARK: - Fixtures
 
     private let itemID = UUID(uuid: (0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x0A))
@@ -90,6 +145,7 @@ struct RestoreServiceTests {
     private struct SUT {
         let applier: LocalRestoreService
         let repository: SwiftDataWardrobeItemRepository
+        let completions: SwiftDataCompletedChallengeRepository
         let preferences: CountingPreferencesRepository
     }
 
@@ -98,11 +154,16 @@ struct RestoreServiceTests {
             for: SwiftDataWardrobeItemRepository.schema,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
-        let repository = SwiftDataWardrobeItemRepository(context: ModelContext(container))
+        let context = ModelContext(container)
+        let repository = SwiftDataWardrobeItemRepository(context: context)
+        let completions = SwiftDataCompletedChallengeRepository(context: context)
         let preferences = CountingPreferencesRepository()
         return SUT(
-            applier: LocalRestoreService(wardrobe: repository, preferences: preferences),
+            applier: LocalRestoreService(
+                wardrobe: repository, completions: completions, preferences: preferences
+            ),
             repository: repository,
+            completions: completions,
             preferences: preferences
         )
     }
@@ -133,10 +194,11 @@ struct RestoreServiceTests {
         """#
     }
 
-    private func wearJSON() -> String {
-        #"""
-        "kind":"wearRecord","record":{"id":"\#(wearID)","itemId":"\#(itemID)","wornOn":"2026-08-25",
-         "revision":1,"completionId":null,"sourcePhotoId":null,"changeSeq":1,"deletedAt":null}
+    private func wearJSON(wornOn: String = "2026-08-25", deleted: Bool = false) -> String {
+        let deletedAt = deleted ? "\"2026-08-25T12:00:00Z\"" : "null"
+        return #"""
+        "kind":"wearRecord","record":{"id":"\#(wearID)","itemId":"\#(itemID)","wornOn":"\#(wornOn)",
+         "revision":1,"completionId":null,"sourcePhotoId":null,"changeSeq":1,"deletedAt":\#(deletedAt)}
         """#
     }
 
@@ -148,10 +210,10 @@ struct RestoreServiceTests {
         """#
     }
 
-    private func completionJSON() -> String {
+    private func completionJSON(id: UUID = UUID(), status: String = "canonical") -> String {
         #"""
-        "kind":"challengeCompletion","record":{"id":"\#(UUID())","cardId":"\#(UUID())",
-         "status":"canonical","localDate":"2026-08-25","timeZone":"Asia/Makassar",
+        "kind":"challengeCompletion","record":{"id":"\#(id)","cardId":"\#(UUID())",
+         "status":"\#(status)","localDate":"2026-08-25","timeZone":"Asia/Makassar",
          "completedAt":"2026-08-25T09:00:00Z","photoId":null,"currentDerivativeId":null,
          "changeSeq":1,"deletedAt":null}
         """#

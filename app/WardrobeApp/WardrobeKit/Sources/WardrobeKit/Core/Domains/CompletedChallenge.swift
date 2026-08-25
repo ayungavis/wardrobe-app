@@ -1,5 +1,11 @@
 import Foundation
 
+public enum CompletionStatus: String, Codable, Sendable {
+    case canonical
+    case conflicting
+    case superseded
+}
+
 public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let card: ChallengeCard
@@ -8,6 +14,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     public let completedAt: Date
     public var previewFile: String?
     public var syncQueuedAt: Date?
+    public var status: CompletionStatus = .canonical
 
     public init(
         id: UUID = UUID(),
@@ -26,7 +33,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, card, photoID, document, completedAt, previewFile
+        case id, card, photoID, document, completedAt, previewFile, status
         case draft
     }
 
@@ -37,6 +44,7 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
         photoID = try container.decode(UUID.self, forKey: .photoID)
         completedAt = try container.decode(Date.self, forKey: .completedAt)
         previewFile = try container.decodeIfPresent(String.self, forKey: .previewFile)
+        status = try container.decodeIfPresent(CompletionStatus.self, forKey: .status) ?? .canonical
 
         if let document = try container.decodeIfPresent(EditorDocument.self, forKey: .document) {
             self.document = document
@@ -54,5 +62,6 @@ public struct CompletedChallenge: Codable, Equatable, Sendable, Identifiable {
         try container.encode(document, forKey: .document)
         try container.encode(completedAt, forKey: .completedAt)
         try container.encodeIfPresent(previewFile, forKey: .previewFile)
+        try container.encode(status, forKey: .status)
     }
 }

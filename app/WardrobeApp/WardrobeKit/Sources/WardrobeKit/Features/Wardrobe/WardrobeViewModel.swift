@@ -32,20 +32,25 @@ public final class WardrobeViewModel {
 
     private(set) var pendingSyncCount = 0
     private(set) var failedSyncCount = 0
+    private(set) var openConflictCount = 0
     private let outbox: (any OutboxRepository)?
+    private let completions: CompletedChallengeRepository?
 
     public init(
         thumbnails: GarmentThumbnailRepository,
         repository: WardrobeItemRepository,
-        outbox: (any OutboxRepository)? = nil
+        outbox: (any OutboxRepository)? = nil,
+        completions: CompletedChallengeRepository? = nil
     ) {
         self.thumbnails = thumbnails
         self.repository = repository
         self.outbox = outbox
+        self.completions = completions
     }
 
     public func load() {
         refreshSyncCounts()
+        openConflictCount = ConflictCounting.openCount(wardrobe: repository, completions: completions)
         loadTask?.cancel()
         if case .loaded = state {} else {
             state = .loading

@@ -6,6 +6,8 @@ public protocol WardrobeItemRepository: AnyObject {
     func items() throws -> [WardrobeItem]
     func fingerprints() throws -> [ItemFingerprint]
     func wears(for itemID: UUID) throws -> [WearRecord]
+    func openConflicts() throws -> [ItemConflict]
+    func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
     func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?)
     func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
@@ -21,7 +23,7 @@ public protocol WardrobeItemRepository: AnyObject {
 
 @MainActor
 public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
-    private let context: ModelContext
+    let context: ModelContext
     private let outbox: (any OutboxRepository)?
 
     public init(context: ModelContext, outbox: (any OutboxRepository)? = nil) {
@@ -33,7 +35,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         Schema([
             WardrobeItemEntity.self, ItemFingerprintEntity.self, WearRecordEntity.self,
             OutboxEntryEntity.self, SyncCursorEntity.self, DiagnosticEntryEntity.self,
-            CompletionEntity.self, MediaUploadEntity.self,
+            CompletionEntity.self, MediaUploadEntity.self, ItemConflictEntity.self,
         ])
     }
 
@@ -60,7 +62,18 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
             predicate: #Predicate { $0.itemID == itemID },
             sortBy: [SortDescriptor(\.wornAt, order: .reverse)]
         )
-        return try context.fetch(descriptor).map(\.domain)
+        let excluded = try nonCanonicalCompletionIDs()
+        return try context.fetch(descriptor)
+            .filter { wear in wear.completionID.map { !excluded.contains($0) } ?? true }
+            .map(\.domain)
+    }
+
+    private func nonCanonicalCompletionIDs() throws -> Set<UUID> {
+        let canonical = CompletionStatus.canonical.rawValue
+        let descriptor = FetchDescriptor<CompletionEntity>(
+            predicate: #Predicate { $0.status != canonical }
+        )
+        return try Set(context.fetch(descriptor).map(\.id))
     }
 
     public func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {
@@ -154,6 +167,20 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         context.insert(WearRecordEntity(wear))
     }
 
+    func stageApply(wear: WearRecord, deletedAt: Date?) throws {
+        let wearID = wear.id
+        let existing = try context.fetch(
+            FetchDescriptor<WearRecordEntity>(predicate: #Predicate { $0.id == wearID })
+        ).first
+        if deletedAt != nil {
+            if let existing {
+                context.delete(existing)
+            }
+            return
+        }
+        context.insert(WearRecordEntity(wear))
+    }
+
     public func commitStaged() throws {
         try context.save()
     }
@@ -205,7 +232,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         try context.save()
     }
 
-    private func stage(_ mutation: SyncMutation) throws {
+    func stage(_ mutation: SyncMutation) throws {
         guard let outbox else { return }
         try outbox.stage(mutation.queued(), at: Date())
     }
