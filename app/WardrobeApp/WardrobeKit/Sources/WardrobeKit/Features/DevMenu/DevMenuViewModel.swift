@@ -39,6 +39,7 @@ public final class DevMenuViewModel {
     private let media: any MediaRepository
     private let uploadQueue: any MediaUploadRepository
     private let applier: any RestoreService
+    private let revision: ContentRevisionModel?
     private let calendar: Calendar
 
     init(
@@ -61,6 +62,7 @@ public final class DevMenuViewModel {
         media: any MediaRepository,
         uploadQueue: any MediaUploadRepository,
         applier: any RestoreService = NoopRestoreService(),
+        revision: ContentRevisionModel? = nil,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -82,6 +84,7 @@ public final class DevMenuViewModel {
         self.media = media
         self.uploadQueue = uploadQueue
         self.applier = applier
+        self.revision = revision
         self.calendar = calendar
     }
 
@@ -180,14 +183,24 @@ public final class DevMenuViewModel {
         pullState = .loading
 
         pullTask = Task { [feed] in
+            var records = 0
             do {
                 let outcome = try await feed.pull(applying: applier)
                 try Task.checkCancellation()
+                records = outcome.records
                 pullState = .loaded(outcome)
             } catch is CancellationError {
+                return
             } catch {
                 Log.report(error, logger: Log.network)
                 pullState = .failed(AppError(wrapping: error))
+            }
+
+            // ponytail: the queue drains even when the pull failed — media queued
+            // by an earlier page must not be held hostage by a later refusal.
+            let fetched = await applier.restoreDueMedia(at: Date())
+            if records > 0 || fetched.restored > 0 {
+                revision?.bump()
             }
             refresh()
         }

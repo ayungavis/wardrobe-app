@@ -9,6 +9,7 @@ public final class AppContainer {
     let photoRepository: PhotoRepository
     let appleAccountRepository: AppleAccountRepository
     let preferencesRepository: AccountPreferencesRepository
+    let contentRevision = ContentRevisionModel()
     let completionPreviewRepository: CompletionPreviewRepository
     let onboarding: OnboardingModel
     private let session: SessionService
@@ -209,6 +210,7 @@ public final class AppContainer {
         uploads: makeMediaUploadRepository(),
         media: makeMediaRepository(),
         preferences: preferencesRepository,
+        revision: contentRevision,
         applier: makeRestoreService()
     )
 
@@ -302,7 +304,8 @@ public extension AppContainer {
             diagnosticsStore: diagnostics,
             media: makeMediaRepository(),
             uploadQueue: makeMediaUploadRepository(),
-            applier: makeRestoreService()
+            applier: makeRestoreService(),
+            revision: contentRevision
         )
     }
 }

@@ -38,6 +38,7 @@ final class ServerSyncService: SyncService {
     private let media: any MediaRepository
     private let preferences: any AccountPreferencesRepository
     private let applier: any RestoreService
+    private let revision: ContentRevisionModel?
     private var inFlight: Task<ReconcileOutcome, Never>?
 
     init(
@@ -47,6 +48,7 @@ final class ServerSyncService: SyncService {
         uploads: any MediaUploadRepository,
         media: any MediaRepository,
         preferences: any AccountPreferencesRepository,
+        revision: ContentRevisionModel? = nil,
         applier: any RestoreService = NoopRestoreService()
     ) {
         self.client = client
@@ -56,6 +58,7 @@ final class ServerSyncService: SyncService {
         self.media = media
         self.preferences = preferences
         self.applier = applier
+        self.revision = revision
     }
 
     func reconcile(_ trigger: SyncTrigger) async -> ReconcileOutcome {
@@ -99,6 +102,9 @@ final class ServerSyncService: SyncService {
             outcome.pulled = try await feed.pull(applying: applier).records
             let fetched = await applier.restoreDueMedia(at: Date())
             outcome.downloaded = fetched.restored
+            if outcome.pulled > 0 || fetched.restored > 0 {
+                revision?.bump()
+            }
             if let fatal = fetched.fatal, outcome.pullError == nil {
                 outcome.pullError = fatal
             }

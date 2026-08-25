@@ -101,7 +101,7 @@ public struct WardrobeView: View {
             onDismiss: { viewModel.load() },
             content: { ConflictsView(viewModel: container.makeConflictsViewModel()) }
         )
-        .task { viewModel.load() }
+        .task(id: container.contentRevision.revision) { viewModel.load() }
     }
 
     private var topBar: some View {

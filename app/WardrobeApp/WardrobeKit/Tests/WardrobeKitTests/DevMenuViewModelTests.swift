@@ -4,6 +4,17 @@ import Testing
 
 @MainActor
 struct DevMenuViewModelTests {
+    @Test func pullingAlsoDrainsTheDownloadQueue() async {
+        let applier = CountingRestoreService()
+        let sut = makeDevMenuViewModel(applier: applier)
+
+        sut.pullChanges()
+        await sut.pullTask?.value
+
+        #expect(applier.drained == 1,
+                "a pull that only queues downloads leaves restored media stranded forever")
+    }
+
     @Test func resetWardrobeClearsItemsAndTheirImages() throws {
         let wardrobe = InMemoryWardrobeItemRepository()
         let thumbnails = InMemoryGarmentThumbnailRepository()

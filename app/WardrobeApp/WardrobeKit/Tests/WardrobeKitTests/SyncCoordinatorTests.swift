@@ -4,6 +4,15 @@ import Testing
 
 @MainActor
 struct SyncCoordinatorTests {
+    @Test func aPullThatBringsRecordsAsksTheScreensToReload() async throws {
+        let sut = try makeSUT()
+
+        _ = await sut.coordinator.reconcile(.manual)
+
+        #expect(sut.revision.revision == 1,
+                "a screen whose .task already ran keeps showing stale data until the id changes")
+    }
+
     // MARK: - Single flight
 
     @Test func twoTriggersAtOnceProduceOneRun() async throws {
@@ -157,6 +166,7 @@ struct SyncCoordinatorTests {
         let client: StubSyncClient
         let outbox: StoredOutboxRepository
         let cursor: InMemoryCursorStore
+        let revision: ContentRevisionModel
     }
 
     private func makeSUT() throws -> SUT {
@@ -164,13 +174,14 @@ struct SyncCoordinatorTests {
         let outbox = StoredOutboxRepository(store: InMemoryOutboxStore())
         let cursor = InMemoryCursorStore()
         let feed = ServerChangeFeedRepository(client: client, cursor: cursor)
+        let revision = ContentRevisionModel()
         return SUT(
             coordinator: ServerSyncService(
                 client: client, outbox: outbox, feed: feed,
                 uploads: makeInMemoryUploads(), media: StubMediaRepository(),
-                preferences: makeGrantedPreferences()
+                preferences: makeGrantedPreferences(), revision: revision
             ),
-            client: client, outbox: outbox, cursor: cursor
+            client: client, outbox: outbox, cursor: cursor, revision: revision
         )
     }
 

@@ -94,7 +94,7 @@ public struct HistoryView: View {
             onDismiss: { viewModel.load() },
             content: { ConflictsView(viewModel: container.makeConflictsViewModel()) }
         )
-        .task { viewModel.load() }
+        .task(id: container.contentRevision.revision) { viewModel.load() }
     }
 
     @ViewBuilder

@@ -16,7 +16,8 @@ func makeDevMenuViewModel(
     ),
     session: FakeSessionService = FakeSessionService(),
     client: any AuthenticatedAPIClient = StubAuthenticatedClient(),
-    tokens: SessionTokenRepository = StoredSessionTokenRepository(store: InMemorySecureStore())
+    tokens: SessionTokenRepository = StoredSessionTokenRepository(store: InMemorySecureStore()),
+    applier: any RestoreService = NoopRestoreService()
 ) -> DevMenuViewModel {
     DevMenuViewModel(
         activeRepository: activeRepository,
@@ -45,7 +46,8 @@ func makeDevMenuViewModel(
         media: ServerMediaRepository(
             client: StubAuthenticatedClient(), cache: InMemoryMediaCacheStore()
         ),
-        uploadQueue: makeInMemoryUploads()
+        uploadQueue: makeInMemoryUploads(),
+        applier: applier
     )
 }
 
@@ -54,4 +56,19 @@ func makeDevMenuWardrobeItem() -> WardrobeItem {
     let id = UUID()
     return WardrobeItem(id: id, category: .top, cutoutFile: "\(id.uuidString).png",
                         createdAt: Date(), updatedAt: Date())
+}
+
+@MainActor
+final class CountingRestoreService: RestoreService {
+    private(set) var applied = 0
+    private(set) var drained = 0
+
+    func apply(_ changes: [ChangeDTO]) throws {
+        applied += changes.count
+    }
+
+    func restoreDueMedia(at _: Date) async -> (restored: Int, fatal: AppError?) {
+        drained += 1
+        return (0, nil)
+    }
 }
