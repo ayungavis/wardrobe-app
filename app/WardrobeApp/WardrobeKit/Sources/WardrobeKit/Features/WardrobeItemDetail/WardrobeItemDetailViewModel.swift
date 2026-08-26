@@ -154,6 +154,21 @@ public final class WardrobeItemDetailViewModel {
         }
     }
 
+    var isRegenerating: Bool {
+        item.map { $0.status == .pending || $0.status == .processing } ?? false
+    }
+
+    func regenerateIllustration(note: String) {
+        guard let item else { return }
+        do {
+            try repository.regenerateIllustration(itemID: item.id, note: note)
+            Log.ui.info("Wardrobe: illustration asked for again")
+            load()
+        } catch {
+            Log.report(error)
+        }
+    }
+
     public func updateItem(name: String, description: String) {
         guard var updated = item else { return }
         updated.name = name

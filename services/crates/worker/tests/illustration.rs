@@ -396,6 +396,67 @@ async fn a_refusal_records_the_http_status(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_prompt_names_the_garment_it_is_drawing(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    sqlx::query("update wardrobe_item set category = 'bottom', name = 'Blue shorts' where id = $1")
+        .bind(scene.item)
+        .execute(&pool)
+        .await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    run(&pool, &server, false).await;
+
+    let prompt = sent_body(&server).await["prompt"]
+        .as_str()
+        .expect("a prompt")
+        .to_lowercase();
+    assert!(
+        prompt.contains("bottom"),
+        "a model shown only a cut-out draws a shirt for a pair of shorts"
+    );
+    assert!(
+        prompt.contains("blue shorts"),
+        "the item's own name is the sharpest hint there is"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_regeneration_note_reaches_the_prompt(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool, true).await?;
+    sqlx::query("update job set payload = payload || jsonb_build_object('note', $2) where id = $1")
+        .bind(scene.job)
+        .bind("these are shorts, not a shirt")
+        .execute(&pool)
+        .await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    run(&pool, &server, false).await;
+
+    let prompt = sent_body(&server).await["prompt"]
+        .as_str()
+        .expect("a prompt")
+        .to_owned();
+    assert!(
+        prompt.contains("these are shorts, not a shirt"),
+        "the whole point of asking again is being able to say what went wrong"
+    );
+    Ok(())
+}
+
 // ----------------------------------------------------------------- limits
 
 #[sqlx::test(migrations = "../../migrations")]

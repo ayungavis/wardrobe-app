@@ -9,7 +9,7 @@ struct ChangeFeedTests {
         let client = StubFeedClient()
         client.pages = Array(repeating: #"{"changes":[],"nextSince":0}"#, count: 2)
         let cursor = InMemoryCursorStore()
-        cursor.seed(position: 18, interpretation: 0)
+        cursor.seed(position: 18, interpretation: FeedInterpretation.version - 1)
         let feed = ServerChangeFeedRepository(client: client, cursor: cursor)
 
         _ = try await feed.pull(applying: NoopRestoreService())

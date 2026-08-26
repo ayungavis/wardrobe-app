@@ -5,6 +5,26 @@ import Testing
 
 @MainActor
 struct IllustrationRestoreTests {
+    @Test func anItemNobodyEverQueuedIsNotWaitingForAnything() throws {
+        let sut = try makeSUT()
+
+        try sut.applier.apply(page([itemJSON(illustrationState: "none")]))
+        try sut.repository.commitStaged()
+
+        #expect(try sut.repository.items().first?.status == ItemStatus.undrawn,
+                "promising a drawing that no job will ever make is a lie the screen tells")
+    }
+
+    @Test func aPulledItemCarriesWhereItsIllustrationGotTo() throws {
+        let sut = try makeSUT()
+
+        try sut.applier.apply(page([itemJSON(illustrationState: "failed")]))
+        try sut.repository.commitStaged()
+
+        #expect(try sut.repository.items().first?.status == .failed,
+                "a screen that cannot see a failure cannot offer to fix it")
+    }
+
     @Test func aPulledItemKeepsItsIllustrationPointer() throws {
         let sut = try makeSUT()
         let illustrationID = UUID()

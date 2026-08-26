@@ -9,6 +9,7 @@ public protocol WardrobeItemRepository: AnyObject {
     func openConflicts() throws -> [ItemConflict]
     func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws
     func merge(winnerID: UUID, loserID: UUID) throws
+    func regenerateIllustration(itemID: UUID, note: String?) throws
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
     func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?)
     func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
@@ -149,6 +150,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         entity.itemDescription = pulled.item.description
         entity.category = pulled.item.category.rawValue
         entity.currentIllustrationID = pulled.item.currentIllustrationID
+        entity.status = pulled.item.status.rawValue
         entity.deletedAt = pulled.deletedAt
         entity.categoryRev = pulled.revisions.category
         entity.nameRev = pulled.revisions.name

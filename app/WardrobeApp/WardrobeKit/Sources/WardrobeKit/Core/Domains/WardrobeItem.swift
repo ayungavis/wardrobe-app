@@ -45,6 +45,7 @@ public struct WardrobeItem: Identifiable, Equatable, Sendable {
 }
 
 public enum ItemStatus: String, CaseIterable, Codable, Sendable {
+    case undrawn
     case pending
     case processing
     case ready

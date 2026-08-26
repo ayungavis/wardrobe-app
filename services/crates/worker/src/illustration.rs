@@ -313,6 +313,62 @@ fn item_of(job: &ClaimedJob) -> Result<Uuid, &'static str> {
         .ok_or("unusable_payload")
 }
 
+#[derive(sqlx::FromRow)]
+struct Subject {
+    category: String,
+    name: Option<String>,
+    garment_type: Option<String>,
+    color: Option<String>,
+    description: Option<String>,
+}
+
+async fn subject(pool: &PgPool, item: Uuid) -> Result<Option<Subject>, &'static str> {
+    sqlx::query_as(
+        "select category, name, garment_type, color, description
+           from wardrobe_item where id = $1",
+    )
+    .bind(item)
+    .fetch_optional(pool)
+    .await
+    .map_err(|_| "database")
+}
+
+fn note_of(job: &ClaimedJob) -> Option<String> {
+    job.payload
+        .get("note")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|note| !note.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+// --- The model is shown a cut-out with no context, so a pair of shorts comes
+// back as a shirt unless the request says what it is looking at.
+fn describe(template: &str, subject: Option<&Subject>, note: Option<&str>) -> String {
+    let mut prompt = template.to_owned();
+    if let Some(subject) = subject {
+        let mut facts = vec![format!("category: {}", subject.category)];
+        for (label, value) in [
+            ("name", subject.name.as_deref()),
+            ("type", subject.garment_type.as_deref()),
+            ("colour", subject.color.as_deref()),
+            ("notes", subject.description.as_deref()),
+        ] {
+            if let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) {
+                facts.push(format!("{label}: {value}"));
+            }
+        }
+        prompt.push_str(" The garment is described as — ");
+        prompt.push_str(&facts.join("; "));
+        prompt.push('.');
+    }
+    if let Some(note) = note {
+        prompt.push_str(" The wearer adds: ");
+        prompt.push_str(note);
+    }
+    prompt
+}
+
 async fn owner(pool: &PgPool, item: Uuid) -> Result<Option<Uuid>, &'static str> {
     sqlx::query_scalar("select account_id from wardrobe_item where id = $1 and deleted_at is null")
         .bind(item)
@@ -339,6 +395,11 @@ pub async fn render_for(
     };
     let settings = settings(pool).await?;
     let pinned = pin(pool, job.id, &settings).await?;
+    let prompt = describe(
+        &settings.prompt,
+        subject(pool, item).await?.as_ref(),
+        note_of(job).as_deref(),
+    );
 
     let Some(cutout) = cutout_for(pool, item).await? else {
         return set_state(pool, account, item, "failed").await;
@@ -389,7 +450,7 @@ pub async fn render_for(
         &provider.api_key,
         &Ask {
             model: &pinned.model,
-            prompt: &settings.prompt,
+            prompt: &prompt,
             cutout: &bytes,
             content_type: "image/png",
             resolution: &settings.resolution,

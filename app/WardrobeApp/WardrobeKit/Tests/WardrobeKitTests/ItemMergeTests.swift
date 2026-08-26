@@ -5,6 +5,29 @@ import Testing
 
 @MainActor
 struct ItemMergeTests {
+    @Test func askingForANewIllustrationSendsTheNoteWithIt() throws {
+        let sut = try makeSUT()
+
+        try sut.wardrobe.regenerateIllustration(itemID: winnerID, note: "  these are shorts  ")
+
+        let entries = try sut.outbox.entries()
+        #expect(entries.map(\.name) == ["regenerateIllustration"])
+        let payload = try #require(entries.first?.payload)
+        let json = try #require(try JSONSerialization.jsonObject(with: payload) as? [String: Any])
+        #expect(json["itemId"] as? String == winnerID.uuidString)
+        #expect(json["note"] as? String == "these are shorts", "whitespace is not guidance")
+    }
+
+    @Test func askingWithoutANoteSendsNone() throws {
+        let sut = try makeSUT()
+
+        try sut.wardrobe.regenerateIllustration(itemID: winnerID, note: "   ")
+
+        let payload = try #require(try sut.outbox.entries().first?.payload)
+        let json = try #require(try JSONSerialization.jsonObject(with: payload) as? [String: Any])
+        #expect(json["note"] == nil)
+    }
+
     @Test func aMergeStagesExactlyOneMergeItemsMutation() throws {
         let sut = try makeSUT()
 

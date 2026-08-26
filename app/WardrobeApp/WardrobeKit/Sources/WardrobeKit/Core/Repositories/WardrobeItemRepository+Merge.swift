@@ -4,6 +4,20 @@ import SwiftData
 // MARK: - Merging two items (FR-026)
 
 public extension SwiftDataWardrobeItemRepository {
+    func regenerateIllustration(itemID: UUID, note: String?) throws {
+        let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        try stage(.regenerateIllustration(RegenerateIllustrationArgsDTO(
+            itemId: itemID,
+            note: trimmed?.isEmpty == false ? trimmed : nil
+        )))
+        if let entity = try context.fetch(
+            FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
+        ).first {
+            entity.status = ItemStatus.pending.rawValue
+        }
+        try context.save()
+    }
+
     func merge(winnerID: UUID, loserID: UUID) throws {
         guard winnerID != loserID else { throw AppError.unexpected }
         let loser = try context.fetch(

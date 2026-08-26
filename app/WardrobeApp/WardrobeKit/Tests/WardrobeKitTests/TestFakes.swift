@@ -94,6 +94,12 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedItems.removeAll { $0.id == loserID }
     }
 
+    private(set) var regenerated: [(id: UUID, note: String?)] = []
+
+    func regenerateIllustration(itemID: UUID, note: String?) throws {
+        regenerated.append((itemID, note))
+    }
+
     func openConflicts() throws -> [ItemConflict] {
         storedConflicts.filter { $0.resolvedAt == nil }
     }

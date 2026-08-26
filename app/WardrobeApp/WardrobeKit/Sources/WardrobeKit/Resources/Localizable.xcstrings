@@ -6121,6 +6121,23 @@
         }
       }
     },
+    "wardrobe.detail.illustration.undrawn": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No drawing yet"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada gambar"
+          }
+        }
+      }
+    },
     "wardrobe.detail.lastWorn": {
       "localizations": {
         "en": {
@@ -6246,6 +6263,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum pernah"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerate"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gambar ulang"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.disclaimer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The drawing follows this item's name, category, and description — correcting those first gives the best result, and the correction stays for next time."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gambar mengikuti nama, kategori, dan deskripsi item ini — memperbaikinya dulu memberi hasil terbaik, dan perbaikan itu bertahan untuk seterusnya."
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anything else to say? (optional)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ada keterangan lain? (opsional)"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.notePlaceholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. these are shorts, not a shirt"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mis. ini celana pendek, bukan baju"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draw it again"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gambar ulang"
           }
         }
       }

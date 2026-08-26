@@ -9,7 +9,7 @@ import Foundation
 // starts reading a field or kind it used to drop — that rewinds every device's
 // cursor once so the old records are re-read under the new reading.
 enum FeedInterpretation {
-    static let version = 1
+    static let version = 2
 }
 
 @MainActor
@@ -113,6 +113,7 @@ final class LocalRestoreService: RestoreService {
                 name: record.name,
                 description: record.description ?? "",
                 category: GarmentCategory(rawValue: record.category) ?? .top,
+                status: Self.status(of: record.illustrationState),
                 cutoutFile: "",
                 currentIllustrationID: record.currentIllustrationId,
                 createdAt: Date(),
@@ -121,6 +122,17 @@ final class LocalRestoreService: RestoreService {
             deletedAt: record.deletedAt,
             revisions: Self.revisions(from: record.attributeRevisions)
         ))
+    }
+
+    private static func status(of illustrationState: String) -> ItemStatus {
+        switch illustrationState {
+        case "queued": .pending
+        case "rendering": .processing
+        case "ready": .ready
+        case "failed": .failed
+        case "none": .undrawn
+        default: .pending
+        }
     }
 
     private static func revisions(from tree: JSONValue) -> SwiftDataWardrobeItemRepository.PulledRevisions {

@@ -78,9 +78,9 @@ func conflictJSON(id: UUID, resolvedAt: String?) -> String {
 }
 
 @MainActor
-func itemJSON(illustrationID: UUID? = nil) -> String {
+func itemJSON(illustrationID: UUID? = nil, illustrationState: String? = nil) -> String {
     let pointer = illustrationID.map { "\"\($0)\"" } ?? "null"
-    let state = illustrationID == nil ? "none" : "ready"
+    let state = illustrationState ?? (illustrationID == nil ? "none" : "ready")
     return #"""
     "kind":"wardrobeItem","record":{"id":"\#(itemID)","category":"top","name":"coat",
      "color":null,"garmentType":null,"description":null,

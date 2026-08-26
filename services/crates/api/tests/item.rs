@@ -33,6 +33,109 @@ async fn upsert(pool: &PgPool, token: &str, args: &Value) -> Value {
     body_json(response).await["results"][0].clone()
 }
 
+async fn regenerate(pool: &PgPool, token: &str, item: Uuid, note: Option<&str>) -> Value {
+    let mut args = json!({ "itemId": item });
+    if let Some(note) = note {
+        args["note"] = json!(note);
+    }
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(
+            json!({ "mutations": [{
+                "id": Uuid::now_v7(), "name": "regenerateIllustration", "args": args
+            }]})
+            .to_string(),
+        ))
+        .expect("request");
+    let response = call(pool.clone(), request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["results"][0].clone()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn regenerating_revives_the_job_the_dedupe_key_locked(pool: PgPool) -> sqlx::Result<()> {
+    let (token, account) = session(&pool, Duration::days(1), false).await?;
+    let item = Uuid::now_v7();
+    sqlx::query(
+        "insert into wardrobe_item (id, account_id, category, change_seq, illustration_state)
+         values ($1, $2, 'bottom', 1, 'failed')",
+    )
+    .bind(item)
+    .bind(account)
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "insert into job (id, account_id, kind, dedupe_key, payload, status, attempts,
+                          last_error_code)
+         values ($1, $2, 'illustration', $3, jsonb_build_object('itemId', $4::text),
+                 'failed', 3, 'provider_refused')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(format!("{item}:v1"))
+    .bind(item.to_string())
+    .execute(&pool)
+    .await?;
+
+    let result = regenerate(&pool, &token, item, Some("these are shorts")).await;
+
+    assert_eq!(result["status"], "applied");
+    let (status, attempts, note, error): (String, i32, Option<String>, Option<String>) =
+        sqlx::query_as(
+            "select status, attempts, payload->>'note', last_error_code from job
+              where dedupe_key = $1",
+        )
+        .bind(format!("{item}:v1"))
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(
+        (status.as_str(), attempts, error),
+        ("pending", 0, None),
+        "a manual retry resets the attempts the automatic ones spent"
+    );
+    assert_eq!(note.as_deref(), Some("these are shorts"));
+
+    let state: String =
+        sqlx::query_scalar("select illustration_state from wardrobe_item where id = $1")
+            .bind(item)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(state, "queued");
+
+    let jobs: i64 = sqlx::query_scalar("select count(*) from job where account_id = $1")
+        .bind(account)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(
+        jobs, 1,
+        "the dedupe key is what stops paying for two renders at once"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn regenerating_someone_elses_item_is_not_found(pool: PgPool) -> sqlx::Result<()> {
+    let (token, _) = session(&pool, Duration::days(1), false).await?;
+    let (_, stranger) = session(&pool, Duration::days(1), false).await?;
+    let item = Uuid::now_v7();
+    sqlx::query(
+        "insert into wardrobe_item (id, account_id, category, change_seq) values ($1, $2, 'top', 1)",
+    )
+    .bind(item)
+    .bind(stranger)
+    .execute(&pool)
+    .await?;
+
+    let result = regenerate(&pool, &token, item, None).await;
+
+    assert_eq!(result["status"], "failed");
+    assert_eq!(result["error"]["code"], "not_found");
+    Ok(())
+}
+
 async fn on_a_device(pool: &PgPool) -> sqlx::Result<(String, Uuid, Uuid)> {
     let (token, account) = session(pool, Duration::days(1), false).await?;
     let device = Uuid::now_v7();

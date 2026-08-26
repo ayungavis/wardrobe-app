@@ -24,6 +24,9 @@ pub async fn apply(
         "completeChallenge" => mutations::complete_challenge::apply(pool, account_id, args).await,
         "deleteItem" => mutations::delete_item::apply(pool, account_id, args).await,
         "mergeItems" => mutations::merge_items::apply(pool, account_id, args).await,
+        "regenerateIllustration" => {
+            mutations::regenerate_illustration::apply(pool, account_id, args).await
+        }
         "resolveCompletion" => mutations::resolve_completion::apply(pool, account_id, args).await,
         "upsertItem" => mutations::upsert_item::apply_as(pool, account_id, device, args).await,
         "upsertPreferences" => mutations::upsert_preferences::apply(pool, account_id, args).await,
