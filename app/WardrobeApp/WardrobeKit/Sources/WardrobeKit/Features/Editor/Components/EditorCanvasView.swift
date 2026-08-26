@@ -285,7 +285,7 @@ struct EditorCanvasView: View {
 
 private struct CanvasFrameView: View {
     let background: CanvasBackground
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     @Binding var canvasSize: CGSize
 
     var body: some View {

@@ -1,9 +1,3 @@
-//
-//  TipsStageView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 20/08/26.
-//
 import DesignSystem
 import SwiftUI
 
@@ -11,15 +5,14 @@ struct TipsStageView: View {
     let onContinue: (Bool) -> Void
     let onClose: () -> Void
     @State private var dontShowAgain = false
-    
+
     var body: some View {
         ZStack(alignment: .center) {
-            Color.black.opacity(0.3).ignoresSafeArea()
-                
-            
+            AppColor.mediaBackground.opacity(0.3).ignoresSafeArea()
+
             VStack {
                 Spacer()
-                
+
                 ZStack(alignment: .bottomTrailing) {
                     Image("TipsScreen", bundle: .module)
                         .resizable()
@@ -38,12 +31,12 @@ struct TipsStageView: View {
                                 Text("capture.tips.title", bundle: .module)
                                     .font(AppFont.title.bold())
                                     .foregroundStyle(AppColor.textPrimary)
-                                
+
                                 VStack(alignment: .leading, spacing: Spacing.xs) {
                                     bullet("capture.tips.bullet1")
                                     bullet("capture.tips.bullet2")
                                 }
-                                
+
                                 Button {
                                     dontShowAgain.toggle()
                                 } label: {
@@ -56,7 +49,7 @@ struct TipsStageView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                
+
                                 HStack {
                                     Spacer()
                                     PrimaryButtonView(Text("capture.tips.gotIt", bundle: .module), minHeight: 28) {
@@ -69,22 +62,15 @@ struct TipsStageView: View {
                         }
                 }
                 .padding(.horizontal, Spacing.lg)
-                
+
                 Spacer()
             }
-            
-//            Button(action: onClose) {
-//                Image(systemName: "chevron.left")
-//                    .font(.system(size: 20, weight: .semibold))
-//                    .foregroundStyle(.white)
-//                    .padding()
-//            }
         }
     }
-    
+
     private func bullet(_ key: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: Spacing.xs) {
-            Text("•")
+            Text(verbatim: "•")
             Text(key, bundle: .module)
         }
         .font(AppFont.body)

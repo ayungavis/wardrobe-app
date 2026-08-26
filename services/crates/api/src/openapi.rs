@@ -2,12 +2,6 @@ use utoipa::OpenApi;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, openapi::OpenApi as OpenApiDoc};
 
-/// The document served at `/openapi.json` and rendered at `/docs`.
-///
-/// It is generated from the handlers themselves, so it cannot describe an
-/// endpoint that does not exist. The decisions it *cannot* express — why the
-/// cursor is what it is, what idempotency guarantees, what an anonymous account
-/// actually protects — live in `docs/api-contract.md`.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -15,22 +9,17 @@ use utoipa::{Modify, openapi::OpenApi as OpenApiDoc};
         description = "Backend for the Wardrobe Challenge App. Session tokens are issued by the server; \
                        the client never asserts an identity of its own.",
         version = "0.1.0",
-        // Without this, utoipa emits an empty license object from Cargo.toml.
         license(name = "Proprietary"),
     ),
     modifiers(&SecurityAddon),
     tags(
+        (name = "challenge", description = "The daily challenge deck"),
         (name = "health", description = "Liveness and readiness"),
         (name = "session", description = "Session lifecycle and identity"),
     )
 )]
 pub struct ApiDoc;
 
-/// The document as it is committed to `services/openapi.json`.
-///
-/// One function behind both the generator and the drift test, so the file and
-/// the check can never disagree about formatting.
-///
 /// # Panics
 ///
 /// Panics if the derived document cannot be serialised, which would mean the
@@ -48,8 +37,6 @@ struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut OpenApiDoc) {
-        // `components` is always present once anything is registered, but the
-        // type is optional; adding it here keeps the scheme defined either way.
         let components = openapi.components.get_or_insert_with(Default::default);
         components.add_security_scheme(
             "session",

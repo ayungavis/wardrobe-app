@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ChallengeDeckView: View {
     let cards: [ChallengeCard]
+    var garments: (ChallengeCard) -> CardGarments = { _ in CardGarments() }
     let onAccept: (ChallengeCard) -> Void
 
     @State private var currentIndex = 0
@@ -16,25 +17,23 @@ struct ChallengeDeckView: View {
     private let parkedOffsetY: CGFloat = -100
     private let swipeThreshold: CGFloat = 120
     private let hapticStepDistance: CGFloat = 12
-    
-    private static let freestyleCard = ChallengeCard(id: UUID(), prompt: "Freestyle")
-    
+
     private var isDeckCleared: Bool {
-            currentIndex >= cards.count
-        }
-    
+        currentIndex >= cards.count
+    }
+
     var body: some View {
         ZStack {
             FreestyleOutfitView(
-                titleKey:"challenge.freestyle.title",
+                titleKey: "challenge.freestyle.title",
                 messageKey: "challenge.freestyle.text",
                 buttonKey: "challenge.accept",
-                onAccept: { onAccept(Self.freestyleCard) }
+                onAccept: { onAccept(ChallengeCard.freestyle) }
             )
             .aspectRatio(346 / 617, contentMode: .fit)
             .zIndex(-Double(cards.count) - 1)
             .allowsHitTesting(isDeckCleared)
-            
+
             ForEach(cards.indices, id: \.self) { index in
                 cardView(for: index)
             }
@@ -49,6 +48,7 @@ struct ChallengeDeckView: View {
 
         ChallengeCardView(
             card: cards[index],
+            garments: garments(cards[index]),
             onAccept: { onAccept(cards[index]) }
         )
         .rotationEffect(rotation(for: index))
@@ -77,7 +77,7 @@ struct ChallengeDeckView: View {
                 dragOffset = min(0, value.translation.width)
                 tickIfNeeded(currentOffset: dragOffset)
                 if dragOffset == 0 {
-                    Self.prepareHaptic()   // new — primes it right as the drag starts
+                    Self.prepareHaptic() // new — primes it right as the drag starts
                 }
             }
             .onEnded { value in
@@ -117,52 +117,46 @@ struct ChallengeDeckView: View {
                 }
             }
     }
-    private static let hapticGenerator: UIImpactFeedbackGenerator = {
-        #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light)
-        #endif
-    }()
+
+    #if os(iOS)
+        private static let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
+    #endif
 
     private static func prepareHaptic() {
         #if os(iOS)
             hapticGenerator.prepare()
         #endif
     }
+
     private static func playHaptic() {
-            #if os(iOS)
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-            #endif
-        }
+        #if os(iOS)
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        #endif
+    }
+
     private func tickIfNeeded(currentOffset: CGFloat) {
-            guard abs(currentOffset - lastHapticTickOffset) >= hapticStepDistance else { return }
-            lastHapticTickOffset = currentOffset
-            Self.playSelectionHaptic()
-        }
+        guard abs(currentOffset - lastHapticTickOffset) >= hapticStepDistance else { return }
+        lastHapticTickOffset = currentOffset
+        Self.playSelectionHaptic()
+    }
 
-        private static let selectionGenerator: UISelectionFeedbackGenerator = {
-            #if os(iOS)
-                UISelectionFeedbackGenerator()
-            #endif
-        }()
+    #if os(iOS)
+        private static let selectionGenerator = UISelectionFeedbackGenerator()
+        private static let impactGenerator = UIImpactFeedbackGenerator(style: .light)
+    #endif
 
-        private static let impactGenerator: UIImpactFeedbackGenerator = {
-            #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light)
-            #endif
-        }()
+    private static func playSelectionHaptic() {
+        #if os(iOS)
+            selectionGenerator.selectionChanged()
+        #endif
+    }
 
-        private static func playSelectionHaptic() {
-            #if os(iOS)
-                selectionGenerator.selectionChanged()
-            #endif
-        }
-
-        private static func playImpactHaptic() {
-            #if os(iOS)
-                impactGenerator.impactOccurred()
-            #endif
-        }
+    private static func playImpactHaptic() {
+        #if os(iOS)
+            impactGenerator.impactOccurred()
+        #endif
+    }
 }
 
 #Preview {

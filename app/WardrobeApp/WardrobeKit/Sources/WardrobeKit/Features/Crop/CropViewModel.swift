@@ -7,11 +7,11 @@ import Observation
 public final class CropViewModel {
     public private(set) var image: Loadable<CGImage> = .idle
 
-    private let photoID: String
+    private let photoID: UUID
     private let photoRepository: PhotoRepository
     private(set) var loadTask: Task<Void, Never>?
 
-    public init(photoID: String, photoRepository: PhotoRepository) {
+    public init(photoID: UUID, photoRepository: PhotoRepository) {
         self.photoID = photoID
         self.photoRepository = photoRepository
     }

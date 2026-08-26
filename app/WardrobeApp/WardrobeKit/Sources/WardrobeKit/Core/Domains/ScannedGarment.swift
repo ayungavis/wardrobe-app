@@ -2,6 +2,7 @@ import Foundation
 
 public struct ScannedGarment: Identifiable, Equatable, Sendable {
     public let id: UUID
+    public let wearID: UUID
     public let name: String
     public let description: String
     public let category: GarmentCategory
@@ -9,18 +10,22 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
     public let fingerprint: ItemFingerprint
     public let matches: [ItemMatch]
     public var decision: Decision
+    public var wornAt: Date?
 
     public init(
         id: UUID,
+        wearID: UUID = UUID(),
         name: String? = nil,
         description: String = "",
         category: GarmentCategory,
         cutoutFile: String,
         fingerprint: ItemFingerprint,
         matches: [ItemMatch],
-        decision: Decision
+        decision: Decision,
+        wornAt: Date? = nil
     ) {
         self.id = id
+        self.wearID = wearID
         self.name = name ?? category.defaultName
         self.description = description
         self.category = category
@@ -28,6 +33,7 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
         self.fingerprint = fingerprint
         self.matches = matches
         self.decision = decision
+        self.wornAt = wornAt
     }
 
     public enum Decision: Equatable, Sendable {

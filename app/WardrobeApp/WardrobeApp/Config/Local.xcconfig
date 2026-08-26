@@ -1,4 +1,3 @@
-API_BASE_URL = http:/$()/localhost:8080
-SENTRY_DSN = https://20d03438cf41ffe30a30fa9c28f6f19a@o447656.ingest.us.sentry.io/4511867550171136
-SENTRY_ENVIRONMENT = development
-
+// Per-machine values only. Everything set here is overridden by Debug.xcconfig,
+// which includes this file first — so keep it to settings Debug.xcconfig does
+// not define, such as DEVELOPMENT_TEAM for running on a physical device.

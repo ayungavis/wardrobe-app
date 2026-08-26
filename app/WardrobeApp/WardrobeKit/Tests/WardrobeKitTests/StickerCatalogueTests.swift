@@ -4,6 +4,30 @@ import Testing
 
 /// FR-019's catalogue, and the storage contract underneath it.
 struct StickerCatalogueTests {
+    /// A wardrobe item's illustration is a sticker whose id names the item, so
+    /// re-stylising the item updates every canvas it was already placed on.
+    @Test func anItemStickerCarriesTheItemItNames() {
+        let itemID = UUID()
+
+        let art = StickerArt.item(itemID)
+
+        #expect(art.wardrobeItemID == itemID)
+        #expect(StickerArt.catalogue("emoji.fire").wardrobeItemID == nil)
+    }
+
+    /// It rides the catalogue kind on purpose: a new kind would make every
+    /// older build refuse the whole document instead of one sticker.
+    @Test func anItemStickerStaysReadableByBuildsThatNeverHeardOfIt() throws {
+        let itemID = UUID()
+        let encoded = try JSONEncoder().encode(StickerArt.item(itemID))
+        let json = try #require(
+            try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+
+        #expect(json["kind"] as? String == "catalogue")
+        #expect(try JSONDecoder().decode(StickerArt.self, from: encoded) == .item(itemID))
+    }
+
     // MARK: Reading what was stored before the catalogue
 
     /// A document written when a sticker was just a glyph must keep it.
@@ -128,7 +152,11 @@ struct StickerCatalogueTests {
         let catalogue = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
         let strings = try #require((catalogue as? [String: Any])?["strings"] as? [String: Any])
 
-        let keys = StickerCatalogue.all.map { StickerCatalogueEntry.nameKey(for: $0.id) }
+        // An image sticker names itself from its glyph, its filename, or its category
+        // and number, so it has no key of its own; the category names it leans on are
+        // covered right here, which is why nothing goes unchecked.
+        let keys = StickerCatalogue.all.filter(\.usesLocalisedName)
+            .map { StickerCatalogueEntry.nameKey(for: $0.id) }
             + StickerCategory.allCases.map { "editor.sticker.category.\($0.rawValue)" }
 
         for key in keys {

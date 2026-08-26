@@ -12,8 +12,8 @@ public enum ExportService {
     // raise when a print/quality requirement appears.
     static let maxOutputPixel: CGFloat = 4096
 
-    public static func render(originals: [String: Data], document: EditorDocument) async throws -> Data {
-        var photos: [String: CGImage] = [:]
+    public static func render(originals: [UUID: Data], document: EditorDocument) async throws -> Data {
+        var photos: [UUID: CGImage] = [:]
         for layer in document.layers {
             guard case let .photo(content) = layer.content,
                   let original = originals[content.photoID]
@@ -21,6 +21,16 @@ public enum ExportService {
                 continue
             }
             photos[content.photoID] = try await prepare(original: original, crop: content.crop)
+        }
+
+        for layer in document.layers {
+            guard case let .sticker(content) = layer.content,
+                  let itemID = content.art.wardrobeItemID,
+                  let illustration = originals[itemID]
+            else {
+                continue
+            }
+            photos[itemID] = try await prepare(original: illustration, crop: nil)
         }
 
         if case let .photo(id, crop) = document.background, let original = originals[id] {
@@ -49,7 +59,7 @@ public enum ExportService {
     }
 
     @MainActor
-    static func rasterize(document: EditorDocument, photos: [String: CGImage]) throws -> CGImage {
+    static func rasterize(document: EditorDocument, photos: [UUID: CGImage]) throws -> CGImage {
         let size = StoryCanvas.exportSize
         let renderer = ImageRenderer(
             content: DocumentCanvasView(document: document, photo: { photos[$0] }, size: size)

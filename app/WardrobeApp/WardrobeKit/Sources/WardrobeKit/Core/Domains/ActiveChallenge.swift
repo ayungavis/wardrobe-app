@@ -3,16 +3,16 @@ import Foundation
 public struct ActiveChallenge: Codable, Equatable, Sendable {
     public let card: ChallengeCard
     public let acceptedAt: Date
-    public var photoID: String?
+    public var photoID: UUID?
     public var document: EditorDocument
-    public var importedPhotoIDs: [String] = []
+    public var importedPhotoIDs: [UUID] = []
 
     public init(
         card: ChallengeCard,
         acceptedAt: Date,
-        photoID: String? = nil,
+        photoID: UUID? = nil,
         document: EditorDocument = EditorDocument(layers: []),
-        importedPhotoIDs: [String] = []
+        importedPhotoIDs: [UUID] = []
     ) {
         self.card = card
         self.acceptedAt = acceptedAt
@@ -30,8 +30,8 @@ public struct ActiveChallenge: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         card = try container.decode(ChallengeCard.self, forKey: .card)
         acceptedAt = try container.decode(Date.self, forKey: .acceptedAt)
-        photoID = try container.decodeIfPresent(String.self, forKey: .photoID)
-        importedPhotoIDs = try container.decodeIfPresent([String].self, forKey: .importedPhotoIDs) ?? []
+        photoID = try container.decodeIfPresent(UUID.self, forKey: .photoID)
+        importedPhotoIDs = try container.decodeIfPresent([UUID].self, forKey: .importedPhotoIDs) ?? []
 
         if let document = try container.decodeIfPresent(EditorDocument.self, forKey: .document) {
             self.document = document

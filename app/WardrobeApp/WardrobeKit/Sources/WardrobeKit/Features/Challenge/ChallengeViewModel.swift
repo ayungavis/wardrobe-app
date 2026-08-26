@@ -5,6 +5,7 @@ import Observation
 @Observable
 public final class ChallengeViewModel {
     public private(set) var deck: Loadable<[ChallengeCard]> = .idle
+    public private(set) var isShowingCuratedDeck = false
     public private(set) var activeChallenge: ActiveChallenge?
     public private(set) var hasCompletedToday = false
     public var isCaptureFlowPresented = false
@@ -14,41 +15,73 @@ public final class ChallengeViewModel {
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
     private let photoRepository: PhotoRepository
+    private let wardrobeRepository: (any WardrobeItemRepository)?
+    private let thumbnails: (any GarmentThumbnailRepository)?
+    private let calendar: Calendar
+    private let now: @Sendable () -> Date
+    private(set) var garments: [UUID: CardGarments] = [:]
+    private(set) var deckDay: Date?
     private(set) var loadTask: Task<Void, Never>?
 
     public init(
         challengeRepository: ChallengeRepository,
         activeRepository: ActiveChallengeRepository,
         completedRepository: CompletedChallengeRepository,
-        photoRepository: PhotoRepository
+        photoRepository: PhotoRepository,
+        wardrobeRepository: (any WardrobeItemRepository)? = nil,
+        thumbnails: (any GarmentThumbnailRepository)? = nil,
+        calendar: Calendar = .current,
+        now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.challengeRepository = challengeRepository
         self.activeRepository = activeRepository
         self.completedRepository = completedRepository
         self.photoRepository = photoRepository
+        self.wardrobeRepository = wardrobeRepository
+        self.thumbnails = thumbnails
+        self.calendar = calendar
+        self.now = now
     }
 
     public func onAppear() {
-        activeChallenge = activeRepository.load()
-        hasCompletedToday = completedRepository.hasCompletion(on: Date())
+        refreshActiveChallenge()
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-autoResume"), activeChallenge != nil {
                 isCaptureFlowPresented = true
             }
         #endif
-        guard case .idle = deck else { return }
+        refreshForForeground()
+    }
+
+    public func refreshForForeground() {
+        refreshActiveChallenge()
+        resolveGarments()
+        guard deckDay != calendar.startOfDay(for: now()) else { return }
+        load()
+    }
+
+    public func reloadDeck() {
+        deckDay = nil
         load()
     }
 
     public func load() {
         loadTask?.cancel()
-        deck = .loading
+        if case .loaded = deck {} else {
+            deck = .loading
+        }
 
         loadTask = Task {
             do {
-                let cards = try await challengeRepository.fetchDailyDeck()
+                let daily = try await challengeRepository.fetchDailyDeck()
                 try Task.checkCancellation()
-                deck = .loaded(cards)
+                deck = .loaded(daily.cards)
+                isShowingCuratedDeck = daily.isCurated
+                // ponytail: a curated deck pins no day, so the real one is
+                // retried on the next foreground; a good deck is not refetched
+                // all day. Upgrade path is a timer at local midnight.
+                deckDay = daily.isCurated ? nil : calendar.startOfDay(for: now())
+                resolveGarments()
             } catch is CancellationError {
             } catch {
                 Log.report(error, logger: Log.network)
@@ -57,12 +90,41 @@ public final class ChallengeViewModel {
         }
     }
 
+    public func garments(for card: ChallengeCard) -> CardGarments {
+        garments[card.id] ?? CardGarments()
+    }
+
+    func resolveGarments() {
+        guard case let .loaded(cards) = deck else { return }
+        guard let wardrobeRepository, let thumbnails else { return }
+        guard cards.contains(where: { $0.outfit != nil }) else {
+            garments = [:]
+            return
+        }
+
+        let items = (try? wardrobeRepository.items()) ?? []
+        let index = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        garments = cards.reduce(into: [:]) { resolved, card in
+            guard let outfit = card.outfit else { return }
+            resolved[card.id] = CardGarments(
+                top: garment(index[outfit.top], thumbnails),
+                bottom: garment(index[outfit.bottom], thumbnails)
+            )
+        }
+    }
+
+    private func garment(
+        _ item: WardrobeItem?,
+        _ thumbnails: any GarmentThumbnailRepository
+    ) -> CardGarment? {
+        guard let item, let data = GarmentImage.data(for: item, in: thumbnails) else { return nil }
+        return CardGarment(data: data, name: item.name)
+    }
+
     public func accept(_ card: ChallengeCard) {
-        //guard !hasCompletedToday else { return }
-        let isFreestyle = card.prompt == "Freestyle" // Or check card.id if you have a specific identifier
-            if hasCompletedToday && !isFreestyle {
-                return
-            }
+        if hasCompletedToday, !card.isFreestyle {
+            return
+        }
 
         if let active = activeChallenge {
             if active.card.id == card.id {
@@ -71,7 +133,7 @@ public final class ChallengeViewModel {
             return
         }
 
-        let challenge = ActiveChallenge(card: card, acceptedAt: Date())
+        let challenge = ActiveChallenge(card: card, acceptedAt: now())
         activeRepository.save(challenge)
         activeChallenge = challenge
         isCaptureFlowPresented = true
@@ -102,6 +164,6 @@ public final class ChallengeViewModel {
 
     public func refreshActiveChallenge() {
         activeChallenge = activeRepository.load()
-        hasCompletedToday = completedRepository.hasCompletion(on: Date())
+        hasCompletedToday = completedRepository.hasCompletion(on: now())
     }
 }

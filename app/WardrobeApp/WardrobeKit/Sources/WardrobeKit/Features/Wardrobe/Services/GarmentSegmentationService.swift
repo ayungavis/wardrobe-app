@@ -35,8 +35,8 @@ public extension GarmentSegmentationService {
     public struct FASHNGarmentSegmentationService: GarmentSegmentationService {
         private static let inputSize = (width: 384, height: 576)
 
-        /// nonisolated(unsafe): the generated wrapper is not `Sendable`, but it
-        /// is immutable once loaded and `MLModel` predictions are thread-safe.
+        // nonisolated(unsafe): the generated wrapper is not `Sendable`, but it
+        // is immutable once loaded and `MLModel` predictions are thread-safe.
         private nonisolated(unsafe) static let model: FASHNSegFormer? = {
             let configuration = MLModelConfiguration()
             configuration.computeUnits = .cpuAndGPU

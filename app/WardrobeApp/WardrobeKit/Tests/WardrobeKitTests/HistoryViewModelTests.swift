@@ -13,6 +13,8 @@ struct HistoryViewModelTests {
     ) -> HistoryViewModel {
         HistoryViewModel(
             completedRepository: completedRepository,
+            outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
+            uploads: makeInMemoryUploads(),
             photoRepository: photoRepository,
             wardrobeRepository: InMemoryWardrobeItemRepository(),
             thumbnails: InMemoryGarmentThumbnailRepository(),
@@ -22,8 +24,8 @@ struct HistoryViewModelTests {
 
     private func makeCompletion(previewFile: String? = nil) -> CompletedChallenge {
         var completion = CompletedChallenge(
-            card: ChallengeCard(prompt: "x"), photoID: "photo-1",
-            document: .fixture(photoID: "photo-1"), completedAt: Date()
+            card: ChallengeCard(prompt: "x"), photoID: id("photo-1"),
+            document: .fixture(photoID: id("photo-1")), completedAt: Date()
         )
         completion.previewFile = previewFile
         return completion

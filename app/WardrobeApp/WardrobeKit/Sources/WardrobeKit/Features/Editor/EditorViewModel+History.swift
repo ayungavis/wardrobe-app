@@ -7,12 +7,20 @@ public extension EditorViewModel {
         activeRepository.didFailToPersist
     }
 
+    func viewDisappeared() {
+        flushTask = Task { await flush() }
+    }
+
     func flush() async {
         await activeRepository.flush()
     }
 
     var canUndo: Bool {
         history.canUndo
+    }
+
+    var recentUndoSteps: [EditorDocument] {
+        Array(history.undoStack.suffix(DocumentHistory.uploadedStepLimit))
     }
 
     var canRedo: Bool {

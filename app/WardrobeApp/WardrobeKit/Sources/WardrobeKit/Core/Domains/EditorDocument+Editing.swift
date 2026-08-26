@@ -16,7 +16,7 @@ public extension EditorDocument {
         layers[index].content = .photo(PhotoContent(photoID: photo.photoID, crop: crop))
     }
 
-    func photoLayerID(showing photoID: String) -> UUID? {
+    func photoLayerID(showing photoID: UUID) -> UUID? {
         layers.first {
             if case let .photo(photo) = $0.content {
                 return photo.photoID == photoID
@@ -25,8 +25,8 @@ public extension EditorDocument {
         }?.id
     }
 
-    var photos: [(id: String, crop: CropSpec?)] {
-        var photos = layers.compactMap { layer -> (id: String, crop: CropSpec?)? in
+    var photos: [(id: UUID, crop: CropSpec?)] {
+        var photos = layers.compactMap { layer -> (id: UUID, crop: CropSpec?)? in
             guard case let .photo(photo) = layer.content else { return nil }
             return (photo.photoID, photo.crop)
         }
@@ -36,13 +36,13 @@ public extension EditorDocument {
         return photos
     }
 
-    var photoCrops: [String: CropSpec?] {
+    var photoCrops: [UUID: CropSpec?] {
         photos.reduce(into: [:]) { result, photo in
             result[photo.id] = photo.crop
         }
     }
 
-    var photoIDs: [String] {
+    var photoIDs: [UUID] {
         photos.map(\.id)
     }
 
@@ -81,7 +81,7 @@ public extension EditorDocument {
         return layer.id
     }
 
-    mutating func appendPhoto(_ photoID: String) {
+    mutating func appendPhoto(_ photoID: UUID) {
         layers.append(EditorLayer(content: .photo(PhotoContent(photoID: photoID))))
     }
 

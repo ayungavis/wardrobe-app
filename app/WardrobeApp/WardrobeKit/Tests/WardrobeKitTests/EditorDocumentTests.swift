@@ -23,7 +23,7 @@ struct EditorDocumentTests {
 
     @Test func everyLayerKindSurvivesARoundTrip() throws {
         let document = makeDocument(layers: [
-            EditorLayer(content: .photo(PhotoContent(photoID: "photo-1"))),
+            EditorLayer(content: .photo(PhotoContent(photoID: id("photo-1")))),
             EditorLayer(content: .text(TextContent(content: "OOTD"))),
             EditorLayer(content: .sticker(StickerContent(emoji: "✨"))),
             EditorLayer(content: .drawing(DrawingContent(strokes: [
@@ -49,7 +49,7 @@ struct EditorDocumentTests {
     }
 
     @Test func arrayOrderIsTheZOrder() throws {
-        let bottom = EditorLayer(content: .photo(PhotoContent(photoID: "p")))
+        let bottom = EditorLayer(content: .photo(PhotoContent(photoID: id("p"))))
         let top = EditorLayer(content: .text(TextContent(content: "on top")))
 
         let restored = try decode(encode(makeDocument(layers: [bottom, top])))
@@ -62,10 +62,10 @@ struct EditorDocumentTests {
     @Test func fieldsAddedLaterFallBackToDefaults() throws {
         let json = """
         {
-          "id": "\(UUID().uuidString)",
+          "id": "\(UUID.v7())",
           "schemaVersion": 1,
           "layers": [
-            { "id": "\(UUID().uuidString)", "content": { "kind": "text", "value": { "content": "hi" } } }
+            { "id": "\(UUID.v7())", "content": { "kind": "text", "value": { "content": "hi" } } }
           ]
         }
         """
@@ -85,7 +85,7 @@ struct EditorDocumentTests {
 
     @Test func aDocumentWithNoLayersDecodesRatherThanFailing() throws {
         let json = """
-        { "id": "\(UUID().uuidString)", "schemaVersion": 1 }
+        { "id": "\(UUID.v7())", "schemaVersion": 1 }
         """
 
         let document = try decode(Data(json.utf8))
@@ -101,7 +101,7 @@ struct EditorDocumentTests {
     @Test func aDocumentFromANewerAppRefusesToDecode() {
         let json = """
         {
-          "id": "\(UUID().uuidString)",
+          "id": "\(UUID.v7())",
           "schemaVersion": \(EditorDocument.currentSchemaVersion + 1),
           "layers": []
         }
@@ -118,7 +118,7 @@ struct EditorDocumentTests {
         #expect(try decode(encode(makeDocument(layers: []))).schemaVersion == 1)
 
         let withPhotoBackground = EditorDocument(
-            layers: [], background: .photo(id: "bg-1", crop: nil)
+            layers: [], background: .photo(id: id("bg-1"), crop: nil)
         )
         #expect(try decode(encode(withPhotoBackground)).schemaVersion == 2)
         #expect(withPhotoBackground.schemaVersion == EditorDocument.currentSchemaVersion)
@@ -128,7 +128,7 @@ struct EditorDocumentTests {
     /// version 1 rather than rejected.
     @Test func aDocumentWithoutAVersionIsTreatedAsTheFirst() throws {
         let json = """
-        { "id": "\(UUID().uuidString)", "layers": [] }
+        { "id": "\(UUID.v7())", "layers": [] }
         """
 
         #expect(try decode(Data(json.utf8)).schemaVersion == 1)
@@ -140,13 +140,13 @@ struct EditorDocumentTests {
         let crop = CropSpec(rect: CGRect(x: 0.1, y: 0.2, width: 0.6, height: 0.45))
         let draft = EditDraft(crop: crop, texts: [TextItem(content: "hi")], stickers: [])
 
-        let document = EditorDocument(migrating: draft, photoID: "photo-1")
+        let document = EditorDocument(migrating: draft, photoID: id("photo-1"))
 
         guard case let .photo(photo) = document.layers.first?.content else {
             Issue.record("the photo must be the bottom layer")
             return
         }
-        #expect(photo.photoID == "photo-1")
+        #expect(photo.photoID == id("photo-1"))
         #expect(photo.crop == crop)
     }
 
@@ -158,7 +158,7 @@ struct EditorDocumentTests {
             stickers: [StickerItem(emoji: "✨")]
         )
 
-        let document = EditorDocument(migrating: draft, photoID: "p")
+        let document = EditorDocument(migrating: draft, photoID: id("p"))
 
         let kinds = document.layers.map { layer -> String in
             switch layer.content {
@@ -185,7 +185,7 @@ struct EditorDocumentTests {
             alignmentName: TextAlignmentStyle.leading.rawValue
         )
 
-        let document = EditorDocument(migrating: EditDraft(texts: [text]), photoID: "p")
+        let document = EditorDocument(migrating: EditDraft(texts: [text]), photoID: id("p"))
 
         let layer = document.layers[1]
         #expect(layer.transform.position == text.position)
@@ -202,7 +202,7 @@ struct EditorDocumentTests {
     }
 
     @Test func anEmptyDraftBecomesJustThePhoto() {
-        let document = EditorDocument(migrating: EditDraft(), photoID: "p")
+        let document = EditorDocument(migrating: EditDraft(), photoID: id("p"))
 
         #expect(document.layers.count == 1)
         #expect(document.layers.first?.transform == .identity)
@@ -285,10 +285,10 @@ struct EditorDocumentTests {
     @Test func anUnknownLayerKindIsReportedAsANewerApp() {
         let json = """
         {
-          "id": "\(UUID().uuidString)",
+          "id": "\(UUID.v7())",
           "schemaVersion": 1,
           "layers": [
-            { "id": "\(UUID().uuidString)", "content": { "kind": "hologram", "value": {} } }
+            { "id": "\(UUID.v7())", "content": { "kind": "hologram", "value": {} } }
           ]
         }
         """

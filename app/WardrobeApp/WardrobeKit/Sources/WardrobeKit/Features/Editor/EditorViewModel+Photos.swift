@@ -18,7 +18,7 @@ public extension EditorViewModel {
             do {
                 let repository = photoRepository
                 let loaded = try await Task.detached(priority: .userInitiated) {
-                    try photoIDs.reduce(into: [String: (Data, CGImage?)]()) { result, id in
+                    try photoIDs.reduce(into: [UUID: (Data, CGImage?)]()) { result, id in
                         let data = try repository.loadOriginal(id: id)
                         result[id] = (data, ImageDecoding.downsampledImage(from: data, maxPixel: 1600))
                     }
@@ -65,12 +65,12 @@ public extension EditorViewModel {
         layerID != challengePhotoLayerID
     }
 
-    func preview(forPhoto photoID: String) -> CGImage? {
-        croppedPreviews[photoID]
+    func preview(forPhoto photoID: UUID) -> CGImage? {
+        croppedPreviews[photoID] ?? illustration(forItem: photoID)
     }
 
     func updateCroppedPreviews() {
-        var cropped: [String: CGImage] = [:]
+        var cropped: [UUID: CGImage] = [:]
         for layer in document.layers {
             guard case let .photo(photo) = layer.content,
                   let preview = previewImages[photo.photoID]

@@ -3,35 +3,89 @@ import SwiftData
 
 @MainActor
 public final class AppContainer {
-    private let challengeRepository: ChallengeRepository
-    private let activeChallengeRepository: ActiveChallengeRepository
-    private let completedChallengeRepository: CompletedChallengeRepository
-    private let photoRepository: PhotoRepository
+    let challengeRepository: ChallengeRepository?
+    let activeChallengeRepository: ActiveChallengeRepository
+    let completedChallengeRepository: CompletedChallengeRepository
+    let photoRepository: PhotoRepository
+    let appleAccountRepository: AppleAccountRepository
     let preferencesRepository: AccountPreferencesRepository
-    private let completionPreviewRepository: CompletionPreviewRepository
+    let contentRevision = ContentRevisionModel()
+    let completionPreviewRepository: CompletionPreviewRepository
+    public let weatherRepository: any WeatherRepository
     let onboarding: OnboardingModel
+    private let session: SessionService
+    private let sessionTokenRepository: SessionTokenRepository
     private let cameraService: CameraService
 
     public init(
-        challengeRepository: ChallengeRepository = MockChallengeRepository(),
+        challengeRepository: ChallengeRepository? = nil,
         activeChallengeRepository: ActiveChallengeRepository = FileActiveChallengeRepository(),
-        completedChallengeRepository: CompletedChallengeRepository = UserDefaultsCompletedChallengeRepository(),
+        completedChallengeRepository: CompletedChallengeRepository? = nil,
         photoRepository: PhotoRepository = FilePhotoRepository(),
-        preferencesRepository: AccountPreferencesRepository = UserDefaultsAccountPreferencesRepository(),
+        preferencesRepository: AccountPreferencesRepository? = nil,
         completionPreviewRepository: CompletionPreviewRepository = FileCompletionPreviewRepository(),
-        appleAccountRepository: AppleAccountRepository = KeychainAppleAccountRepository(),
-        cameraService: CameraService? = nil
+        appleAccountRepository: AppleAccountRepository = StoredAppleAccountRepository(),
+        session: SessionService? = nil,
+        sessionTokenRepository: SessionTokenRepository = StoredSessionTokenRepository(),
+        cameraService: CameraService? = nil,
+        weather: (any WeatherRepository)? = nil
     ) {
         self.challengeRepository = challengeRepository
         self.activeChallengeRepository = activeChallengeRepository
+        let completedChallengeRepository = completedChallengeRepository
+            ?? Self.migratedCompletions()
         self.completedChallengeRepository = completedChallengeRepository
         self.photoRepository = photoRepository
+        let preferencesRepository = preferencesRepository
+            ?? UserDefaultsAccountPreferencesRepository(outbox: Self.makeOutboxRepository())
         self.preferencesRepository = preferencesRepository
         self.completionPreviewRepository = completionPreviewRepository
+        self.appleAccountRepository = appleAccountRepository
+        self.sessionTokenRepository = sessionTokenRepository
+        let session = session ?? Self.defaultSession(tokens: sessionTokenRepository)
+        self.session = session
         onboarding = OnboardingModel(
-            preferences: preferencesRepository, accounts: appleAccountRepository
+            preferences: preferencesRepository,
+            accounts: appleAccountRepository,
+            session: session
         )
         self.cameraService = cameraService ?? Self.defaultCameraService()
+        weatherRepository = weather ?? Self.defaultWeatherRepository()
+    }
+
+    var baseURL: URL {
+        Self.apiBaseURL
+    }
+
+    func makeUnauthenticatedClient() -> APIClient {
+        URLSessionAPIClient(baseURL: Self.apiBaseURL)
+    }
+
+    public func makeAuthenticatedClient() -> AuthenticatedAPIClient {
+        SessionedAPIClient(client: URLSessionAPIClient(baseURL: Self.apiBaseURL), session: session)
+    }
+
+    private static func defaultSession(tokens: SessionTokenRepository) -> SessionService {
+        ServerSessionService(
+            client: URLSessionAPIClient(baseURL: apiBaseURL),
+            identities: StoredAnonymousIdentityRepository(),
+            tokens: tokens
+        )
+    }
+
+    private static var apiBaseURL: URL {
+        let configured = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String
+        guard let configured, let url = URL(string: configured), url.host()?.isEmpty == false else {
+            Log.network.error("APIBaseURL is missing or unusable; the app stays local-only")
+            // A compile-time constant that provably parses; every request against
+            // it then fails and the app runs local-only, which is the intent.
+            return URL(string: "http://localhost")!
+        }
+        return url
+    }
+
+    public func startSession() async {
+        await session.start()
     }
 
     private static func defaultCameraService() -> CameraService {
@@ -50,15 +104,6 @@ public final class AppContainer {
         OnboardingViewModel(onboarding: onboarding)
     }
 
-    public func makeChallengeViewModel() -> ChallengeViewModel {
-        ChallengeViewModel(
-            challengeRepository: challengeRepository,
-            activeRepository: activeChallengeRepository,
-            completedRepository: completedChallengeRepository,
-            photoRepository: photoRepository
-        )
-    }
-
     public func makeCaptureFlowViewModel(challenge: ActiveChallenge) -> CaptureFlowViewModel {
         CaptureFlowViewModel(
             challenge: challenge,
@@ -71,7 +116,10 @@ public final class AppContainer {
             scanner: makeGarmentScanService(),
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
-            preferences: preferencesRepository
+            preferences: preferencesRepository,
+            outbox: makeOutboxRepository(),
+            uploads: makeMediaUploadRepository(),
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }
 
@@ -89,27 +137,29 @@ public final class AppContainer {
             activeRepository: activeChallengeRepository,
             photoRepository: photoRepository,
             librarySaver: Self.defaultLibrarySaver(),
-            preferencesRepository: preferencesRepository
+            preferencesRepository: preferencesRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository
         )
     }
 
-    public func makeCropViewModel(photoID: String) -> CropViewModel {
+    public func makeCropViewModel(photoID: UUID) -> CropViewModel {
         CropViewModel(photoID: photoID, photoRepository: photoRepository)
-    }
-
-    public func makeWardrobeViewModel() -> WardrobeViewModel {
-        WardrobeViewModel(
-            thumbnails: garmentThumbnailRepository,
-            repository: makeWardrobeItemRepository()
-        )
     }
 
     public func makeWardrobeItemDetailViewModel(itemID: UUID) -> WardrobeItemDetailViewModel {
         WardrobeItemDetailViewModel(
             itemID: itemID,
             repository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            completions: completedChallengeRepository,
+            photos: photoRepository,
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
+    }
+
+    public func makeAddByCameraViewModel() -> AddByCameraViewModel {
+        AddByCameraViewModel(camera: makeCameraService(), review: makeGarmentReviewModel())
     }
 
     public func makeGarmentReviewModel() -> GarmentReviewModel {
@@ -137,11 +187,50 @@ public final class AppContainer {
         )
     }
 
-    private let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
+    let garmentThumbnailRepository: GarmentThumbnailRepository = FileGarmentThumbnailRepository()
 
-    private func makeWardrobeItemRepository() -> WardrobeItemRepository {
-        SwiftDataWardrobeItemRepository(container: Self.wardrobeContainer)
+    func makeWardrobeItemRepository() -> WardrobeItemRepository {
+        SwiftDataWardrobeItemRepository(context: Self.wardrobeContext, outbox: Self.makeOutboxRepository())
     }
+
+    public func makeOutboxRepository() -> OutboxRepository {
+        Self.makeOutboxRepository()
+    }
+
+    static func makeOutboxRepository() -> OutboxRepository {
+        StoredOutboxRepository(store: SwiftDataOutboxStore(context: wardrobeContext))
+    }
+
+    // ponytail: one instance, deliberately. A coordinator built per call would
+    // hold its own inFlight and the single-flight guarantee would be a no-op.
+    private(set) lazy var syncCoordinator: any SyncService = ServerSyncService(
+        client: makeAuthenticatedClient(),
+        outbox: makeOutboxRepository(),
+        feed: makeChangeFeedRepository(),
+        uploads: makeMediaUploadRepository(),
+        media: makeMediaRepository(),
+        preferences: preferencesRepository,
+        revision: contentRevision,
+        applier: makeRestoreService()
+    )
+
+    private(set) lazy var reachability: any ReachabilityService = PathReachabilityService()
+
+    public func makeMediaRepository() -> MediaRepository {
+        ServerMediaRepository(client: makeAuthenticatedClient(), cache: FileMediaCacheStore())
+    }
+
+    func makeMediaUploadRepository() -> MediaUploadRepository {
+        StoredMediaUploadRepository(
+            store: SwiftDataMediaUploadStore(context: Self.wardrobeContext),
+            photos: photoRepository,
+            previews: completionPreviewRepository,
+            thumbnails: garmentThumbnailRepository
+        )
+    }
+
+    @MainActor
+    static let wardrobeContext = ModelContext(wardrobeContainer)
 
     private static let wardrobeContainer: ModelContainer = {
         do {
@@ -166,18 +255,6 @@ public final class AppContainer {
         #endif
     }
 
-    public func makeDevMenuViewModel() -> DevMenuViewModel {
-        DevMenuViewModel(
-            activeRepository: activeChallengeRepository,
-            completedRepository: completedChallengeRepository,
-            photoRepository: photoRepository,
-            wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository,
-            previews: completionPreviewRepository,
-            onboarding: onboarding
-        )
-    }
-
     private static func defaultLibrarySaver() -> PhotoLibrarySaveService {
         #if os(iOS)
             PHPhotoLibrarySaveService()
@@ -193,9 +270,114 @@ public final class AppContainer {
     public func makeHistoryViewModel() -> HistoryViewModel {
         HistoryViewModel(
             completedRepository: completedChallengeRepository,
+            outbox: makeOutboxRepository(),
+            uploads: makeMediaUploadRepository(),
             photoRepository: photoRepository,
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository,
+            downloads: makeMediaDownloadRepository()
+        )
+    }
+}
+
+// MARK: - Dev menu
+
+public extension AppContainer {
+    func makeDevMenuViewModel() -> DevMenuViewModel {
+        DevMenuViewModel(
+            activeRepository: activeChallengeRepository,
+            completedRepository: completedChallengeRepository,
+            photoRepository: photoRepository,
+            wardrobeRepository: makeWardrobeItemRepository(),
+            thumbnails: garmentThumbnailRepository,
+            previews: completionPreviewRepository,
+            onboarding: onboarding,
+            session: session,
+            client: makeAuthenticatedClient(),
+            plainClient: makeUnauthenticatedClient(),
+            baseURL: Self.apiBaseURL,
+            tokens: sessionTokenRepository,
+            outboxRepository: makeOutboxRepository(),
+            feed: makeChangeFeedRepository(),
+            coordinator: syncCoordinator,
+            diagnosticsStore: diagnostics,
+            media: makeMediaRepository(),
+            uploadQueue: makeMediaUploadRepository(),
+            applier: makeRestoreService(),
+            revision: contentRevision
+        )
+    }
+}
+
+// MARK: - Upload consent
+
+public extension AppContainer {
+    var needsUploadConsentPrompt: Bool {
+        let stored = preferencesRepository.load()
+        guard stored.uploadConsentAt == nil, stored.uploadConsentDeclinedAt == nil else {
+            return false
+        }
+        return !((try? makeMediaUploadRepository().entries()) ?? []).isEmpty
+    }
+
+    func makeConsentViewModel() -> ConsentViewModel {
+        // ponytail: the provider named in the disclosure comes from configuration
+        // (xcconfig -> Info.plist), per the ticket. Seedream is the model the
+        // generation spec names; swap the xcconfig value when the operator does.
+        ConsentViewModel(
+            preferences: preferencesRepository,
+            providerName: Bundle.main.object(forInfoDictionaryKey: "ConsentAIProvider") as? String
+                ?? "the configured AI provider"
+        )
+    }
+}
+
+// MARK: - Diagnostics
+
+extension AppContainer {
+    var diagnostics: any DiagnosticsStore {
+        Self.diagnosticsStore
+    }
+
+    @MainActor
+    static func migratedCompletions() -> CompletedChallengeRepository {
+        let repository = SwiftDataCompletedChallengeRepository(context: wardrobeContext)
+        migrateCompletions(from: UserDefaultsCompletedChallengeRepository(), into: repository)
+        return repository
+    }
+
+    func startDiagnostics() {
+        let store = diagnostics
+        Log.diagnosticsSink = { error, context in
+            Task { @MainActor in
+                try? store.record(error, context: context, at: Date())
+            }
+        }
+    }
+
+    @MainActor
+    private static let diagnosticsStore: any DiagnosticsStore =
+        SwiftDataDiagnosticsStore(container: wardrobeContainer)
+}
+
+// MARK: - Wardrobe and its conflicts
+
+public extension AppContainer {
+    func makeWardrobeViewModel() -> WardrobeViewModel {
+        WardrobeViewModel(
+            thumbnails: garmentThumbnailRepository,
+            repository: makeWardrobeItemRepository(),
+            outbox: makeOutboxRepository(),
+            completions: completedChallengeRepository
+        )
+    }
+
+    func makeConflictsViewModel() -> ConflictsViewModel {
+        ConflictsViewModel(
+            wardrobe: makeWardrobeItemRepository(),
+            completions: completedChallengeRepository,
+            outbox: makeOutboxRepository(),
             previews: completionPreviewRepository
         )
     }

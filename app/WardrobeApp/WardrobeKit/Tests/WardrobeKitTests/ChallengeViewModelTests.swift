@@ -4,17 +4,28 @@ import Testing
 
 /// Repository whose responses are resolved manually, so tests control timing.
 actor ControlledChallengeRepository: ChallengeRepository {
-    private var continuations: [CheckedContinuation<[ChallengeCard], Error>] = []
+    private var waitingFetches: [CheckedContinuation<DailyDeck, Error>] = []
+    private var pendingResults: [Result<DailyDeck, Error>] = []
+    private(set) var fetches = 0
 
-    func fetchDailyDeck() async throws -> [ChallengeCard] {
-        try await withCheckedThrowingContinuation { continuations.append($0) }
+    func fetchDailyDeck() async throws -> DailyDeck {
+        fetches += 1
+        if !pendingResults.isEmpty {
+            return try pendingResults.removeFirst().get()
+        }
+        return try await withCheckedThrowingContinuation { waitingFetches.append($0) }
     }
 
-    func resolveNext(with result: Result<[ChallengeCard], Error>) async {
-        while continuations.isEmpty {
-            await Task.yield()
+    func resolveNext(cards: [ChallengeCard], isCurated: Bool = false) async {
+        await resolveNext(with: .success(DailyDeck(cards: cards, isCurated: isCurated)))
+    }
+
+    func resolveNext(with result: Result<DailyDeck, Error>) async {
+        if waitingFetches.isEmpty {
+            pendingResults.append(result)
+        } else {
+            waitingFetches.removeFirst().resume(with: result)
         }
-        continuations.removeFirst().resume(with: result)
     }
 }
 
@@ -44,7 +55,7 @@ struct ChallengeViewModelTests {
         sut.load()
         #expect(sut.deck == .loading)
 
-        await challengeRepository.resolveNext(with: .success(cards))
+        await challengeRepository.resolveNext(cards: cards)
         await sut.loadTask?.value
 
         #expect(sut.deck == .loaded(cards))
@@ -71,8 +82,8 @@ struct ChallengeViewModelTests {
         let staleTask = sut.loadTask
         sut.load()
 
-        await challengeRepository.resolveNext(with: .success(stale))
-        await challengeRepository.resolveNext(with: .success(latest))
+        await challengeRepository.resolveNext(cards: stale)
+        await challengeRepository.resolveNext(cards: latest)
         await staleTask?.value
         await sut.loadTask?.value
 
@@ -141,7 +152,7 @@ struct ChallengeViewModelTests {
     private func makeCompletion(at date: Date) -> CompletedChallenge {
         CompletedChallenge(
             card: ChallengeCard(prompt: "done"),
-            photoID: UUID().uuidString,
+            photoID: UUID.v7(),
             document: .fixture(),
             completedAt: date
         )
@@ -191,7 +202,7 @@ struct ChallengeViewModelTests {
         sut.accept(ChallengeCard(prompt: "x"))
 
         var active = try #require(activeRepository.stored)
-        active.photoID = "11111111-2222-3333-4444-555555555555"
+        active.photoID = id("11111111-2222-3333-4444-555555555555")
         activeRepository.stored = active
         sut.refreshActiveChallenge()
 
@@ -200,8 +211,143 @@ struct ChallengeViewModelTests {
         #expect(sut.activeChallenge != nil)
 
         sut.abandon()
-        #expect(photoRepository.deleted == ["11111111-2222-3333-4444-555555555555"])
+        #expect(photoRepository.deleted == [id("11111111-2222-3333-4444-555555555555")])
         #expect(sut.activeChallenge == nil)
         #expect(activeRepository.stored == nil)
+    }
+}
+
+@MainActor
+struct ChallengeDeckRefreshTests {
+    private let jakarta = TimeZone(identifier: "Asia/Jakarta") ?? .gmt
+
+    private func calendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = jakarta
+        return calendar
+    }
+
+    private func makeSUT(
+        repository: ControlledChallengeRepository,
+        completedRepository: CompletedChallengeRepository = InMemoryCompletedChallengeRepository(),
+        clock: @escaping @Sendable () -> Date
+    ) -> ChallengeViewModel {
+        ChallengeViewModel(
+            challengeRepository: repository,
+            activeRepository: InMemoryActiveChallengeRepository(),
+            completedRepository: completedRepository,
+            photoRepository: SpyPhotoRepository(),
+            calendar: calendar(),
+            now: clock
+        )
+    }
+
+    private func card(_ prompt: String) -> ChallengeCard {
+        ChallengeCard(prompt: prompt)
+    }
+
+    @Test func aDeckLoadedYesterdayIsRefetchedOnForeground() async {
+        let repository = ControlledChallengeRepository()
+        nonisolated(unsafe) var stamp = Date(timeIntervalSince1970: 1_787_000_000)
+        let sut = makeSUT(repository: repository) { stamp }
+
+        sut.onAppear()
+        await repository.resolveNext(cards: [card("yesterday")])
+        await sut.loadTask?.value
+
+        stamp = stamp.addingTimeInterval(60 * 60 * 24)
+        sut.refreshForForeground()
+        await repository.resolveNext(cards: [card("today")])
+        await sut.loadTask?.value
+
+        #expect(await repository.fetches == 2, "a deck loaded yesterday is not today's deck")
+        if case let .loaded(cards) = sut.deck {
+            #expect(cards.map(\.prompt) == ["today"])
+        } else {
+            Issue.record("the refetched deck must be the loaded one")
+        }
+    }
+
+    @Test func aDeckLoadedTodayIsNotRefetchedOnForeground() async {
+        let repository = ControlledChallengeRepository()
+        let stamp = Date(timeIntervalSince1970: 1_787_000_000)
+        let sut = makeSUT(repository: repository) { stamp }
+
+        sut.onAppear()
+        await repository.resolveNext(cards: [card("today")])
+        await sut.loadTask?.value
+
+        sut.refreshForForeground()
+
+        #expect(await repository.fetches == 1,
+                "foregrounding all day must not re-ask for a deck that cannot have changed")
+    }
+
+    @Test func aCuratedFallbackIsRetriedOnTheNextForeground() async {
+        let repository = ControlledChallengeRepository()
+        let stamp = Date(timeIntervalSince1970: 1_787_000_000)
+        let sut = makeSUT(repository: repository) { stamp }
+
+        sut.onAppear()
+        await repository.resolveNext(cards: [card("curated")], isCurated: true)
+        await sut.loadTask?.value
+
+        sut.refreshForForeground()
+        await repository.resolveNext(cards: [card("generated")])
+        await sut.loadTask?.value
+
+        #expect(await repository.fetches == 2,
+                "a fallback deck pins no day, so the real one is asked for again")
+        #expect(!sut.isShowingCuratedDeck)
+    }
+
+    @Test func aRegeneratedDeckIsPickedUpTheSameDay() async {
+        let repository = ControlledChallengeRepository()
+        let stamp = Date(timeIntervalSince1970: 1_787_000_000)
+        let sut = makeSUT(repository: repository) { stamp }
+
+        sut.onAppear()
+        await repository.resolveNext(cards: [card("before")])
+        await sut.loadTask?.value
+
+        sut.reloadDeck()
+        await repository.resolveNext(cards: [card("after")])
+        await sut.loadTask?.value
+
+        #expect(await repository.fetches == 2,
+                "the day key that spares a good deck from being refetched must not also strand a regenerated one")
+        if case let .loaded(cards) = sut.deck {
+            #expect(cards.map(\.prompt) == ["after"])
+        } else {
+            Issue.record("the regenerated deck must be the loaded one")
+        }
+    }
+
+    @Test func dayRolloverAlsoReopensTheDeckAfterYesterdaysCompletion() async {
+        let repository = ControlledChallengeRepository()
+        nonisolated(unsafe) var stamp = Date(timeIntervalSince1970: 1_787_000_000)
+        let completed = InMemoryCompletedChallengeRepository()
+        completed.stored = [
+            CompletedChallenge(
+                card: card("done"),
+                photoID: UUID(),
+                document: EditorDocument(id: UUID(), layers: []),
+                completedAt: stamp
+            ),
+        ]
+        let sut = makeSUT(repository: repository, completedRepository: completed) { stamp }
+
+        sut.onAppear()
+        await repository.resolveNext(cards: [card("today")])
+        await sut.loadTask?.value
+        #expect(sut.hasCompletedToday)
+
+        stamp = stamp.addingTimeInterval(60 * 60 * 24)
+        sut.refreshForForeground()
+        await repository.resolveNext(cards: [card("tomorrow")])
+        await sut.loadTask?.value
+
+        #expect(!sut.hasCompletedToday,
+                "the daily gate rolls over with the clock the deck reads, not the wall clock")
     }
 }

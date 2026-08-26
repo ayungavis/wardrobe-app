@@ -7,6 +7,20 @@ import UniformTypeIdentifiers
 
 @MainActor
 struct ExportServiceTests {
+    @Test func anItemStickerReachesTheFlattenedImage() async throws {
+        let itemID = UUID()
+        var document = EditorDocument(id: UUID(), layers: [])
+        document.appendSticker(.item(itemID))
+
+        let blank = try await ExportService.render(originals: [:], document: document)
+        let drawn = try await ExportService.render(
+            originals: [itemID: SampleCameraService.makeSampleJPEG(width: 120, height: 120)],
+            document: document
+        )
+
+        #expect(blank != drawn, "an illustration nobody loaded exports as nothing at all")
+    }
+
     /// A JPEG deliberately stuffed with EXIF + GPS metadata.
     private func makeJPEGWithMetadata(width: Int = 100, height: Int = 200) throws -> Data {
         let base = try SampleCameraService.makeSampleJPEG(width: width, height: height)
@@ -53,8 +67,8 @@ struct ExportServiceTests {
         #expect(sourceProps[kCGImagePropertyGPSDictionary] != nil)
 
         let exported = try await ExportService.render(
-            originals: ["photo-1": original],
-            document: EditorDocument(photoID: "photo-1")
+            originals: [id("photo-1"): original],
+            document: EditorDocument(photoID: id("photo-1"))
         )
         let props = try properties(of: exported)
 
@@ -75,7 +89,7 @@ struct ExportServiceTests {
     func exportAlwaysUsesStoryCanvasSize(document: EditorDocument) async throws {
         let original = try SampleCameraService.makeSampleJPEG(width: 100, height: 200)
 
-        let exported = try await ExportService.render(originals: ["photo-1": original], document: document)
+        let exported = try await ExportService.render(originals: [id("photo-1"): original], document: document)
         let props = try properties(of: exported)
 
         #expect(props[kCGImagePropertyPixelWidth] as? Int == Int(StoryCanvas.exportSize.width))
@@ -99,7 +113,7 @@ struct ExportServiceTests {
             )]
         )
 
-        let exported = try await ExportService.render(originals: ["photo-1": original], document: document)
+        let exported = try await ExportService.render(originals: [id("photo-1"): original], document: document)
         let props = try properties(of: exported)
 
         #expect((props[kCGImagePropertyPixelWidth] as? Int ?? 0) > 0)
@@ -113,11 +127,11 @@ struct ExportServiceTests {
         let original = try SampleCameraService.makeSampleJPEG(width: 200, height: 200)
         var document = EditorDocument.fixture()
         document.background = .photo(
-            id: "bg-1", crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.5))
+            id: id("bg-1"), crop: CropSpec(rect: CGRect(x: 0, y: 0, width: 1, height: 0.5))
         )
 
         let exported = try await ExportService.render(
-            originals: ["photo-1": original, "bg-1": background], document: document
+            originals: [id("photo-1"): original, id("bg-1"): background], document: document
         )
         let props = try properties(of: exported)
 

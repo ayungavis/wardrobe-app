@@ -1,13 +1,29 @@
 import Foundation
+import SwiftData
 
+@MainActor
 public protocol CompletedChallengeRepository: Sendable {
     func load() -> [CompletedChallenge]
     func append(_ completion: CompletedChallenge)
+    func stage(_ completion: CompletedChallenge)
+    @discardableResult
+    func stageStatus(id: UUID, status: CompletionStatus) -> Bool
+    func commitStaged() throws
     func removeCompletions(on date: Date)
     func removeAll()
 }
 
+@MainActor
 public extension CompletedChallengeRepository {
+    func stage(_ completion: CompletedChallenge) {
+        append(completion)
+    }
+
+    func applyStatus(id: UUID, status: CompletionStatus) throws {
+        stageStatus(id: id, status: status)
+        try commitStaged()
+    }
+
     func hasCompletion(on date: Date, calendar: Calendar = .current) -> Bool {
         load().contains { calendar.isDate($0.completedAt, inSameDayAs: date) }
     }
@@ -15,6 +31,8 @@ public extension CompletedChallengeRepository {
 
 // ponytail: UserDefaults JSON array; move to SwiftData when History needs
 // querying and paging.
+// Type safety: @unchecked because UserDefaults and Calendar are both immutable
+// here and UserDefaults is itself thread-safe; the type holds no mutable state.
 public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeRepository, @unchecked Sendable {
     private let defaults: UserDefaults
     private let calendar: Calendar
@@ -25,10 +43,10 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
         self.calendar = calendar
     }
 
-    /// ponytail: a skipped entry is dropped rather than preserved verbatim.
-    /// Keeping its raw JSON needs a passthrough type; it comes back from the
-    /// server once sync exists, and the server is the system of record for
-    /// confirmed documents (FR-096).
+    // ponytail: a skipped entry is dropped rather than preserved verbatim.
+    // Keeping its raw JSON needs a passthrough type; it comes back from the
+    // server once sync exists, and the server is the system of record for
+    // confirmed documents (FR-096).
     public func load() -> [CompletedChallenge] {
         guard let data = defaults.data(forKey: Self.key) else { return [] }
         guard let entries = try? JSONDecoder().decode([LenientEntry<CompletedChallenge>].self, from: data) else {
@@ -45,14 +63,22 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
 
     public func append(_ completion: CompletedChallenge) {
         var completions = load()
-//        guard !completions.contains(where: {
-//            calendar.isDate($0.completedAt, inSameDayAs: completion.completedAt)
-//        }) else {
-//            return
-//        }
         completions.append(completion)
         save(completions)
     }
+
+    // ponytail: the JSON blob has no staging area, so stage lands immediately
+    // and commit has nothing to do; the SwiftData repository is the real one.
+    @discardableResult
+    public func stageStatus(id: UUID, status: CompletionStatus) -> Bool {
+        var completions = load()
+        guard let index = completions.firstIndex(where: { $0.id == id }) else { return false }
+        completions[index].status = status
+        save(completions)
+        return true
+    }
+
+    public func commitStaged() {}
 
     public func removeCompletions(on date: Date) {
         let kept = load().filter { !calendar.isDate($0.completedAt, inSameDayAs: date) }
@@ -78,4 +104,226 @@ private struct LenientEntry<Value: Decodable>: Decodable {
     init(from decoder: Decoder) throws {
         value = try? Value(from: decoder)
     }
+}
+
+// MARK: - SwiftData
+
+@MainActor
+public final class SwiftDataCompletedChallengeRepository: CompletedChallengeRepository {
+    private let context: ModelContext
+    private let calendar: Calendar
+
+    public init(context: ModelContext, calendar: Calendar = .current) {
+        self.context = context
+        self.calendar = calendar
+    }
+
+    public func load() -> [CompletedChallenge] {
+        let descriptor = FetchDescriptor<CompletionEntity>(
+            sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
+        )
+        let fetched = (try? context.fetch(descriptor)) ?? []
+        let decoded = fetched.compactMap(\.domain)
+        if decoded.count != fetched.count {
+            Log.report(AppError.unexpected, context: Log.Context(operation: "completions.load.dropped"))
+        }
+        return decoded
+    }
+
+    public func append(_ completion: CompletedChallenge) {
+        stage(completion)
+        save()
+    }
+
+    public func stage(_ completion: CompletedChallenge) {
+        guard let entity = CompletionEntity(completion) else {
+            Log.report(AppError.unexpected)
+            return
+        }
+        context.insert(entity)
+    }
+
+    @discardableResult
+    public func stageStatus(id: UUID, status: CompletionStatus) -> Bool {
+        guard let entity = stored().first(where: { $0.id == id }) else { return false }
+        entity.status = status.rawValue
+        return true
+    }
+
+    public func commitStaged() throws {
+        try context.save()
+    }
+
+    func stageRestore(_ restored: RestoredCompletion, card: ChallengeCard) {
+        if let entity = stored().first(where: { $0.id == restored.id }) {
+            entity.status = restored.status.rawValue
+            entity.currentDerivativeID = restored.derivativeID
+            return
+        }
+        guard let cardData = try? JSONEncoder().encode(card) else {
+            Log.report(AppError.unexpected)
+            return
+        }
+        let entity = CompletionEntity.restored(restored, cardData: cardData)
+        context.insert(entity)
+    }
+
+    func needsDocument(id: UUID) -> Bool {
+        guard let entity = stored().first(where: { $0.id == id }) else { return false }
+        return entity.documentState != DocumentState.available.rawValue || entity.document.isEmpty
+    }
+
+    func completionID(forDerivative derivativeID: UUID) -> UUID? {
+        stored().first { $0.currentDerivativeID == derivativeID && $0.previewFile == nil }?.id
+    }
+
+    func stagePreview(id: UUID, file: String) {
+        stored().first { $0.id == id }?.previewFile = file
+    }
+
+    func stageDocument(id: UUID, _ document: EditorDocument) {
+        guard let entity = stored().first(where: { $0.id == id }),
+              let data = try? JSONEncoder().encode(document)
+        else {
+            return
+        }
+        entity.document = data
+        entity.documentState = DocumentState.available.rawValue
+    }
+
+    func stageDocumentState(id: UUID, _ state: DocumentState) {
+        stored().first { $0.id == id }?.documentState = state.rawValue
+    }
+
+    public func removeCompletions(on date: Date) {
+        for entity in stored() where calendar.isDate(entity.completedAt, inSameDayAs: date) {
+            context.delete(entity)
+        }
+        save()
+    }
+
+    public func removeAll() {
+        try? context.delete(model: CompletionEntity.self)
+        save()
+    }
+
+    private func stored() -> [CompletionEntity] {
+        (try? context.fetch(FetchDescriptor<CompletionEntity>())) ?? []
+    }
+
+    private func save() {
+        do {
+            try context.save()
+        } catch {
+            Log.report(error)
+        }
+    }
+}
+
+// MARK: - Storage entity
+
+@Model
+final class CompletionEntity {
+    #Unique<CompletionEntity>([\.id])
+    private(set) var id: UUID = UUID()
+    var photoID: UUID = UUID()
+    var completedAt: Date = Date()
+    var previewFile: String?
+    var syncQueuedAt: Date?
+    var status: String = CompletionStatus.canonical.rawValue
+    var documentState: String = DocumentState.available.rawValue
+    var currentDerivativeID: UUID?
+    var card: Data = Data()
+    var document: Data = Data()
+
+    init?(_ completion: CompletedChallenge) {
+        guard let card = try? JSONEncoder().encode(completion.card),
+              let document = try? JSONEncoder().encode(completion.document)
+        else {
+            return nil
+        }
+        id = completion.id
+        photoID = completion.photoID
+        completedAt = completion.completedAt
+        previewFile = completion.previewFile
+        syncQueuedAt = completion.syncQueuedAt
+        status = completion.status.rawValue
+        documentState = completion.documentState.rawValue
+        self.card = card
+        self.document = document
+    }
+
+    private init() {}
+
+    static func restored(_ restored: RestoredCompletion, cardData: Data) -> CompletionEntity {
+        let entity = CompletionEntity()
+        entity.id = restored.id
+        entity.photoID = restored.photoID ?? restored.id
+        entity.completedAt = restored.completedAt
+        entity.status = restored.status.rawValue
+        entity.documentState = DocumentState.pending.rawValue
+        entity.currentDerivativeID = restored.derivativeID
+        entity.card = cardData
+        entity.document = Data()
+        return entity
+    }
+
+    var domain: CompletedChallenge? {
+        guard let card = try? JSONDecoder().decode(ChallengeCard.self, from: card) else { return nil }
+        let state = DocumentState(rawValue: documentState) ?? .available
+        let document: EditorDocument
+        if state == .available {
+            guard let decoded = try? JSONDecoder().decode(EditorDocument.self, from: self.document) else {
+                return nil
+            }
+            document = decoded
+        } else {
+            document = EditorDocument(id: id, layers: [])
+        }
+        var completion = CompletedChallenge(
+            id: id, card: card, photoID: photoID, document: document,
+            completedAt: completedAt, previewFile: previewFile
+        )
+        completion.syncQueuedAt = syncQueuedAt
+        completion.status = CompletionStatus(rawValue: status) ?? .canonical
+        completion.documentState = state
+        return completion
+    }
+}
+
+// MARK: - Migration
+
+// ponytail: the legacy key is dropped only after the write is read back and every
+// id has arrived, so a write that fails can never take the old data with it.
+@MainActor
+@discardableResult
+public func migrateCompletions(
+    from legacy: any CompletedChallengeRepository,
+    into store: any CompletedChallengeRepository,
+    defaults: UserDefaults = .standard
+) -> Int {
+    let key = "completedChallenges.migratedToSwiftData"
+    guard !defaults.bool(forKey: key) else { return 0 }
+
+    let carried = legacy.load()
+    guard !carried.isEmpty else {
+        defaults.set(true, forKey: key)
+        return 0
+    }
+
+    let existing = Set(store.load().map(\.id))
+    for completion in carried where !existing.contains(completion.id) {
+        store.append(completion)
+    }
+
+    let arrived = Set(store.load().map(\.id))
+    guard carried.allSatisfy({ arrived.contains($0.id) }) else {
+        Log.report(AppError.unexpected)
+        return 0
+    }
+
+    legacy.removeAll()
+    defaults.set(true, forKey: key)
+    Log.app.info("Completions migrated: \(carried.count, privacy: .public)")
+    return carried.count
 }

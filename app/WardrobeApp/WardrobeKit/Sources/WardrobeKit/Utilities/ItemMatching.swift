@@ -1,9 +1,9 @@
 import Foundation
 
 enum ItemMatching {
-    /// ponytail: every constant below is a first guess. §13 of the design doc
-    /// says thresholds can only be calibrated once real user photos exist — they
-    /// live here together so that calibration is a one-line change.
+    // ponytail: every constant below is a first guess. §13 of the design doc
+    // says thresholds can only be calibrated once real user photos exist — they
+    // live here together so that calibration is a one-line change.
     enum Tuning {
         static let colorSpread: Float = 40
         static let printSpread: Float = 1.2

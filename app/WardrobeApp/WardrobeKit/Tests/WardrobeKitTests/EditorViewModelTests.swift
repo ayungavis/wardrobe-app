@@ -5,6 +5,42 @@ import Testing
 
 @MainActor
 struct EditorViewModelTests {
+    @Test func onlyItemsWithAReadyIllustrationReachTheStickerTray() throws {
+        let wardrobe = InMemoryWardrobeItemRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        let illustrated = UUID()
+        let plain = UUID()
+        wardrobe.storedItems = [
+            WardrobeItem(id: illustrated, category: .top, cutoutFile: "cut.png",
+                         currentIllustrationID: illustrated, createdAt: Date(), updatedAt: Date()),
+            WardrobeItem(id: plain, category: .bottom, cutoutFile: "cut2.png",
+                         createdAt: Date(), updatedAt: Date()),
+        ]
+        let bytes = try SampleCameraService.makeSampleJPEG(width: 60, height: 60)
+        thumbnails.files["\(illustrated.uuidString).png"] = bytes
+        thumbnails.files["cut2.png"] = bytes
+        let sut = try makeEditorSUT(wardrobeRepository: wardrobe, thumbnails: thumbnails)
+
+        sut.loadWardrobeStickers()
+
+        #expect(sut.wardrobeStickers.map(\.id) == [illustrated],
+                "a tray of question marks is worse than a shorter tray")
+    }
+
+    @Test func placingAnItemStickerLeavesTheRecentsAlone() throws {
+        let sut = try makeEditorSUT()
+        let itemID = UUID()
+        let image = try #require(ImageDecoding.downsampledImage(
+            from: SampleCameraService.makeSampleJPEG(width: 60, height: 60), maxPixel: 64
+        ))
+
+        sut.addItemSticker(WardrobeSticker(id: itemID, name: "Coat", image: image))
+
+        #expect(sut.document.layers.last?.content == .sticker(StickerContent(art: .item(itemID))))
+        #expect(sut.recentStickerIDs.isEmpty,
+                "recents are catalogue-only; an item id there is filtered out and lost")
+    }
+
     @Test func loadDecodesOriginalAndPreview() async throws {
         let sut = try makeEditorSUT()
 

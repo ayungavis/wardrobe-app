@@ -12,6 +12,17 @@ public enum StickerArt: Equatable, Sendable {
         }
     }
 
+    public static func item(_ itemID: UUID) -> StickerArt {
+        .catalogue(itemPrefix + itemID.uuidString)
+    }
+
+    public var wardrobeItemID: UUID? {
+        guard case let .catalogue(id) = self, id.hasPrefix(Self.itemPrefix) else { return nil }
+        return UUID(uuidString: String(id.dropFirst(Self.itemPrefix.count)))
+    }
+
+    private static let itemPrefix = "item."
+
     public var design: StickerDesign? {
         switch self {
         case let .catalogue(id): StickerCatalogue.entry(id: id)?.design

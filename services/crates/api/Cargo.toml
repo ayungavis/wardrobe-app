@@ -6,14 +6,22 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+tower_governor.workspace = true
+governor.workspace = true
 axum.workspace = true
+base64.workspace = true
 chrono.workspace = true
+getrandom.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+sentry.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tower.workspace = true
 tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -22,9 +30,11 @@ utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
 uuid.workspace = true
 wardrobe-db = { path = "../db" }
+wardrobe-observability = { path = "../observability" }
+wardrobe-storage = { path = "../storage" }
 
 [dev-dependencies]
-tower.workspace = true
+rsa = "0.9"
 
 # The image builds only this binary; the OpenAPI generator is a dev tool.
 [[bin]]

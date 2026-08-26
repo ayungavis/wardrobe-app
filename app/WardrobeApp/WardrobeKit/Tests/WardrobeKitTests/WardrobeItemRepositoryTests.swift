@@ -10,7 +10,7 @@ struct WardrobeItemRepositoryTests {
             for: SwiftDataWardrobeItemRepository.schema,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
-        return SwiftDataWardrobeItemRepository(container: container)
+        return SwiftDataWardrobeItemRepository(context: ModelContext(container))
     }
 
     private func makeItem(
@@ -118,8 +118,8 @@ struct WardrobeItemRepositoryTests {
             for: SwiftDataWardrobeItemRepository.schema,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
-        let writer = SwiftDataWardrobeItemRepository(container: container)
-        let reader = SwiftDataWardrobeItemRepository(container: container)
+        let writer = SwiftDataWardrobeItemRepository(context: ModelContext(container))
+        let reader = SwiftDataWardrobeItemRepository(context: ModelContext(container))
         let item = makeItem()
         try writer.insert(item, fingerprint: nil, wear: WearRecord(itemID: item.id, wornAt: Date()))
         _ = try reader.items()

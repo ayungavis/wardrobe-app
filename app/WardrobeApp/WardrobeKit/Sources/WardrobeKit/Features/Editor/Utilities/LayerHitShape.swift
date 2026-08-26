@@ -5,11 +5,11 @@ struct LayerHitShape: Shape {
     let content: LayerContent
     let referenceWidth: CGFloat
 
-    /// ponytail: a stroke thickened to exactly its drawn width is nearly
-    /// impossible to hit with a finger, so this is the floor. 32 rather than
-    /// §19's 44 because that number is about *controls*, and selecting a layer
-    /// already has a non-gesture path of its own through the layer panel. Tune
-    /// it here if it feels mean or greedy.
+    // ponytail: a stroke thickened to exactly its drawn width is nearly
+    // impossible to hit with a finger, so this is the floor. 32 rather than
+    // §19's 44 because that number is about *controls*, and selecting a layer
+    // already has a non-gesture path of its own through the layer panel. Tune
+    // it here if it feels mean or greedy.
     static let minimumTouchWidth: CGFloat = 32
 
     func path(in rect: CGRect) -> Path {

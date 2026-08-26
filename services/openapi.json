@@ -15,7 +15,6 @@
           "health"
         ],
         "summary": "Liveness and readiness in one.",
-        "description": "It deliberately touches `PostgreSQL`: a health check that does not would only\nreport that this process is running, which is the least useful thing to know\nabout a service whose entire job is reading and writing a database.",
         "operationId": "health",
         "responses": {
           "200": {
@@ -41,13 +40,548 @@
         }
       }
     },
+    "/v1/challenges/deck": {
+      "get": {
+        "tags": [
+          "challenge"
+        ],
+        "summary": "Returns the day's generated deck, or the curated catalog when none exists.",
+        "operationId": "deck",
+        "parameters": [
+          {
+            "name": "localDate",
+            "in": "query",
+            "description": "The user-local calendar date, computed on the device.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "The device's locale, used to pick curated copy; defaults to `en`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The day's deck",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unusable query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/changes": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Returns every record written after a cursor position, deletions included.",
+        "operationId": "changes",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "description": "The last `changeSeq` you received; omit to start from the beginning.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many records to return, clamped to 1000.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of changes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/media": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Registers an object and returns a signed URL to upload it.",
+        "operationId": "reserve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReserveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A signed upload URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown kind or unusable metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That id belongs to another account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Object storage is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/media/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Returns a signed URL to download an object whose bytes have arrived.",
+        "operationId": "download",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The media id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A signed download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such object, or its bytes never arrived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Object storage is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/sessions/anonymous": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Starts or resumes an anonymous account for a device.",
+        "operationId": "anonymous",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnonymousRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A session for the device's anonymous account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The device id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/apple": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Verifies an Apple identity token and links it to this device's account.",
+        "operationId": "apple",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A session for the Apple-backed account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The identity token did not verify",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Apple sign-in is not configured or Apple is unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/current": {
+      "delete": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Revokes every session in this device's family.",
+        "operationId": "sign_out",
+        "responses": {
+          "204": {
+            "description": "The family is revoked; server data is untouched"
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/sessions/refresh": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Exchanges a refresh token for a new pair and retires the old one.",
+        "operationId": "refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A rotated session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown, expired, revoked, or already-used refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sync": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Applies a batch of named mutations, each in its own transaction.",
+        "operationId": "sync",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Every mutation reported individually",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope itself could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 100 mutations, or a body past 1 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/v1/users/me": {
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Removes the account: its rows, its objects, and every session it owns.",
+        "operationId": "delete_me",
+        "responses": {
+          "204": {
+            "description": "Rows and objects are gone; nothing remains to retry"
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Objects remain and could not be removed; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/whoami": {
       "get": {
         "tags": [
           "session"
         ],
         "summary": "Confirms which account a session token belongs to.",
-        "description": "The client uses it after sign-in or restore to check that its stored token is\nstill good, without having to attempt a real write to find out.",
         "operationId": "whoami",
         "responses": {
           "200": {
@@ -81,6 +615,356 @@
   },
   "components": {
     "schemas": {
+      "AccountPreference": {
+        "type": "object",
+        "required": [
+          "recentStickerIds",
+          "lastTextStyle",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastTextStyle": {
+            "type": "object"
+          },
+          "onboardingCompletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "recentStickerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uploadConsentAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ActiveChallenge": {
+        "type": "object",
+        "required": [
+          "id",
+          "cardId",
+          "acceptedAt",
+          "localDate",
+          "timeZone",
+          "changeSeq"
+        ],
+        "properties": {
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "photoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        }
+      },
+      "AnonymousRequest": {
+        "type": "object",
+        "required": [
+          "deviceId"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The UUID the client holds in its Keychain."
+          }
+        }
+      },
+      "AppleRequest": {
+        "type": "object",
+        "required": [
+          "deviceId",
+          "identityToken",
+          "nonce"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identityToken": {
+            "type": "string",
+            "description": "The identity token Apple returned to the client."
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The raw nonce whose SHA-256 the client sent to Apple."
+          }
+        }
+      },
+      "CanvasDocument": {
+        "type": "object",
+        "required": [
+          "id",
+          "completionId",
+          "derivativeId",
+          "schemaVersion",
+          "mediaObjectId",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "derivativeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "historyMediaObjectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "historyStepCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ChallengeCompletion": {
+        "type": "object",
+        "required": [
+          "id",
+          "cardId",
+          "localDate",
+          "timeZone",
+          "completedAt",
+          "status",
+          "changeSeq"
+        ],
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currentDerivativeId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "photoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        }
+      },
+      "Change": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Record"
+          },
+          {
+            "type": "object",
+            "required": [
+              "changeSeq"
+            ],
+            "properties": {
+              "changeSeq": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The feed position of this record; the cursor is the last one you received."
+              }
+            }
+          }
+        ]
+      },
+      "ChangesResponse": {
+        "type": "object",
+        "description": "One page of the change feed, oldest position first.",
+        "required": [
+          "changes",
+          "nextSince"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "nextSince": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pass this back as `since`; it never moves past a record this page omitted."
+          }
+        }
+      },
+      "DeckCard": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt"
+        ],
+        "properties": {
+          "bottomItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "DeckResponse": {
+        "type": "object",
+        "description": "The day's challenge cards.",
+        "required": [
+          "localDate",
+          "source",
+          "cards"
+        ],
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeckCard"
+            }
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string",
+            "description": "`generated` or `curated`; `curated` means generation was unavailable."
+          }
+        }
+      },
       "ErrorBody": {
         "type": "object",
         "description": "The single error shape every endpoint returns.",
@@ -112,6 +996,35 @@
           }
         }
       },
+      "GrantResponse": {
+        "type": "object",
+        "description": "A short-lived grant to move bytes, never an identity to store.",
+        "required": [
+          "mediaId",
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "byteSize": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "required": [
@@ -122,6 +1035,812 @@
             "type": "string",
             "description": "`ok` when the process is up and the database answers.",
             "example": "ok"
+          }
+        }
+      },
+      "ItemCutout": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "mediaObjectId",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourcePhotoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "ItemFingerprint": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "version",
+          "colorLab",
+          "aspectRatio",
+          "featurePrint",
+          "maskQuality",
+          "changeSeq"
+        ],
+        "properties": {
+          "aspectRatio": {
+            "type": "number",
+            "format": "float"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "colorLab": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "featurePrint": {
+            "type": "string",
+            "format": "byte"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maskQuality": {
+            "type": "number",
+            "format": "float"
+          },
+          "sourcePhotoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ItemIllustration": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "mediaObjectId",
+          "styleVersion",
+          "model",
+          "promptVersion",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "styleVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "MutationRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "args"
+        ],
+        "properties": {
+          "args": {
+            "type": "object",
+            "description": "Arguments for this mutation."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The client's own id for this mutation, echoed back in its result."
+          },
+          "name": {
+            "type": "string",
+            "description": "Which mutation to run, such as `deleteItem`."
+          }
+        }
+      },
+      "MutationResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Outcome": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "status"
+            ],
+            "properties": {
+              "record": {
+                "type": "object",
+                "description": "The record as it now stands, which a replay returns unchanged."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "error",
+              "status"
+            ],
+            "properties": {
+              "error": {
+                "$ref": "#/components/schemas/ErrorDetail",
+                "description": "This mutation alone failed; its neighbours were still applied."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "Photo": {
+        "type": "object",
+        "required": [
+          "id",
+          "mediaObjectId",
+          "source",
+          "changeSeq"
+        ],
+        "properties": {
+          "capturedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "PhotoDerivative": {
+        "type": "object",
+        "required": [
+          "id",
+          "photoId",
+          "mediaObjectId",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "photoId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Record": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wardrobeItem"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/WardrobeItem"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "itemFingerprint"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ItemFingerprint"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "itemCutout"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ItemCutout"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "itemIllustration"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ItemIllustration"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wardrobeItemConflict"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/WardrobeItemConflict"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "photo"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/Photo"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "photoDerivative"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/PhotoDerivative"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "canvasDocument"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/CanvasDocument"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "challengeCompletion"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ChallengeCompletion"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "activeChallenge"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/ActiveChallenge"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wearRecord"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/WearRecord"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "accountPreference"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/AccountPreference"
+              }
+            }
+          }
+        ]
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token from the previous session response."
+          }
+        }
+      },
+      "ReserveRequest": {
+        "type": "object",
+        "required": [
+          "mediaId",
+          "kind",
+          "contentType"
+        ],
+        "properties": {
+          "byteSize": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "One of original, derivative, cutout, illustration, document, history."
+          },
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The client's own id for this object, reused on a retry."
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "description": "A newly issued session.",
+        "required": [
+          "accountId",
+          "accessToken",
+          "refreshToken",
+          "expiresAt",
+          "refreshExpiresAt"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Returned exactly once; only its hash is stored."
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "SyncRequest": {
+        "type": "object",
+        "required": [
+          "mutations"
+        ],
+        "properties": {
+          "mutations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MutationRequest"
+            }
+          }
+        }
+      },
+      "SyncResponse": {
+        "type": "object",
+        "description": "The outcome of every mutation in the batch, in the order they were sent.",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MutationResult"
+            }
+          }
+        }
+      },
+      "WardrobeItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "attributeRevisions",
+          "illustrationState",
+          "changeSeq"
+        ],
+        "properties": {
+          "attributeRevisions": {
+            "type": "object"
+          },
+          "category": {
+            "type": "string"
+          },
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentIllustrationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "garmentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "illustrationState": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "WardrobeItemConflict": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "field",
+          "revision",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "field": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originDevice": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "resolvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "This table resolves rather than deletes, so it carries no tombstone."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "WearRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "wornOn",
+          "revision",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourcePhotoId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "wornOn": {
+            "type": "string",
+            "format": "date"
           }
         }
       },
@@ -153,6 +1872,10 @@
     }
   },
   "tags": [
+    {
+      "name": "challenge",
+      "description": "The daily challenge deck"
+    },
     {
       "name": "health",
       "description": "Liveness and readiness"

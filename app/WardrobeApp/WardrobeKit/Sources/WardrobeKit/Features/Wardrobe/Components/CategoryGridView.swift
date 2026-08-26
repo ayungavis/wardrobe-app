@@ -9,20 +9,13 @@ struct CategoryGridView: View {
     let namespace: Namespace.ID
     let onClose: () -> Void
     let onSelect: (WardrobeItem) -> Void
-    @Binding var sortOrder: WardrobeView.SortOrder
-    
+    @Binding var sortOrder: WardrobeViewModel.SortOrder
+
     private let columns = [
         GridItem(.flexible(), spacing: Spacing.md),
         GridItem(.flexible(), spacing: Spacing.md),
     ]
-    
-    private var sortedItems: [WardrobeItem] {
-        switch sortOrder {
-        case .mostUsed: items.sorted { wearCount($0) > wearCount($1) }
-        case .leastUsed: items.sorted { wearCount($0) < wearCount($1) }
-        }
-    }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -30,7 +23,6 @@ struct CategoryGridView: View {
                     HStack(spacing: Spacing.sm) {
                         Image(systemName: "chevron.left")
                         Text(category.title, bundle: .module)
-                            
                     }
                     .foregroundStyle(AppColor.textPrimary)
                     .font(AppFont.roundedTitle)
@@ -38,33 +30,32 @@ struct CategoryGridView: View {
                 }
                 Spacer()
                 Menu {
-                    Picker("", selection: $sortOrder) {
-                        ForEach(WardrobeView.SortOrder.allCases, id: \.self) { order in
+                    Picker(String(), selection: $sortOrder) {
+                        ForEach(WardrobeViewModel.SortOrder.allCases, id: \.self) { order in
                             Text(order.title, bundle: .module).tag(order)
                         }
                     }
                 } label: {
                     Label {
-                        Text("wardrobe.filter", bundle: .module) } icon: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                        }
-                        .font(AppFont.roundedTitle2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(AppColor.textPrimary)
-                        .padding(.vertical, Spacing.sm)
-                        .padding(.horizontal, Spacing.md)
-                        .background(Capsule()
-                                    
-                            .fill(.clear)
-                            .glassEffect(.clear)
-                        )
+                        Text("wardrobe.filter", bundle: .module)
+                    } icon: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .font(AppFont.roundedTitle2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(AppColor.textPrimary)
+                    .padding(.vertical, Spacing.sm)
+                    .padding(.horizontal, Spacing.md)
+                    .background(Capsule()
+                        .fill(.clear)
+                        .glassEffect(.clear))
                 }
             }
             .padding(Spacing.lg)
-            
+
             ScrollView {
                 LazyVGrid(columns: columns, spacing: Spacing.md) {
-                    ForEach(sortedItems) { item in
+                    ForEach(items) { item in
                         Button {
                             onSelect(item)
                         } label: {

@@ -7,7 +7,7 @@ public final class GarmentReviewModel {
     public private(set) var garments: [ScannedGarment] = []
     public private(set) var isScanning = false
 
-    private var scannedPhotoID: String?
+    private var scannedPhotoID: UUID?
     private let scanner: GarmentScanService
     private let photoRepository: PhotoRepository
     private let wardrobeRepository: WardrobeItemRepository
@@ -30,17 +30,17 @@ public final class GarmentReviewModel {
     // screen — a second of jank on a big photo. Moving Core ML off the main
     // actor is the upgrade when it starts to bite.
 
-    public func scanIfNeeded(photoID: String?) {
+    public func scanIfNeeded(photoID: UUID?) {
         guard let photoID, scannedPhotoID != photoID else { return }
         scannedPhotoID = photoID
         scan { [photoRepository] in try photoRepository.loadOriginal(id: photoID) }
     }
 
     public func scan(photo: Data) {
-        scan { photo }
+        scan(wornAt: CaptureDate.original(in: photo)) { photo }
     }
 
-    private func scan(_ load: @escaping () throws -> Data) {
+    private func scan(wornAt: Date? = nil, _ load: @escaping () throws -> Data) {
         let previous = scanTask
         isScanning = true
 
@@ -51,7 +51,11 @@ public final class GarmentReviewModel {
                 let photo = try load()
                 guard !Task.isCancelled else { return }
                 let start = ContinuousClock.now
-                try await stage(scanner.scan(photo: photo))
+                try await stage(scanner.scan(photo: photo).map { garment in
+                    var dated = garment
+                    dated.wornAt = wornAt
+                    return dated
+                })
                 Log.ui.info(
                     "Garment scan finished in \((ContinuousClock.now - start).ms, privacy: .public)ms"
                 )
@@ -78,6 +82,17 @@ public final class GarmentReviewModel {
         self.garments.append(contentsOf: garments)
     }
 
+    // ponytail: a no-op against today's scanner, which already applies
+    // defaultDecision when it mints a garment. It is the net for any future
+    // staging path that does not; delete it if none appears.
+    public func promoteConfidentMatches() {
+        for index in garments.indices where garments[index].decision == .new {
+            garments[index].decision = ScannedGarment.defaultDecision(
+                for: garments[index].matches
+            )
+        }
+    }
+
     public func choose(_ decision: ScannedGarment.Decision, for garmentID: UUID) {
         guard let index = garments.firstIndex(where: { $0.id == garmentID }) else { return }
         garments[index].decision = decision
@@ -94,26 +109,127 @@ public final class GarmentReviewModel {
         return thumbnailData(forFile: item.cutoutFile)
     }
 
+    public func commitStaged() throws {
+        try wardrobeRepository.commitStaged()
+    }
+
+    public func discardStaged() {
+        wardrobeRepository.discardStaged()
+    }
+
     public func commit(completionID: UUID?, at date: Date) {
         for garment in garments {
-            do {
-                switch garment.decision {
-                case .new:
-                    try insert(garment, completionID: completionID, at: date)
-                case let .existing(itemID):
-                    try merge(garment, into: itemID, completionID: completionID, at: date)
-                case .discard:
-                    try thumbnails.delete(file: garment.cutoutFile)
-                }
-            } catch {
-                Log.report(error)
-            }
+            record(garment, wornAt: completionID.map { _ in date }, completionID: completionID, at: date)
         }
         garments = []
     }
 
-    private func insert(_ garment: ScannedGarment, completionID: UUID?, at date: Date) throws {
-        let wear = completionID.map { WearRecord(itemID: garment.id, completionID: $0, wornAt: date) }
+    // ponytail: staged, never saved — the caller's single save is what makes the
+    // checkmark atomic. A garment that fails throws instead of being logged past,
+    // because "one of them silently vanished" is not what atomically means.
+    public func stageCommit(completionID: UUID, at date: Date) throws -> [ScannedGarment] {
+        let committed = garments
+        for garment in committed {
+            switch garment.decision {
+            case .new:
+                stageInsert(garment, completionID: completionID, at: date)
+            case let .existing(itemID):
+                stageMerge(garment, into: itemID, completionID: completionID, at: date)
+                try thumbnails.delete(file: garment.cutoutFile)
+            case .discard:
+                try thumbnails.delete(file: garment.cutoutFile)
+            }
+        }
+        return committed
+    }
+
+    private func stageInsert(_ garment: ScannedGarment, completionID: UUID, at date: Date) {
+        wardrobeRepository.stageInsert(
+            WardrobeItem(
+                id: garment.id,
+                name: garment.name,
+                description: garment.description,
+                category: garment.category,
+                cutoutFile: garment.cutoutFile,
+                createdAt: date,
+                updatedAt: date
+            ),
+            fingerprint: garment.fingerprint,
+            wear: WearRecord(id: garment.wearID, itemID: garment.id, completionID: completionID, wornAt: date)
+        )
+    }
+
+    private func stageMerge(
+        _ garment: ScannedGarment, into itemID: UUID, completionID: UUID, at date: Date
+    ) {
+        wardrobeRepository.stageWear(
+            WearRecord(id: garment.wearID, itemID: itemID, completionID: completionID, wornAt: date),
+            fingerprint: ItemFingerprint(
+                itemID: itemID,
+                version: garment.fingerprint.version,
+                colorLab: garment.fingerprint.colorLab,
+                aspectRatio: garment.fingerprint.aspectRatio,
+                featurePrint: garment.fingerprint.featurePrint,
+                maskQuality: garment.fingerprint.maskQuality,
+                createdAt: date
+            )
+        )
+    }
+
+    public func commitImported() {
+        var undated: [ScannedGarment] = []
+        for garment in garments {
+            if garment.decision == .discard {
+                record(garment, wornAt: nil, completionID: nil, at: .now)
+                continue
+            }
+            guard let wornAt = garment.wornAt else {
+                undated.append(garment)
+                continue
+            }
+            record(garment, wornAt: wornAt, completionID: nil, at: wornAt)
+        }
+        garments = undated
+    }
+
+    public func setWornAt(_ date: Date, for garmentID: UUID) {
+        guard let index = garments.firstIndex(where: { $0.id == garmentID }) else { return }
+        garments[index].wornAt = date
+    }
+
+    public var isMissingAWearDate: Bool {
+        garments.contains { $0.wornAt == nil && $0.decision != .discard }
+    }
+
+    private func record(
+        _ garment: ScannedGarment,
+        wornAt: Date?,
+        completionID: UUID?,
+        at date: Date
+    ) {
+        do {
+            switch garment.decision {
+            case .new:
+                try insert(garment, wornAt: wornAt, completionID: completionID, at: date)
+            case let .existing(itemID):
+                try merge(garment, into: itemID, wornAt: wornAt, completionID: completionID, at: date)
+            case .discard:
+                try thumbnails.delete(file: garment.cutoutFile)
+            }
+        } catch {
+            Log.report(error)
+        }
+    }
+
+    private func insert(
+        _ garment: ScannedGarment,
+        wornAt: Date?,
+        completionID: UUID?,
+        at date: Date
+    ) throws {
+        let wear = wornAt.map {
+            WearRecord(id: garment.wearID, itemID: garment.id, completionID: completionID, wornAt: $0)
+        }
         try wardrobeRepository.insert(
             WardrobeItem(
                 id: garment.id,
@@ -132,10 +248,13 @@ public final class GarmentReviewModel {
     private func merge(
         _ garment: ScannedGarment,
         into itemID: UUID,
+        wornAt: Date?,
         completionID: UUID?,
         at date: Date
     ) throws {
-        let wear = completionID.map { WearRecord(itemID: itemID, completionID: $0, wornAt: date) }
+        let wear = wornAt.map {
+            WearRecord(id: garment.wearID, itemID: itemID, completionID: completionID, wornAt: $0)
+        }
         try wardrobeRepository.recordWear(
             wear,
             fingerprint: ItemFingerprint(
@@ -150,11 +269,11 @@ public final class GarmentReviewModel {
         )
         try thumbnails.delete(file: garment.cutoutFile)
     }
-    
+
     public func wardrobeItems(in category: GarmentCategory) -> [WardrobeItem] {
         (try? wardrobeRepository.items().filter { $0.category == category }) ?? []
     }
-    
+
     public var activeGarments: [ScannedGarment] {
         garments.filter { $0.decision != .discard }
     }

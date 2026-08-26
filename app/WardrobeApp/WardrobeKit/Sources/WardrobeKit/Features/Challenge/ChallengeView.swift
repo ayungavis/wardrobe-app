@@ -4,11 +4,11 @@ import SwiftUI
 
 public struct ChallengeView: View {
     @State private var viewModel: ChallengeViewModel
-    @State private var isDevMenuPresented = DevMode.opensOnLaunch
     @State private var hasSwiped = false
+    @State private var isProfilePresented = false
 
     private let container: AppContainer
-    
+
     public init(viewModel: ChallengeViewModel, container: AppContainer) {
         _viewModel = State(wrappedValue: viewModel)
         self.container = container
@@ -19,11 +19,9 @@ public struct ChallengeView: View {
 
         NavigationStack {
             ZStack {
-                
                 Group {
                     if viewModel.hasCompletedToday {
-                        //Text("Completed Today")
-                        CompletedTodayView(onAccept: viewModel.accept)
+                        CompletedTodayView(weather: container.weatherRepository, onAccept: viewModel.accept)
                     } else if let active = viewModel.activeChallenge {
                         ActiveChallengeStateView(
                             challenge: active,
@@ -42,7 +40,6 @@ public struct ChallengeView: View {
                             .playbackMode(.playing(.fromFrame(40, toFrame: 120, loopMode: .autoReverse)))
                             .resizable()
                             .frame(width: 300, height: 300)
-                        //.allowsHitTesting(false)
                             .offset(y: 280) // position over cards
                             .transition(.opacity)
                     }
@@ -50,7 +47,16 @@ public struct ChallengeView: View {
                 }
             }
             .appBackgroundStickers()
-            // interaction listener
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        isProfilePresented = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel(Text("profile.entry", bundle: .module))
+                }
+            }
             .simultaneousGesture(
                 DragGesture().onChanged { _ in
                     if !hasSwiped {
@@ -60,41 +66,13 @@ public struct ChallengeView: View {
                     }
                 }
             )
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 1).onEnded { _ in
-                    print("long press")
-                    isDevMenuPresented = true
-                    
-                },
-                including: DevMode.isEnabled ? .all : .none
-            )
-            .overlay(alignment: .topTrailing) {
-                    if DevMode.isXcodeDebugBuild {
-                        Button {
-                            isDevMenuPresented = true
-                        } label: {
-                            Image(systemName: "hammer.fill")
-                                .foregroundStyle(.white)
-                                .padding(Spacing.sm)
-                                .background(Circle().fill(.black.opacity(0.4)))
-                        }
-                        .padding(Spacing.md)
-                    }
-                }
-            .sheet(
-                isPresented: $isDevMenuPresented,
-                onDismiss: { viewModel.refreshActiveChallenge() },
-                content: {
-                    DevMenuView(
-                        viewModel: container.makeDevMenuViewModel(),
-                        makeReview: { container.makeGarmentReviewModel() },
-                        makeBenchmark: { container.makeMatchBenchmarkViewModel() },
-                        onStateChanged: { viewModel.refreshActiveChallenge() }
-                    )
-                }
-            )
         }
-        .task { viewModel.onAppear() }
+        .task(id: container.contentRevision.revision) { viewModel.onAppear() }
+        .sheet(
+            isPresented: $isProfilePresented,
+            onDismiss: { viewModel.refreshActiveChallenge() },
+            content: { ProfileView(viewModel: container.makeProfileViewModel(), weather: container.weatherRepository) }
+        )
         .confirmationDialog(
             Text("challenge.abandon.confirm.title", bundle: .module),
             isPresented: $viewModel.isAbandonConfirmationPresented,
@@ -125,44 +103,25 @@ public struct ChallengeView: View {
                 }
             }
         )
-#endif
+        #endif
     }
-    
+
     @ViewBuilder
     private var deckContent: some View {
         switch viewModel.deck {
         case .idle, .loading:
             ProgressView()
-        case let .failed(error):
-            errorView(error)
+        case .failed:
+            deckView(CuratedChallengeRepository.deck)
         case let .loaded(cards):
             deckView(cards)
         }
     }
-    
-    private func errorView(_ error: AppError) -> some View {
-        ContentUnavailableView {
-            Label {
-                Text("challenge.error.title", bundle: .module)
-            } icon: {
-                Image(systemName: "wifi.exclamationmark")
-            }
-        } description: {
-            Text(error.userMessage)
-        } actions: {
-            Button {
-                viewModel.load()
-            } label: {
-                Text("common.retry", bundle: .module)
-            }
-        }
-    }
-    
+
     private func deckView(_ cards: [ChallengeCard]) -> some View {
-        // ponytail: paged TabView as the stacked-carousel stand-in; revisit
-        // when the real card-deck design lands (FR-007 also needs non-swipe
-        // browsing buttons for VoiceOver).
-        ChallengeDeckView(cards: cards) { card in
+        // ponytail: FR-007 still owes non-swipe browsing buttons for VoiceOver,
+        // and the new card art makes them more valuable, not less.
+        ChallengeDeckView(cards: cards, garments: viewModel.garments(for:)) { card in
             viewModel.accept(card)
         }
         .padding(.horizontal, Spacing.xl)

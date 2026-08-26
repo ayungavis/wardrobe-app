@@ -18,19 +18,12 @@ struct WardrobeAppApp: App {
         WindowGroup {
             RootView(container: container)
         }
-        // Draft writes are coalesced, so this is where the last one is made to
-        // land — without it, backgrounding mid-edit could lose the burst that
-        // the timer had not got to yet (FR-004).
         .onChange(of: scenePhase) { _, phase in
             guard phase == .background else { return }
             Task { await container.flushDrafts() }
         }
     }
 
-    /// DSN comes from Info.plist via xcconfig. A missing or unusable DSN (a dev
-    /// machine without a Sentry account, or a truncated xcconfig value) simply
-    /// leaves the SDK off — starting it with a broken DSN only produces a
-    /// stream of fatal log lines.
     private static func startSentryIfConfigured() {
         guard let dsn = Bundle.main.object(forInfoDictionaryKey: "SentryDSN") as? String,
               let url = URL(string: dsn), url.host?.isEmpty == false
@@ -44,6 +37,40 @@ struct WardrobeAppApp: App {
             options.environment = Bundle.main
                 .object(forInfoDictionaryKey: "SentryEnvironment") as? String ?? "development"
         }
-        Log.errorReporter = { SentrySDK.capture(error: $0) }
+        Log.breadcrumbRecorder = { error, context in
+            let crumb = Breadcrumb(level: .warning, category: "http")
+            crumb.message = String(describing: error)
+            var data: [String: Any] = [:]
+            if let operation = context.operation {
+                data["operation"] = operation
+            }
+            if let endpoint = context.endpoint {
+                data["endpoint"] = endpoint
+            }
+            if let requestID = context.requestID {
+                data["request_id"] = requestID
+            }
+            if let status = context.status {
+                data["status"] = status
+            }
+            crumb.data = data
+            SentrySDK.addBreadcrumb(crumb)
+        }
+        Log.errorReporter = { error, context in
+            SentrySDK.capture(error: error) { scope in
+                if let operation = context.operation {
+                    scope.setTag(value: operation, key: "operation")
+                }
+                if let endpoint = context.endpoint {
+                    scope.setTag(value: endpoint, key: "endpoint")
+                }
+                if let requestID = context.requestID {
+                    scope.setTag(value: requestID, key: "request_id")
+                }
+                if let status = context.status {
+                    scope.setTag(value: "\(status)", key: "status")
+                }
+            }
+        }
     }
 }

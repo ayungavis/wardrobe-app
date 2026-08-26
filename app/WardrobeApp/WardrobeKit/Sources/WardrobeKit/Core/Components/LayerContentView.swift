@@ -4,13 +4,13 @@ import SwiftUI
 struct LayerContentView: View {
     let content: LayerContent
     let canvasSize: CGSize
-    let photo: (String) -> CGImage?
+    let image: (UUID) -> CGImage?
 
     var body: some View {
         switch content {
         case let .photo(content):
             PolaroidPhotoView(
-                photo: photo(content.photoID),
+                photo: image(content.photoID),
                 width: canvasSize.width * PolaroidPhotoView.widthRatio
             )
         case let .text(text):
@@ -18,7 +18,8 @@ struct LayerContentView: View {
         case let .sticker(sticker):
             StickerArtworkView(
                 art: sticker.art,
-                size: TextRendering.baseStickerFontSize(in: canvasSize)
+                size: TextRendering.baseStickerFontSize(in: canvasSize),
+                image: sticker.art.wardrobeItemID.flatMap(image)
             )
         case let .drawing(drawing):
             DrawingCanvasView(content: drawing, referenceWidth: canvasSize.width)

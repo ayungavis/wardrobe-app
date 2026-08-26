@@ -1,36 +1,32 @@
-//! Schema and the two database operations whose correctness is subtle enough
-//! that the rest of the backend should never re-implement them.
-//!
-//! Everything else about the schema is documented in `docs/backend-schema.md`.
-//!
-//! ponytail: queries here use the runtime API rather than `sqlx::query!`, so
-//! nothing needs a live database or a committed `.sqlx` cache to compile. Move
-//! to the macros once there are enough queries for compile-time SQL checking to
-//! pay for the offline-cache workflow.
+// ponytail: queries here use the runtime API rather than `sqlx::query!`, so
+// nothing needs a live database or a committed `.sqlx` cache to compile. Move to
+// the macros once there are enough queries for compile-time SQL checking to pay
+// for the offline-cache workflow.
 
 use sqlx::PgConnection;
 use sqlx::migrate::Migrator;
 use uuid::Uuid;
 
-/// The migrations that define the schema, embedded so tests and the binaries
-/// apply exactly the same files.
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
-/// Allocates this account's next position in its change feed.
-///
-/// The pull cursor is `change_seq`, not `updated_at`, because `now()` is the
-/// transaction's *start* time: two concurrent writers can commit in the reverse
-/// order of their timestamps, and a client that advanced past the later-visible
-/// row would never sync it (FR-059). Bumping a counter on the account row makes
-/// the feed totally ordered, at the cost of serialising writes for one account —
-/// which is one person's phone.
-///
-/// Must be called inside the same transaction as the domain write.
-///
+pub const ILLUSTRATION: &str = "illustration";
+pub const STYLISE_ILLUSTRATION: &str = "styliseIllustration";
+pub const CHALLENGE_DECK: &str = "challengeDeck";
+pub const STYLE_VERSION: &str = "v1";
+
+#[must_use]
+pub fn upload_cap(kind: &str) -> i64 {
+    match kind {
+        "original" => 25 * 1024 * 1024,
+        "derivative" | "illustration" => 10 * 1024 * 1024,
+        "cutout" | "history" => 5 * 1024 * 1024,
+        _ => 2 * 1024 * 1024,
+    }
+}
+
 /// # Errors
 ///
-/// Returns [`sqlx::Error::RowNotFound`] when the account does not exist, and any
-/// other database error unchanged.
+/// Returns [`sqlx::Error::RowNotFound`] when the account does not exist.
 pub async fn next_change_seq(conn: &mut PgConnection, account_id: Uuid) -> sqlx::Result<i64> {
     sqlx::query_scalar::<_, i64>(
         "update account
@@ -44,7 +40,49 @@ pub async fn next_change_seq(conn: &mut PgConnection, account_id: Uuid) -> sqlx:
     .await
 }
 
-/// A job this worker now owns.
+/// # Errors
+///
+/// Returns [`sqlx::Error::RowNotFound`] when the account does not exist.
+pub async fn reserve_change_seq(
+    conn: &mut PgConnection,
+    account_id: Uuid,
+    count: i64,
+) -> sqlx::Result<i64> {
+    sqlx::query_scalar::<_, i64>(
+        "update account
+            set change_seq = change_seq + $2,
+                updated_at = now()
+          where id = $1
+      returning change_seq",
+    )
+    .bind(account_id)
+    .bind(count)
+    .fetch_one(conn)
+    .await
+}
+
+/// # Errors
+///
+/// Returns any database error unchanged.
+pub async fn reclaim_stalled(
+    conn: &mut PgConnection,
+    kind: &str,
+    older_than: chrono::Duration,
+) -> sqlx::Result<u64> {
+    sqlx::query(
+        "update job
+            set status = 'pending', updated_at = now()
+          where kind = $1
+            and status = 'running'
+            and started_at < now() - $2::interval",
+    )
+    .bind(kind)
+    .bind(older_than)
+    .execute(conn)
+    .await
+    .map(|done| done.rows_affected())
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ClaimedJob {
     pub id: Uuid,
@@ -53,12 +91,6 @@ pub struct ClaimedJob {
     pub attempts: i32,
 }
 
-/// Takes the next runnable job of `kind`, or nothing if none is due.
-///
-/// `for update skip locked` is what lets several workers share one table without
-/// a broker: a row already locked by another claimant is stepped over instead of
-/// waited on, so two workers can never hold the same job.
-///
 /// # Errors
 ///
 /// Returns any database error unchanged.
@@ -84,4 +116,38 @@ pub async fn claim_job(conn: &mut PgConnection, kind: &str) -> sqlx::Result<Opti
     .bind(kind)
     .fetch_optional(conn)
     .await
+}
+
+// ---------------------------------------------------------------- errors
+
+pub struct ErrorFacts {
+    pub code: &'static str,
+    pub sqlstate: Option<String>,
+    pub constraint: Option<String>,
+}
+
+#[must_use]
+pub fn error_facts(error: &sqlx::Error) -> ErrorFacts {
+    let (code, database) = match error {
+        sqlx::Error::RowNotFound => ("row_not_found", None),
+        sqlx::Error::PoolTimedOut => ("pool_timed_out", None),
+        sqlx::Error::PoolClosed => ("pool_closed", None),
+        sqlx::Error::Io(_) => ("io", None),
+        sqlx::Error::Tls(_) => ("tls", None),
+        sqlx::Error::Protocol(_) => ("protocol", None),
+        sqlx::Error::Configuration(_) => ("configuration", None),
+        sqlx::Error::ColumnNotFound(_) | sqlx::Error::ColumnIndexOutOfBounds { .. } => {
+            ("column_not_found", None)
+        }
+        sqlx::Error::ColumnDecode { .. } | sqlx::Error::Decode(_) => ("decode", None),
+        sqlx::Error::Migrate(_) => ("migrate", None),
+        sqlx::Error::Database(source) => ("database", Some(source)),
+        _ => ("other", None),
+    };
+
+    ErrorFacts {
+        code,
+        sqlstate: database.and_then(|source| source.code().map(std::borrow::Cow::into_owned)),
+        constraint: database.and_then(|source| source.constraint().map(str::to_owned)),
+    }
 }

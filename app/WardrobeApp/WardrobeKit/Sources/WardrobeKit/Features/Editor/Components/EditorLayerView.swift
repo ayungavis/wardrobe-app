@@ -6,7 +6,7 @@ struct EditorLayerView: View {
     let layer: EditorLayer
     let canvasSize: CGSize
     let transform: ElementTransform
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     let isSelected: Bool
     let isOverDeleteTarget: Bool
     let isChallengePhoto: Bool
@@ -18,7 +18,7 @@ struct EditorLayerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        LayerContentView(content: layer.content, canvasSize: canvasSize, photo: photo)
+        LayerContentView(content: layer.content, canvasSize: canvasSize, image: photo)
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size
             } action: { newSize in

@@ -1,19 +1,12 @@
-//
-//  FreestyleOutfitView.swift
-//  WardrobeKit
-//
-//  Created by Luisa Haning Tyas on 22/08/26.
-//
-
-import SwiftUI
 import DesignSystem
+import SwiftUI
 
 struct FreestyleOutfitView: View {
     let titleKey: LocalizedStringKey
     let messageKey: LocalizedStringKey
     let buttonKey: LocalizedStringKey
     let onAccept: () -> Void
-    
+
     var body: some View {
         ZStack {
             Image("BrownCard", bundle: .module)
@@ -33,10 +26,8 @@ struct FreestyleOutfitView: View {
                     .padding(.horizontal, Spacing.sm)
                 PrimaryButtonView(Text(buttonKey, bundle: .module), action: onAccept)
                     .frame(width: 108, height: 50)
-                
             }
             .padding(Spacing.lg)
         }.frame(width: 254, height: 362)
-        
     }
 }

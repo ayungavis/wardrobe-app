@@ -6,6 +6,20 @@ import Observation
 public final class DevMenuViewModel {
     public private(set) var summary = DevStateSummary()
     public private(set) var lastAction: String?
+    private(set) var sessionState: Loadable<DevSessionInfo> = .idle
+    private(set) var sessionTask: Task<Void, Never>?
+    private(set) var healthState: Loadable<String> = .idle
+    private(set) var healthTask: Task<Void, Never>?
+    private(set) var outbox: [OutboxEnvelope] = []
+    private(set) var cursor: Int64 = 0
+    private(set) var pullState: Loadable<PullOutcome> = .idle
+    var deckState: Loadable<String> = .idle
+    var pullTask: Task<Void, Never>?
+    private(set) var reconcileState: Loadable<ReconcileOutcome> = .idle
+    private(set) var diagnostics: [DiagnosticEntry] = []
+    private(set) var mediaState: Loadable<String> = .idle
+    private(set) var pendingUploads: [MediaUpload] = []
+    private(set) var mediaTask: Task<Void, Never>?
 
     private let activeRepository: ActiveChallengeRepository
     private let completedRepository: CompletedChallengeRepository
@@ -14,9 +28,22 @@ public final class DevMenuViewModel {
     private let thumbnails: GarmentThumbnailRepository
     private let previews: CompletionPreviewRepository
     private let onboarding: OnboardingModel
+    private let session: any SessionService
+    let client: any AuthenticatedAPIClient
+    private let plainClient: any APIClient
+    let baseURL: URL
+    private let tokens: any SessionTokenRepository
+    let outboxRepository: any OutboxRepository
+    private let feed: any ChangeFeedRepository
+    let coordinator: any SyncService
+    private let diagnosticsStore: any DiagnosticsStore
+    private let media: any MediaRepository
+    private let uploadQueue: any MediaUploadRepository
+    private let applier: any RestoreService
+    private let revision: ContentRevisionModel?
     private let calendar: Calendar
 
-    public init(
+    init(
         activeRepository: ActiveChallengeRepository,
         completedRepository: CompletedChallengeRepository,
         photoRepository: PhotoRepository,
@@ -24,6 +51,19 @@ public final class DevMenuViewModel {
         thumbnails: GarmentThumbnailRepository,
         previews: CompletionPreviewRepository,
         onboarding: OnboardingModel,
+        session: any SessionService,
+        client: any AuthenticatedAPIClient,
+        plainClient: any APIClient,
+        baseURL: URL,
+        tokens: any SessionTokenRepository,
+        outboxRepository: any OutboxRepository,
+        feed: any ChangeFeedRepository,
+        coordinator: any SyncService,
+        diagnosticsStore: any DiagnosticsStore,
+        media: any MediaRepository,
+        uploadQueue: any MediaUploadRepository,
+        applier: any RestoreService = NoopRestoreService(),
+        revision: ContentRevisionModel? = nil,
         calendar: Calendar = .current
     ) {
         self.activeRepository = activeRepository
@@ -33,10 +73,87 @@ public final class DevMenuViewModel {
         self.thumbnails = thumbnails
         self.previews = previews
         self.onboarding = onboarding
+        self.session = session
+        self.client = client
+        self.plainClient = plainClient
+        self.baseURL = baseURL
+        self.tokens = tokens
+        self.outboxRepository = outboxRepository
+        self.feed = feed
+        self.coordinator = coordinator
+        self.diagnosticsStore = diagnosticsStore
+        self.media = media
+        self.uploadQueue = uploadQueue
+        self.applier = applier
+        self.revision = revision
         self.calendar = calendar
     }
 
+    func checkHealth() {
+        healthTask?.cancel()
+        healthState = .loading
+
+        healthTask = Task { [plainClient] in
+            do {
+                let response = try await plainClient.send(GetHealthEndpoint())
+                try Task.checkCancellation()
+                healthState = .loaded(response.status)
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, logger: Log.network)
+                healthState = .failed(AppError(wrapping: error))
+            }
+        }
+    }
+
+    func loadSession(callingWhoami: Bool = false) {
+        sessionTask?.cancel()
+        sessionState = .loading
+
+        sessionTask = Task {
+            do {
+                _ = try await session.accessToken()
+                try Task.checkCancellation()
+
+                let whoami: DevSessionInfo.Whoami?
+                if callingWhoami {
+                    let response = try await client.send(GetWhoamiEndpoint())
+                    try Task.checkCancellation()
+                    whoami = DevSessionInfo.Whoami(
+                        accountID: response.accountId, sessionID: response.sessionId
+                    )
+                } else {
+                    whoami = nil
+                }
+
+                guard let stored = tokens.load() else {
+                    sessionState = .failed(.sessionExpired)
+                    return
+                }
+                sessionState = .loaded(DevSessionInfo(
+                    accountID: stored.accountID,
+                    accessExpiresAt: stored.expiresAt,
+                    refreshExpiresAt: stored.refreshExpiresAt,
+                    isAccessUsable: stored.isUsable(at: .now),
+                    whoami: whoami
+                ))
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, logger: Log.network)
+                sessionState = .failed(AppError(wrapping: error))
+            }
+        }
+    }
+
+    func note(_ action: String) {
+        lastAction = action
+    }
+
     public func refresh() {
+        outbox = (try? outboxRepository.entries()) ?? []
+        cursor = (try? feed.position()) ?? 0
+        diagnostics = (try? diagnosticsStore.entries()) ?? []
+        pendingUploads = (try? uploadQueue.entries()) ?? []
         let active = activeRepository.load()
         summary = DevStateSummary(
             completionCount: completedRepository.load().count,
@@ -50,18 +167,117 @@ public final class DevMenuViewModel {
         )
     }
 
-    public func resetOnboarding() {
+    func reconcileNow() {
+        pullTask?.cancel()
+        reconcileState = .loading
+
+        pullTask = Task { [coordinator] in
+            let outcome = await coordinator.reconcile(.manual)
+            guard !Task.isCancelled else { return }
+            reconcileState = .loaded(outcome)
+            refresh()
+        }
+    }
+
+    func pullChanges() {
+        pullTask?.cancel()
+        pullState = .loading
+
+        pullTask = Task { [feed] in
+            var records = 0
+            do {
+                let outcome = try await feed.pull(applying: applier)
+                try Task.checkCancellation()
+                records = outcome.records
+                pullState = .loaded(outcome)
+            } catch is CancellationError {
+                return
+            } catch {
+                Log.report(error, logger: Log.network)
+                pullState = .failed(AppError(wrapping: error))
+            }
+
+            // ponytail: the queue drains even when the pull failed — media queued
+            // by an earlier page must not be held hostage by a later refusal.
+            let fetched = await applier.restoreDueMedia(at: Date())
+            if records > 0 || fetched.restored > 0 {
+                revision?.bump()
+            }
+            refresh()
+        }
+    }
+
+    func runMediaRoundTrip() {
+        mediaTask?.cancel()
+        mediaState = .loading
+
+        mediaTask = Task { [media] in
+            let id = UUID()
+            let payload = Data("wardrobe round trip \(id.uuidString)".utf8)
+            do {
+                try await media.upload(payload, id: id, kind: .cutout, contentType: "text/plain")
+                try media.clearCache()
+                let read = try await media.data(for: id)
+                try Task.checkCancellation()
+                mediaState = read == payload
+                    ? .loaded("\(payload.count) bytes up and back, identical")
+                    : .failed(.serverRejected)
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, context: Log.Context(operation: "media.roundTrip"), logger: Log.network)
+                mediaState = .failed(AppError(wrapping: error))
+            }
+            refresh()
+        }
+    }
+
+    func clearDiagnostics() {
         do {
-            try onboarding.reset()
+            try diagnosticsStore.removeAll()
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Diagnostics cleared"
+    }
+
+    public func retryFailedOutbox() {
+        do {
+            try outboxRepository.retryFailed(at: Date())
+            try uploadQueue.retryFailed(at: Date())
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Outbox retry requested"
+    }
+
+    public func clearOutbox() {
+        do {
+            try outboxRepository.removeAll()
+        } catch {
+            Log.report(error)
+        }
+        refresh()
+        lastAction = "Outbox cleared"
+    }
+}
+
+// MARK: - Resets
+
+public extension DevMenuViewModel {
+    func resetOnboarding() async {
+        do {
+            try await onboarding.reset()
             Log.ui.info("Dev: onboarding reset")
         } catch {
             Log.report(error)
         }
         refresh()
-        lastAction = "Onboarding reset"
+        note("Onboarding reset")
     }
 
-    public func resetWardrobe() {
+    func resetWardrobe() {
         do {
             try wardrobeRepository.deleteAll()
             try thumbnails.deleteAll()
@@ -70,10 +286,10 @@ public final class DevMenuViewModel {
             Log.report(error)
         }
         refresh()
-        lastAction = "Wardrobe cleared"
+        note("Wardrobe cleared")
     }
 
-    public func resetToday() {
+    func resetToday() {
         let today = Date()
 
         let todaysCompletions = completedRepository.load()
@@ -93,11 +309,11 @@ public final class DevMenuViewModel {
         activeRepository.clear()
 
         refresh()
-        lastAction = "Today's challenge reset"
+        note("Today's challenge reset")
         Log.ui.info("Dev: today's challenge reset")
     }
 
-    public func resetHistory() {
+    func resetHistory() {
         for completion in completedRepository.load() {
             photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
         }
@@ -109,7 +325,7 @@ public final class DevMenuViewModel {
         completedRepository.removeAll()
 
         refresh()
-        lastAction = "History cleared"
+        note("History cleared")
         Log.ui.info("Dev: history cleared")
     }
 

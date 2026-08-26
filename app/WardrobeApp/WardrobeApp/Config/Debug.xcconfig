@@ -1,12 +1,21 @@
 // Development environment values. No secrets here — DSN is not a secret,
 // real secrets belong in Keychain / CI secret storage.
 
-// Per-developer overrides (gitignored). To run on a physical device, create
-// Local.xcconfig next to this file with: DEVELOPMENT_TEAM = YOUR_TEAM_ID
+// Local.xcconfig is tracked, not gitignored as this file once claimed, and it
+// is included first — so every assignment below wins over it. Put per-machine
+// signing (DEVELOPMENT_TEAM) there; an API_BASE_URL there would never apply.
 #include? "Local.xcconfig"
 
 // `//` starts a comment in xcconfig, so every URL needs the empty-$() trick
 // between the slashes — without it the value is silently truncated to "https:".
-API_BASE_URL = http:/$()/localhost:8080
+//
+// On a physical device 127.0.0.1 is the phone itself, not this Mac, so the two
+// SDKs point at different hosts: the simulator at the local server, the phone
+// at Railway. For phone-against-local-Mac testing use this Mac's .local name
+// (or its LAN address) here instead.
+API_BASE_URL[sdk=iphonesimulator*] = http:/$()/127.0.0.1:8080
+API_BASE_URL[sdk=iphoneos*] = https:/$()/wardrobe-app-api.up.railway.app
+//API_BASE_URL[sdk=iphoneos*] = http:/$()/Wahyus-MacBook-Pro-M5.local:8080
 SENTRY_DSN = https:/$()/20d03438cf41ffe30a30fa9c28f6f19a@o447656.ingest.us.sentry.io/4511867550171136
 SENTRY_ENVIRONMENT = development
+CONSENT_AI_PROVIDER = Seedream (ByteDance)

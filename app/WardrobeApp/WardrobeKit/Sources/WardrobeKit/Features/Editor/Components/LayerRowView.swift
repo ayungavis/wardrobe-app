@@ -4,7 +4,7 @@ import SwiftUI
 
 struct LayerRowView: View {
     let layer: EditorLayer
-    let photo: (String) -> CGImage?
+    let photo: (UUID) -> CGImage?
     let isSelected: Bool
     let depth: Int
     let layerCount: Int

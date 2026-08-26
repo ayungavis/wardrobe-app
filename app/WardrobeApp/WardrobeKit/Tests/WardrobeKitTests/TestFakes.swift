@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import CryptoKit
 import Foundation
 @testable import WardrobeKit
 
@@ -46,6 +47,15 @@ final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, 
         stored.removeAll { Calendar.current.isDate($0.completedAt, inSameDayAs: date) }
     }
 
+    @discardableResult
+    func stageStatus(id: UUID, status: CompletionStatus) -> Bool {
+        guard let index = stored.firstIndex(where: { $0.id == id }) else { return false }
+        stored[index].status = status
+        return true
+    }
+
+    func commitStaged() {}
+
     func removeAll() {
         stored = []
     }
@@ -56,9 +66,14 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
     var storedItems: [WardrobeItem] = []
     var storedFingerprints: [ItemFingerprint] = []
     var storedWears: [WearRecord] = []
+    var storedConflicts: [ItemConflict] = []
+    var itemsError: Error?
 
     func items() throws -> [WardrobeItem] {
-        storedItems.sorted { $0.createdAt > $1.createdAt }
+        if let itemsError {
+            throw itemsError
+        }
+        return storedItems.sorted { $0.createdAt > $1.createdAt }
     }
 
     func fingerprints() throws -> [ItemFingerprint] {
@@ -69,21 +84,71 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
         storedWears.filter { $0.itemID == itemID }
     }
 
+    func merge(winnerID: UUID, loserID: UUID) throws {
+        storedWears = storedWears.map { wear in
+            guard wear.itemID == loserID else { return wear }
+            return WearRecord(
+                id: wear.id, itemID: winnerID, completionID: wear.completionID, wornAt: wear.wornAt
+            )
+        }
+        storedItems.removeAll { $0.id == loserID }
+    }
+
+    private(set) var regenerated: [(id: UUID, note: String?)] = []
+
+    func regenerateIllustration(itemID: UUID, note: String?) throws {
+        regenerated.append((itemID, note))
+    }
+
+    func openConflicts() throws -> [ItemConflict] {
+        storedConflicts.filter { $0.resolvedAt == nil }
+    }
+
+    func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws {
+        let index = storedItems.firstIndex { $0.id == conflict.itemID }
+        if choice == .useIncoming, conflict.field == .name, let value = conflict.value, let index {
+            storedItems[index].name = value
+        }
+        storedConflicts = storedConflicts.map { row in
+            guard row.itemID == conflict.itemID, row.field == conflict.field else { return row }
+            return ItemConflict(
+                id: row.id, itemID: row.itemID, field: row.field,
+                value: row.value, revision: row.revision, resolvedAt: Date()
+            )
+        }
+    }
+
     func update(_ item: WardrobeItem) throws {
         guard let index = storedItems.firstIndex(where: { $0.id == item.id }) else { return }
         storedItems[index] = item
     }
 
-    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord) throws {
+    func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws {
         storedItems.append(item)
         if let fingerprint {
             storedFingerprints.append(fingerprint)
         }
-        storedWears.append(wear)
+        if let wear {
+            storedWears.append(wear)
+        }
     }
 
-    func recordWear(_ wear: WearRecord, fingerprint: ItemFingerprint) throws {
-        storedWears.append(wear)
+    func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) {
+        try? insert(item, fingerprint: fingerprint, wear: wear)
+    }
+
+    func stageWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) {
+        try? recordWear(wear, fingerprint: fingerprint)
+    }
+
+    func commitStaged() throws {}
+
+    func discardStaged() {}
+
+    func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws {
+        if let wear {
+            storedWears.append(wear)
+        }
         storedFingerprints.append(fingerprint)
     }
 
@@ -163,194 +228,38 @@ actor FakePhotoLibrary: PhotoLibraryService {
 }
 
 final class SpyPhotoRepository: PhotoRepository, @unchecked Sendable {
-    var saved: [String: Data] = [:]
-    var deleted: [String] = []
+    var saved: [UUID: Data] = [:]
+    var deleted: [UUID] = []
     var saveError: Error?
 
-    func saveOriginal(_ data: Data) throws -> String {
+    func saveOriginal(_ data: Data) throws -> UUID {
         if let saveError {
             throw saveError
         }
-        let id = UUID().uuidString
+        let id = UUID.v7()
         saved[id] = data
         return id
     }
 
-    func loadOriginal(id: String) throws -> Data {
+    func saveOriginal(_ data: Data, id: UUID) throws {
+        if let saveError {
+            throw saveError
+        }
+        saved[id] = data
+    }
+
+    func hasOriginal(id: UUID) -> Bool {
+        saved[id] != nil
+    }
+
+    func loadOriginal(id: UUID) throws -> Data {
         guard let data = saved[id] else { throw AppError.unexpected }
         return data
     }
 
-    func deleteOriginal(id: String) throws {
+    func deleteOriginal(id: UUID) throws {
         deleted.append(id)
         saved[id] = nil
-    }
-}
-
-@MainActor
-final class FakeCameraService: CameraService {
-    var permission: CameraPermission = .notDetermined
-    var permissionAfterRequest: CameraPermission = .granted
-    var captureResult: Result<Data, Error> = .success(Data([0x01]))
-    var startError: Error?
-    var toggleError: Error?
-    private(set) var stopCount = 0
-    private(set) var toggleCount = 0
-    private(set) var isFlashOn = false
-    private(set) var isUsingFrontCamera = false
-    private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
-    private(set) var focusPoints: [CGPoint] = []
-
-    /// Mirrors a typical iPhone: ultra-wide on the back, none on the front.
-    var zoomOptions: [CGFloat] {
-        isUsingFrontCamera ? [1, 2] : CameraZoom.presets
-    }
-
-    func toggleFlash() {
-        isFlashOn.toggle()
-    }
-
-    func setDisplayZoom(_ factor: CGFloat) {
-        displayZoomFactor = CameraZoom.clamp(factor, to: zoomOptions)
-    }
-
-    func focus(at point: CGPoint) {
-        focusPoints.append(point)
-    }
-
-    var previewSession: AVCaptureSession? {
-        nil
-    }
-
-    func requestPermission() async -> CameraPermission {
-        permission = permissionAfterRequest
-        return permission
-    }
-
-    func startSession() async throws {
-        if let startError {
-            throw startError
-        }
-    }
-
-    func stopSession() {
-        stopCount += 1
-    }
-
-    func toggleCamera() async throws {
-        if let toggleError {
-            throw toggleError
-        }
-        toggleCount += 1
-        isUsingFrontCamera.toggle()
-        displayZoomFactor = CameraZoom.standard
-    }
-
-    func capturePhoto() async throws -> Data {
-        try captureResult.get()
-    }
-}
-
-// MARK: - Document fixtures and readers
-
-extension EditorDocument {
-    /// The same document with every photo layer pointed at `photoID`.
-    func showingPhoto(_ photoID: String) -> EditorDocument {
-        var copy = self
-        copy.layers = layers.map { layer in
-            guard case let .photo(content) = layer.content else { return layer }
-            var updated = layer
-            updated.content = .photo(PhotoContent(photoID: photoID, crop: content.crop))
-            return updated
-        }
-        return copy
-    }
-
-    /// The bottom photo layer's crop — the single-photo shape most tests still
-    /// speak in. Production says which layer it means (FR-093); a test with one
-    /// photo has nothing to disambiguate.
-    var firstPhotoCrop: CropSpec? {
-        photoIDs.first
-            .flatMap { photoLayerID(showing: $0) }
-            .flatMap { crop(ofLayer: $0) }
-    }
-
-    /// The layer showing the first photo, for tests that need to name it.
-    var firstPhotoLayerID: UUID? {
-        photoIDs.first.flatMap { photoLayerID(showing: $0) }
-    }
-
-    /// Builds a document from the flat shape tests already read well in.
-    /// Routed through the migration on purpose rather than reimplementing it —
-    /// the migration has its own tests, so a break there fails loudly at the
-    /// source instead of quietly here.
-    static func fixture(
-        photoID: String? = "photo-1",
-        crop: CropSpec? = nil,
-        texts: [TextItem] = [],
-        stickers: [StickerItem] = [],
-        background: CanvasBackground = .default
-    ) -> EditorDocument {
-        var document = EditorDocument(
-            migrating: EditDraft(crop: crop, texts: texts, stickers: stickers),
-            photoID: photoID
-        )
-        document.background = background
-        return document
-    }
-
-    var textContents: [String] {
-        layers.compactMap { layer in
-            guard case let .text(text) = layer.content else { return nil }
-            return text.content
-        }
-    }
-
-    /// The flat projection, kept here because only tests still compare against
-    /// the pre-canvas shape — production reads `EditorLayer.textDraft`.
-    var textItems: [TextItem] {
-        layers.compactMap { layer in
-            guard case let .text(text) = layer.content else { return nil }
-            return TextItem(
-                id: layer.id,
-                content: text.content,
-                position: layer.transform.position,
-                scale: layer.transform.scale,
-                rotationDegrees: layer.transform.rotationDegrees,
-                colorName: text.colorName,
-                hasBackground: text.backgroundStyle == .solid,
-                fontName: text.fontName,
-                alignmentName: text.alignmentName
-            )
-        }
-    }
-
-    var stickerItems: [StickerItem] {
-        layers.compactMap { layer -> StickerItem? in
-            guard case let .sticker(sticker) = layer.content,
-                  case let .emoji(glyph)? = sticker.art.design
-            else {
-                return nil
-            }
-            return StickerItem(
-                id: layer.id,
-                emoji: glyph,
-                position: layer.transform.position,
-                scale: layer.transform.scale,
-                rotationDegrees: layer.transform.rotationDegrees
-            )
-        }
-    }
-
-    var stickerEmojis: [String] {
-        stickerItems.map(\.emoji)
-    }
-
-    var stickerArts: [StickerArt] {
-        layers.compactMap { layer in
-            guard case let .sticker(sticker) = layer.content else { return nil }
-            return sticker.art
-        }
     }
 }
 
@@ -365,25 +274,24 @@ final class InMemoryAccountPreferencesRepository: AccountPreferencesRepository, 
     func save(_ preferences: AccountPreferences) {
         stored = preferences
     }
+
+    func applyRemote(_ preferences: AccountPreferences) {
+        stored = preferences
+    }
 }
 
-final class InMemoryAppleAccountRepository: AppleAccountRepository, @unchecked Sendable {
-    // @unchecked: tests drive it from one actor at a time.
-    var stored: AppleAccount?
-    var saveError: AppError?
+// -------------------------------------------------- readable photo identities
 
-    func load() -> AppleAccount? {
-        stored
-    }
+/// A stable UUID for a fixture name, so `id("photo-1")` still reads like the
+/// string literal it replaced while satisfying the typed identity.
+let samplePhotoID = id("photo-1")
 
-    func save(_ account: AppleAccount) throws {
-        if let saveError {
-            throw saveError
-        }
-        stored = stored.map { $0.merged(with: account) } ?? account
-    }
-
-    func clear() throws {
-        stored = nil
-    }
+func id(_ name: String) -> UUID {
+    var bytes = Array(SHA256.hash(data: Data(name.utf8)).prefix(16))
+    bytes[6] = (bytes[6] & 0x0F) | 0x70
+    bytes[8] = (bytes[8] & 0x3F) | 0x80
+    return UUID(uuid: (
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    ))
 }

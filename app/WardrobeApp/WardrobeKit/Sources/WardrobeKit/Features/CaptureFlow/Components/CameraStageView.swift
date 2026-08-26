@@ -33,7 +33,7 @@ struct CameraStageView: View {
             VStack {
                 topBar
                 Spacer()
-                CameraZoomControl(
+                CameraZoomControlView(
                     options: viewModel.zoomOptions,
                     selected: viewModel.displayZoomFactor,
                     isFrontCamera: viewModel.isUsingFrontCamera,
@@ -56,7 +56,7 @@ struct CameraStageView: View {
             PhotoLibraryGridView(
                 access: viewModel.libraryAccess,
                 assets: viewModel.recentAssets,
-                library: viewModel.library,
+                thumbnail: { await viewModel.thumbnail(forAsset: $0) },
                 onPick: { viewModel.importAsset(id: $0) },
                 onPickData: { viewModel.usePickedPhoto($0) }
             )
@@ -91,13 +91,13 @@ struct CameraStageView: View {
                 Circle()
                     .strokeBorder(AppColor.onMedia, lineWidth: 5)
                     .frame(width: 80, height: 80)
-                    .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(8))
+                    .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(Spacing.sm))
             }
             .disabled(viewModel.isCapturing)
             .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
 
             HStack {
-                GalleryButton(thumbnail: viewModel.galleryThumbnail) {
+                GalleryButtonView(thumbnail: viewModel.galleryThumbnail) {
                     viewModel.isGalleryPresented = true
                 }
                 Spacer()
@@ -172,7 +172,7 @@ struct CameraStageView: View {
     }
 }
 
-private struct CameraZoomControl: View {
+private struct CameraZoomControlView: View {
     let options: [CGFloat]
     let selected: CGFloat
     let isFrontCamera: Bool
@@ -239,7 +239,7 @@ private struct CameraZoomControl: View {
     }
 }
 
-private struct GalleryButton: View {
+private struct GalleryButtonView: View {
     let thumbnail: CGImage?
     let action: () -> Void
 

@@ -1,3 +1,4 @@
+import DesignSystem
 import PhotosUI
 import SwiftUI
 
@@ -59,7 +60,7 @@ struct MatchBenchmarkView: View {
     private var picker: some View {
         PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
             if viewModel.isScanning {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.sm) {
                     ProgressView()
                     Text(verbatim: "Scanning…")
                 }

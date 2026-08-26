@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -20,20 +21,26 @@ public final class CaptureFlowViewModel {
     public private(set) var isTipsPresented = false
     public var isGalleryPresented = false
 
-    public let library: PhotoLibraryService
+    private let library: PhotoLibraryService
 
     public internal(set) var isCompleted = false
+    var pendingUndoSteps: [EditorDocument] = []
     public internal(set) var isCompleting = false
     public private(set) var didResumeDraft = false
 
     public let review: GarmentReviewModel
 
     private let camera: CameraService
+    let wardrobeRepository: WardrobeItemRepository
+    let thumbnails: GarmentThumbnailRepository
+    let syncNow: () async -> Void
     private let preferences: AccountPreferencesRepository
     let activeRepository: ActiveChallengeRepository
     let completedRepository: CompletedChallengeRepository
     let photoRepository: PhotoRepository
     let previews: CompletionPreviewRepository
+    let outbox: any OutboxRepository
+    let uploads: any MediaUploadRepository
     private(set) var consentTask: Task<Void, Never>?
     private(set) var captureTask: Task<Void, Never>?
     private(set) var sessionTask: Task<Void, Never>?
@@ -53,7 +60,10 @@ public final class CaptureFlowViewModel {
         scanner: GarmentScanService,
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
-        preferences: AccountPreferencesRepository
+        preferences: AccountPreferencesRepository,
+        outbox: any OutboxRepository,
+        uploads: any MediaUploadRepository,
+        syncNow: @escaping () async -> Void = {}
     ) {
         self.challenge = challenge
         self.camera = camera
@@ -62,7 +72,12 @@ public final class CaptureFlowViewModel {
         self.photoRepository = photoRepository
         self.previews = previews
         self.library = library
+        self.wardrobeRepository = wardrobeRepository
+        self.thumbnails = thumbnails
+        self.syncNow = syncNow
         self.preferences = preferences
+        self.outbox = outbox
+        self.uploads = uploads
         review = GarmentReviewModel(
             scanner: scanner,
             photoRepository: photoRepository,
@@ -71,8 +86,7 @@ public final class CaptureFlowViewModel {
         )
         stage = Self.initialStage(
             challenge: challenge,
-            permission: camera.permission,
-            
+            permission: camera.permission
         )
         isTipsPresented = stage == .camera && !preferences.load().hasSeenCaptureTips
         didResumeDraft = stage == .editor
@@ -93,7 +107,11 @@ public final class CaptureFlowViewModel {
     }
 
     // MARK: Consent / permission (FR-013, FR-014)
-    
+
+    public func thumbnail(forAsset assetID: String) async -> CGImage? {
+        await library.thumbnail(for: assetID, maxPixel: 200)
+    }
+
     public func consentContinue() {
         consentTask = Task {
             let result = await camera.requestPermission()
@@ -105,7 +123,7 @@ public final class CaptureFlowViewModel {
             }
         }
     }
-    
+
     public func recheckPermission() {
         switch stage {
         case .consent, .denied, .camera:
@@ -113,11 +131,11 @@ public final class CaptureFlowViewModel {
                 challenge: challenge,
                 permission: camera.permission
             )
-        case .crop,.scanReview, .editor:
+        case .crop, .scanReview, .editor:
             break
         }
     }
-    
+
     public func tipsContinue(dontShowAgain: Bool) {
         if dontShowAgain {
             var stored = preferences.load()
@@ -235,7 +253,7 @@ public final class CaptureFlowViewModel {
         stage = .scanReview
         review.scanIfNeeded(photoID: photoID)
     }
-    
+
     public func continueToEditor() {
         stage = .editor
     }

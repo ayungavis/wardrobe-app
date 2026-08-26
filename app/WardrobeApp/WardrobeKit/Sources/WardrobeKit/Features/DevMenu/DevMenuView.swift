@@ -31,17 +31,52 @@ struct DevMenuView: View {
     var body: some View {
         NavigationStack {
             List {
-                DevStateSection(summary: viewModel.summary)
-                DevTodaySection(lastAction: viewModel.lastAction) {
+                DevStateSectionView(summary: viewModel.summary)
+                DevSessionSectionView(
+                    baseURL: viewModel.baseURL,
+                    state: viewModel.sessionState,
+                    health: viewModel.healthState,
+                    onReload: { viewModel.loadSession() },
+                    onWhoami: { viewModel.loadSession(callingWhoami: true) },
+                    onHealth: { viewModel.checkHealth() }
+                )
+                DevMediaSectionView(
+                    state: viewModel.mediaState,
+                    pendingUploads: viewModel.pendingUploads,
+                    onRoundTrip: { viewModel.runMediaRoundTrip() }
+                )
+                DevDiagnosticsSectionView(
+                    entries: viewModel.diagnostics,
+                    onClear: { viewModel.clearDiagnostics() }
+                )
+                DevChallengeSectionView(
+                    state: viewModel.deckState,
+                    onGenerate: viewModel.generateDeck,
+                    onFetch: viewModel.fetchDeck
+                )
+
+                DevSyncSectionView(
+                    cursor: viewModel.cursor,
+                    state: viewModel.pullState,
+                    reconcile: viewModel.reconcileState,
+                    onPull: { viewModel.pullChanges() },
+                    onReconcile: { viewModel.reconcileNow() }
+                )
+                DevOutboxSectionView(
+                    entries: viewModel.outbox,
+                    onRetryFailed: { viewModel.retryFailedOutbox() },
+                    onClear: { viewModel.clearOutbox() }
+                )
+                DevTodaySectionView(lastAction: viewModel.lastAction) {
                     isResetConfirmationPresented = true
                 }
-                DevHistorySection {
+                DevHistorySectionView {
                     isHistoryResetConfirmationPresented = true
                 }
-                DevOnboardingSection {
+                DevOnboardingSectionView {
                     isOnboardingResetConfirmationPresented = true
                 }
-                DevWardrobeSection(
+                DevWardrobeSectionView(
                     onScan: { isBulkScanPresented = true },
                     onBenchmark: { isBenchmarkPresented = true },
                     onReset: { isWardrobeResetConfirmationPresented = true }
@@ -118,7 +153,7 @@ struct DevMenuView: View {
                 ) {
                     Button(role: .destructive) {
                         dismiss()
-                        viewModel.resetOnboarding()
+                        Task { await viewModel.resetOnboarding() }
                     } label: {
                         Text(verbatim: "Reset")
                     }
@@ -141,7 +176,7 @@ struct DevMenuView: View {
     }
 }
 
-private struct DevStateSection: View {
+private struct DevStateSectionView: View {
     let summary: DevStateSummary
 
     var body: some View {
@@ -192,7 +227,7 @@ private struct DevStateSection: View {
     }
 }
 
-private struct DevTodaySection: View {
+private struct DevTodaySectionView: View {
     let lastAction: String?
     let onReset: () -> Void
 
@@ -209,7 +244,7 @@ private struct DevTodaySection: View {
     }
 }
 
-private struct DevHistorySection: View {
+private struct DevHistorySectionView: View {
     let onReset: () -> Void
 
     var body: some View {
@@ -226,7 +261,7 @@ private struct DevHistorySection: View {
     }
 }
 
-private struct DevOnboardingSection: View {
+private struct DevOnboardingSectionView: View {
     let onReset: () -> Void
 
     var body: some View {
@@ -243,7 +278,7 @@ private struct DevOnboardingSection: View {
     }
 }
 
-private struct DevWardrobeSection: View {
+private struct DevWardrobeSectionView: View {
     let onScan: () -> Void
     let onBenchmark: () -> Void
     let onReset: () -> Void

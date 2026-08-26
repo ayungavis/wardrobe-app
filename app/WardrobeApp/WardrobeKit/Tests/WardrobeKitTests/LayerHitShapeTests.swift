@@ -51,7 +51,7 @@ struct LayerHitShapeTests {
     /// The three kinds that do fill their box must be untouched by this.
     @Test func everyOtherKindStaysTheWholeBox() {
         let kinds: [LayerContent] = [
-            .photo(PhotoContent(photoID: "p")),
+            .photo(PhotoContent(photoID: id("p"))),
             .text(TextContent(content: "OOTD")),
             .sticker(StickerContent(emoji: "✨")),
         ]

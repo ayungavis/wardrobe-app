@@ -8,7 +8,7 @@ import Testing
 struct EditorDocumentEditingTests {
     private func makeDocument() -> EditorDocument {
         EditorDocument(layers: [
-            EditorLayer(content: .photo(PhotoContent(photoID: "photo-1"))),
+            EditorLayer(content: .photo(PhotoContent(photoID: id("photo-1")))),
             EditorLayer(content: .sticker(StickerContent(emoji: "✨"))),
             EditorLayer(content: .text(TextContent(content: "OOTD"))),
         ])
@@ -178,7 +178,7 @@ struct EditorDocumentEditingTests {
 
         let document = EditorDocument(
             migrating: EditDraft(crop: crop, texts: [text], stickers: [sticker]),
-            photoID: "photo-1"
+            photoID: id("photo-1")
         )
 
         #expect(document.firstPhotoCrop == crop)
@@ -194,7 +194,7 @@ struct EditorDocumentEditingTests {
     }
 
     @Test func aDraftWithNothingInItBecomesJustThePhoto() {
-        let document = EditorDocument(migrating: EditDraft(), photoID: "photo-1")
+        let document = EditorDocument(migrating: EditDraft(), photoID: id("photo-1"))
 
         #expect(document.layers.count == 1)
         #expect(document.firstPhotoCrop == nil)

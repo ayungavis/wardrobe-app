@@ -22,7 +22,7 @@ public struct EditorDocument: Equatable, Sendable {
         self.background = background
     }
 
-    public init(photoID: String, crop: CropSpec? = nil) {
+    public init(photoID: UUID, crop: CropSpec? = nil) {
         self.init(layers: [EditorLayer(content: .photo(PhotoContent(photoID: photoID, crop: crop)))])
     }
 }
@@ -30,7 +30,7 @@ public struct EditorDocument: Equatable, Sendable {
 // MARK: - Migration
 
 public extension EditorDocument {
-    init(migrating draft: EditDraft, photoID: String?) {
+    init(migrating draft: EditDraft, photoID: UUID?) {
         var layers: [EditorLayer] = []
 
         if let photoID {

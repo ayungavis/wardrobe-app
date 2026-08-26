@@ -41,8 +41,7 @@ struct WardrobeSearchBarView: View {
         .padding(Spacing.md)
         .background(Capsule()
             .fill(.clear)
-            .glassEffect(.clear)
-        )
+            .glassEffect(.clear))
         .contentShape(.capsule)
         .onTapGesture { open() }
         .accessibilityElement(children: isActive ? .contain : .ignore)

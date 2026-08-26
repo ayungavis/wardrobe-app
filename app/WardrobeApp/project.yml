@@ -49,6 +49,7 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
+        com.apple.developer.weatherkit: true
     info:
       path: WardrobeApp/Info.plist
       properties:
@@ -64,9 +65,14 @@ targets:
         SentryDSN: $(SENTRY_DSN)
         SentryEnvironment: $(SENTRY_ENVIRONMENT)
         APIBaseURL: $(API_BASE_URL)
+        ConsentAIProvider: $(CONSENT_AI_PROVIDER)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Finds the development backend running on your Mac over Wi-Fi. Release builds talk to the hosted API and never use the local network.
         NSCameraUsageDescription: The camera is used to photograph your outfit for the daily challenge. Photos stay on your device until you choose to share them.
         NSPhotoLibraryAddUsageDescription: Lets you save your edited outfit photo to your photo library.
         NSPhotoLibraryUsageDescription: Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this.
+        NSLocationWhenInUseUsageDescription: Checks tomorrow's forecast near you so your challenge cards suit the weather. Your location never leaves your device — only a short weather summary is sent.
     dependencies:
       - package: WardrobeKit
         product: WardrobeKit

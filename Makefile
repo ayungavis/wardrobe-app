@@ -10,8 +10,8 @@ TEST_FLAGS ?=
 
 .PHONY: help validate \
         ios-generate ios-format ios-lint ios-test ios-build ios-run ios-validate \
-        backend-up backend-down backend-migrate backend-reset backend-run backend-openapi \
-        backend-fmt backend-lint backend-test backend-validate
+        backend-up backend-down backend-migrate backend-reset backend-run backend-worker backend-seed-ai backend-openapi \
+        backend-fmt backend-lint backend-test backend-build backend-image backend-validate backend-live-ai
 
 ## Descriptions come from the `##` comments below, so this list cannot go stale.
 help:
@@ -72,6 +72,12 @@ backend-reset: services/.env ## Drop and rebuild the database from empty
 backend-run: services/.env ## Run the API (Swagger UI at http://localhost:8080/docs)
 	$(MAKE) -C services run
 
+backend-worker: services/.env ## Run the job worker against the local containers
+	$(MAKE) -C services worker
+
+backend-seed-ai: services/.env ## Enable illustration jobs locally (needs OPENROUTER_TEST_MODEL in .env)
+	$(MAKE) -C services seed-ai
+
 backend-openapi: ## Regenerate services/openapi.json from the handlers
 	$(MAKE) -C services openapi
 
@@ -84,9 +90,18 @@ backend-lint: ## cargo clippy -D warnings
 backend-test: services/.env ## cargo test (starts the containers it needs)
 	$(MAKE) -C services test
 
+backend-build: ## cargo build --release for both binaries (what the Dockerfile runs)
+	$(MAKE) -C services build
+
+backend-image: ## docker build the deploy image (context is services/, needs a >=4 GiB builder)
+	$(MAKE) -C services image
+
 backend-validate: services/.env ## fmt → clippy → test
 	$(MAKE) -C services validate
 	@echo "✅ backend OK — fmt, clippy, test all green"
+
+backend-live-ai: services/.env ## Call OpenRouter for real (needs a key and credits)
+	$(MAKE) -C services live-ai
 
 # ------------------------------------------------------------------- both
 

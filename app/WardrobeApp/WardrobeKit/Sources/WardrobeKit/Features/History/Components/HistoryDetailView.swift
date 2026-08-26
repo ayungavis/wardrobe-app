@@ -24,10 +24,6 @@ public struct HistoryDetailView: View {
 
     public var body: some View {
         ZStack {
-//            Image("appBG", bundle: .module)
-//                .resizable()
-//                .ignoresSafeArea()
-
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .top) {
                     VStack(spacing: Spacing.lg) {
@@ -62,17 +58,28 @@ public struct HistoryDetailView: View {
             Image("TornReceipt", bundle: .module)
                 .resizable()
 
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                VStack(alignment: .leading, spacing: Spacing.md) {
                     HStack(alignment: .top) {
                         label("history.detail.date")
                         Text(completion.completedAt, format: .dateTime.day().month(.wide).year())
                     }
 
+                    if completion.documentState != .available {
+                        Text(
+                            completion.documentState == .pending
+                                ? "history.detail.document.pending"
+                                : "history.detail.document.unsupported",
+                            bundle: .module
+                        )
+                        .font(AppFont.caption)
+                        .foregroundColor(AppColor.textSecondary)
+                    }
+
                     VStack(alignment: .leading, spacing: 6) {
                         label("history.detail.description")
                         Text(completion.card.prompt)
-                            .font(.body)
+                            .font(AppFont.body)
                             .foregroundColor(AppColor.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -86,15 +93,15 @@ public struct HistoryDetailView: View {
     }
 
     private var wearSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             label("history.detail.wear")
 
             if garments.isEmpty {
                 Text("history.detail.garments.empty", bundle: .module)
-                    .font(.caption)
+                    .font(AppFont.caption)
                     .foregroundStyle(AppColor.textSecondary)
             } else {
-                HStack(spacing: 16) {
+                HStack(spacing: Spacing.lg) {
                     ForEach(garments, id: \.item.id) { entry in
                         Button {
                             onSelectGarment(entry.item.id)
@@ -106,11 +113,11 @@ public struct HistoryDetailView: View {
                 }
             }
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, Spacing.xl)
     }
 
     private func garmentView(item: WardrobeItem, wearCount: Int) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.sm) {
             if let data = viewModel.thumbnailData(for: item) {
                 DownsampledPhotoView(data: data)
                     .frame(width: 130, height: 130)

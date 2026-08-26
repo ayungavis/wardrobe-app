@@ -22,6 +22,8 @@ func makeEditorSUT(
     photoRepository: SpyPhotoRepository = SpyPhotoRepository(),
     librarySaver: SpyLibrarySaver = SpyLibrarySaver(),
     preferencesRepository: InMemoryAccountPreferencesRepository = InMemoryAccountPreferencesRepository(),
+    wardrobeRepository: InMemoryWardrobeItemRepository? = nil,
+    thumbnails: InMemoryGarmentThumbnailRepository? = nil,
     document: EditorDocument? = nil
 ) throws -> EditorViewModel {
     let photoID = try photoRepository.saveOriginal(SampleCameraService.makeSampleJPEG(width: 100, height: 200))
@@ -37,6 +39,8 @@ func makeEditorSUT(
         activeRepository: activeRepository,
         photoRepository: photoRepository,
         librarySaver: librarySaver,
-        preferencesRepository: preferencesRepository
+        preferencesRepository: preferencesRepository,
+        wardrobeRepository: wardrobeRepository,
+        thumbnails: thumbnails
     )
 }

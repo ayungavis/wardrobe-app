@@ -4,6 +4,7 @@ import Testing
 
 /// FR-002 and FR-099: the handful of conveniences that follow the account
 /// rather than the phone.
+@MainActor
 struct AccountPreferencesTests {
     private func makeDefaults(_ name: String) throws -> UserDefaults {
         let defaults = try #require(UserDefaults(suiteName: name))
@@ -56,7 +57,7 @@ struct AccountPreferencesTests {
         let defaults = try makeDefaults("AccountPreferencesTests.roundTrip")
         let repository = UserDefaultsAccountPreferencesRepository(defaults: defaults)
 
-        repository.save(AccountPreferences(recentStickerIDs: ["emoji.fire"], hasCompletedOnboarding: true))
+        repository.save(AccountPreferences(recentStickerIDs: ["emoji.fire"], onboardingCompletedAt: Date()))
 
         let restored = repository.load()
         #expect(restored.recentStickerIDs == ["emoji.fire"])

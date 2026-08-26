@@ -1,20 +1,20 @@
 import Foundation
 
 public struct AppleAccount: Equatable, Codable, Sendable {
-    public let userID: String
+    public let accountID: UUID
     public var fullName: String?
     public var email: String?
 
-    public init(userID: String, fullName: String? = nil, email: String? = nil) {
-        self.userID = userID
+    public init(accountID: UUID, fullName: String? = nil, email: String? = nil) {
+        self.accountID = accountID
         self.fullName = fullName
         self.email = email
     }
 
     public func merged(with newer: AppleAccount) -> AppleAccount {
-        guard newer.userID == userID else { return newer }
+        guard newer.accountID == accountID else { return newer }
         return AppleAccount(
-            userID: userID,
+            accountID: accountID,
             fullName: newer.fullName ?? fullName,
             email: newer.email ?? email
         )

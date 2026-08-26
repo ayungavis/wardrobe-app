@@ -7,12 +7,12 @@ public struct CaptureFlowView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: CaptureFlowViewModel
     private let makeEditorViewModel: (ActiveChallenge) -> EditorViewModel
-    private let makeCropViewModel: (String) -> CropViewModel
+    private let makeCropViewModel: (UUID) -> CropViewModel
 
     public init(
         viewModel: CaptureFlowViewModel,
         makeEditorViewModel: @escaping (ActiveChallenge) -> EditorViewModel,
-        makeCropViewModel: @escaping (String) -> CropViewModel
+        makeCropViewModel: @escaping (UUID) -> CropViewModel
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.makeEditorViewModel = makeEditorViewModel
@@ -34,7 +34,7 @@ public struct CaptureFlowView: View {
             case .camera:
                 ZStack {
                     CameraStageView(viewModel: viewModel, onClose: { dismiss() })
-                    
+
                     if viewModel.isTipsPresented {
                         TipsStageView(
                             onContinue: { dontShowAgain in viewModel.tipsContinue(dontShowAgain: dontShowAgain) },
@@ -59,19 +59,9 @@ public struct CaptureFlowView: View {
                     didResumeDraft: viewModel.didResumeDraft,
                     makeCropViewModel: makeCropViewModel,
                     onDiscard: { viewModel.discardPhoto() },
-                    onComplete: { viewModel.completeChallenge() },
-//                    reviewDrawer: {
-//                        ItemReviewDrawerView(
-//                            garments: viewModel.review.garments,
-//                            isScanning: viewModel.review.isScanning,
-//                            thumbnail: { viewModel.review.thumbnailData(forFile: $0) },
-//                            itemThumbnail: { viewModel.review.thumbnailData(forItemID: $0) },
-//                            onChoose: { viewModel.review.choose($1, for: $0) }
-//                        )
-//                    }
+                    onComplete: { steps in viewModel.completeChallenge(history: steps) }
                 )
                 .task { viewModel.review.scanIfNeeded(photoID: viewModel.challenge.photoID) }
-                
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -191,6 +181,3 @@ private struct DeniedStageView: View {
         .padding(Spacing.xl)
     }
 }
-
-
-

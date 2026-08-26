@@ -9,22 +9,20 @@ public struct EditorView: View {
     @State private var canvasSize: CGSize = .zero
     @State private var isDiscardConfirmPresented = false
     @State private var isRestoredNoticeVisible = false
-    
+
     private let isCompleting: Bool
     private let didResumeDraft: Bool
-    private let makeCropViewModel: (String) -> CropViewModel
+    private let makeCropViewModel: (UUID) -> CropViewModel
     private let onDiscard: () -> Void
-    private let onComplete: () -> Void
-    //private let reviewDrawer: ReviewDrawer
-    
+    private let onComplete: ([EditorDocument]) -> Void
+
     public init(
         viewModel: EditorViewModel,
         isCompleting: Bool,
         didResumeDraft: Bool,
-        makeCropViewModel: @escaping (String) -> CropViewModel,
+        makeCropViewModel: @escaping (UUID) -> CropViewModel,
         onDiscard: @escaping () -> Void,
-        onComplete: @escaping () -> Void,
-        //@ViewBuilder reviewDrawer: () -> ReviewDrawer
+        onComplete: @escaping ([EditorDocument]) -> Void
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.isCompleting = isCompleting
@@ -32,12 +30,11 @@ public struct EditorView: View {
         self.makeCropViewModel = makeCropViewModel
         self.onDiscard = onDiscard
         self.onComplete = onComplete
-        //self.reviewDrawer = reviewDrawer()
     }
-    
+
     public var body: some View {
         @Bindable var viewModel = viewModel
-        
+
         ZStack {
             AppColor.mediaBackground.ignoresSafeArea()
             content
@@ -47,17 +44,22 @@ public struct EditorView: View {
         .sensoryFeedback(.success, trigger: viewModel.didSaveToPhotos) { $1 }
         .sensoryFeedback(.error, trigger: viewModel.alertError) { $1 != nil }
         .task(id: didResumeDraft) { await showRestoredNotice() }
-        .onDisappear { Task { await viewModel.flush() } }
+        .onDisappear { viewModel.viewDisappeared() }
         .sheet(isPresented: $viewModel.isExportPresented) {
             ExportSheetView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.isStickerPickerPresented) {
-            StickerPickerView(recentIDs: viewModel.recentStickerIDs) { viewModel.addSticker($0) }
-                .presentationDetents([.fraction(0.48), .large])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(30)
-                .presentationBackground(AppColor.mediaSurface)
-                .preferredColorScheme(.dark)
+            StickerPickerView(
+                recentIDs: viewModel.recentStickerIDs,
+                wardrobe: viewModel.wardrobeStickers,
+                onPick: { viewModel.addSticker($0) },
+                onPickItem: { viewModel.addItemSticker($0) }
+            )
+            .presentationDetents([.fraction(0.48), .large])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(30)
+            .presentationBackground(AppColor.mediaSurface)
+            .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $viewModel.isLayerPanelPresented) {
             LayerPanelView(viewModel: viewModel)
@@ -108,7 +110,7 @@ public struct EditorView: View {
             Text(viewModel.alertError?.userMessage ?? "")
         }
     }
-    
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.originals {
@@ -132,36 +134,30 @@ public struct EditorView: View {
             }
         }
     }
-    
+
     private func showRestoredNotice() async {
         guard didResumeDraft else { return }
         withAnimation(reduceMotion ? nil : .snappy) { isRestoredNoticeVisible = true }
         guard !voiceOverEnabled else { return }
-        
+
         try? await Task.sleep(for: .seconds(4))
         guard !Task.isCancelled else { return }
         withAnimation(reduceMotion ? nil : .snappy) { isRestoredNoticeVisible = false }
     }
-    
+
     private var draftBannerKind: DraftBannerView.Kind? {
         if viewModel.didFailToPersistDraft {
             return .writeFailed
         }
         return isRestoredNoticeVisible ? .restored : nil
     }
-    
+
     private var canvasStage: some View {
         ZStack {
             EditorCanvasView(viewModel: viewModel, canvasSize: $canvasSize)
                 .ignoresSafeArea(.keyboard)
-            
+
             if viewModel.activeTool == nil {
-//                VStack {
-//                    Spacer()
-//                    reviewDrawer
-//                        .padding(.bottom, 96)
-//                }
-                
                 if let banner = draftBannerKind {
                     VStack {
                         HStack {
@@ -174,7 +170,7 @@ public struct EditorView: View {
                     }
                     .padding(Spacing.lg)
                 }
-                
+
                 EditorControlsView(
                     isSaving: viewModel.isSaving,
                     didSave: viewModel.didSaveToPhotos,
@@ -193,10 +189,10 @@ public struct EditorView: View {
                     onLayers: { viewModel.isLayerPanelPresented = true },
                     onSave: viewModel.saveDirectly,
                     onShare: viewModel.beginExport,
-                    onComplete: onComplete
+                    onComplete: { onComplete(viewModel.recentUndoSteps) }
                 )
             }
-            
+
             if case let .drawing(session) = viewModel.activeTool {
                 VStack {
                     Spacer()
@@ -213,7 +209,7 @@ public struct EditorView: View {
                     .padding(.bottom, Spacing.lg)
                 }
             }
-            
+
             if case let .text(working, isNew) = viewModel.activeTool {
                 TextComposerView(
                     working: working,

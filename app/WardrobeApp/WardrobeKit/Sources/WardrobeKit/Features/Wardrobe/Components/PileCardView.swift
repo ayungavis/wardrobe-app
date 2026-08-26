@@ -16,7 +16,7 @@ struct PileCardView: View {
             HStack {
                 Text(category.title, bundle: .module)
                     .font(AppFont.roundedTitle)
-                Text("\(items.count)")
+                Text(items.count, format: .number)
                     .font(AppFont.roundedCaption)
                     .foregroundStyle(AppColor.accent)
                     .padding(.horizontal, Spacing.sm)
@@ -61,8 +61,8 @@ struct PileCardView: View {
                 isFannedOut = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-                    isPulsing = true
-                }
+                isPulsing = true
+            }
         }
         .onDisappear {
             isPulsing = false

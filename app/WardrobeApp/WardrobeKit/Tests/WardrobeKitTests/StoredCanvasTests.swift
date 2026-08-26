@@ -6,6 +6,7 @@ import Testing
 /// What people already have on their phones has to keep opening, and history
 /// has to survive a shape change. Both are one-way doors, so they are tested
 /// against the stored bytes rather than against the types.
+@MainActor
 struct StoredCanvasTests {
     private func makeDefaults(_ name: String) throws -> UserDefaults {
         let defaults = try #require(UserDefaults(suiteName: name))
@@ -21,9 +22,9 @@ struct StoredCanvasTests {
         let textID = UUID()
         let legacy = Data("""
         {
-          "card": { "id": "\(UUID().uuidString)", "prompt": "Wear red." },
+          "card": { "id": "\(UUID.v7())", "prompt": "Wear red." },
           "acceptedAt": 1000,
-          "photoID": "photo-1",
+          "photoID": "\(id("photo-1").uuidString)",
           "draft": {
             "crop": { "rect": [[0.1, 0.2], [0.6, 0.45]] },
             "texts": [{
@@ -37,7 +38,7 @@ struct StoredCanvasTests {
 
         let challenge = try JSONDecoder().decode(ActiveChallenge.self, from: legacy)
 
-        #expect(challenge.photoID == "photo-1")
+        #expect(challenge.photoID == id("photo-1"))
         #expect(challenge.document.firstPhotoCrop?.rect.width == 0.6)
         #expect(challenge.document.textContents == ["OOTD"])
         #expect(challenge.document.layers.contains { $0.id == textID })
@@ -46,12 +47,12 @@ struct StoredCanvasTests {
     @Test func aCompletedChallengeStoredAsAFlatDraftStillRenders() throws {
         let legacy = Data("""
         {
-          "id": "\(UUID().uuidString)",
-          "card": { "id": "\(UUID().uuidString)", "prompt": "Wear red." },
-          "photoID": "photo-1",
+          "id": "\(UUID.v7())",
+          "card": { "id": "\(UUID.v7())", "prompt": "Wear red." },
+          "photoID": "\(id("photo-1").uuidString)",
           "completedAt": 2000,
           "draft": { "texts": [], "stickers": [{
-            "id": "\(UUID().uuidString)", "emoji": "✨", "position": [0.9, 0.1], "scale": 2
+            "id": "\(UUID.v7())", "emoji": "✨", "position": [0.9, 0.1], "scale": 2
           }] }
         }
         """.utf8)
@@ -67,7 +68,7 @@ struct StoredCanvasTests {
     /// keep decoding, because history is never migrated in place.
     @Test func previewFileRoundTripsAndIsOptionalOnOlderRecords() throws {
         var completion = CompletedChallenge(
-            card: ChallengeCard(prompt: "x"), photoID: "photo-1",
+            card: ChallengeCard(prompt: "x"), photoID: id("photo-1"),
             document: .fixture(), completedAt: Date(timeIntervalSince1970: 1000)
         )
         completion.previewFile = "preview-1.jpg"
@@ -77,9 +78,9 @@ struct StoredCanvasTests {
 
         let withoutKey = Data("""
         {
-          "id": "\(UUID().uuidString)",
-          "card": { "id": "\(UUID().uuidString)", "prompt": "Wear red." },
-          "photoID": "photo-1",
+          "id": "\(UUID.v7())",
+          "card": { "id": "\(UUID.v7())", "prompt": "Wear red." },
+          "photoID": "\(id("photo-1").uuidString)",
           "completedAt": 2000,
           "draft": { "texts": [], "stickers": [] }
         }
@@ -92,7 +93,7 @@ struct StoredCanvasTests {
     /// path, not a format we keep producing.
     @Test func aMigratedChallengeIsRewrittenAsADocument() throws {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = "photo-1"
+        challenge.photoID = id("photo-1")
         challenge.document = .fixture(texts: [TextItem(content: "hi")])
 
         let encoded = try JSONEncoder().encode(challenge)
@@ -111,7 +112,7 @@ struct StoredCanvasTests {
     @Test func oneUnreadableCompletionDoesNotTakeTheRestWithIt() throws {
         let defaults = try makeDefaults("StoredCanvasTests.history")
         let good = CompletedChallenge(
-            card: ChallengeCard(prompt: "x"), photoID: "photo-1",
+            card: ChallengeCard(prompt: "x"), photoID: id("photo-1"),
             document: .fixture(), completedAt: Date(timeIntervalSince1970: 1000)
         )
         let encodedGood = try JSONSerialization.jsonObject(with: JSONEncoder().encode(good))
@@ -128,7 +129,7 @@ struct StoredCanvasTests {
     @Test func appendingAfterAnUnreadableEntryKeepsTheReadableOnes() throws {
         let defaults = try makeDefaults("StoredCanvasTests.append")
         let old = CompletedChallenge(
-            card: ChallengeCard(prompt: "old"), photoID: "photo-1",
+            card: ChallengeCard(prompt: "old"), photoID: id("photo-1"),
             document: .fixture(), completedAt: Date(timeIntervalSince1970: 1000)
         )
         let encodedOld = try JSONSerialization.jsonObject(with: JSONEncoder().encode(old))
@@ -137,7 +138,7 @@ struct StoredCanvasTests {
 
         let repository = UserDefaultsCompletedChallengeRepository(defaults: defaults)
         repository.append(CompletedChallenge(
-            card: ChallengeCard(prompt: "new"), photoID: "photo-2",
+            card: ChallengeCard(prompt: "new"), photoID: id("photo-2"),
             document: .fixture(), completedAt: Date(timeIntervalSince1970: 200_000)
         ))
 

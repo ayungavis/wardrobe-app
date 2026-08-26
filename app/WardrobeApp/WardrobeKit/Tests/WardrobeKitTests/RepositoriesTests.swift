@@ -7,8 +7,8 @@ struct ActiveChallengeRepositoryTests {
     private func makeStore(
         defaults: UserDefaults? = nil
     ) throws -> FileActiveChallengeRepository {
-        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID().uuidString)")
-        let defaults = try defaults ?? #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID.v7())")
+        let defaults = try defaults ?? #require(UserDefaults(suiteName: "test-\(UUID.v7())"))
         return FileActiveChallengeRepository(directory: directory, legacyDefaults: defaults)
     }
 
@@ -26,7 +26,7 @@ struct ActiveChallengeRepositoryTests {
             card: ChallengeCard(prompt: "Wear red."),
             acceptedAt: Date(timeIntervalSince1970: 1000)
         )
-        let photoID = UUID().uuidString
+        let photoID = UUID.v7()
         challenge.photoID = photoID
         challenge.document = .fixture(
             photoID: photoID,
@@ -57,8 +57,8 @@ struct ActiveChallengeRepositoryTests {
     /// The point of coalescing: a burst of edits is one write, and the one that
     /// lands is the last one.
     @Test func aBurstOfSavesLandsAsTheLastOne() async throws {
-        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID().uuidString)")
-        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID.v7())")
+        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID.v7())"))
         let activeRepository = FileActiveChallengeRepository(
             directory: directory, legacyDefaults: defaults
         )
@@ -79,8 +79,8 @@ struct ActiveChallengeRepositoryTests {
     /// Updating the app must not throw away a challenge someone was in the
     /// middle of, so the old key is read once and then retired.
     @Test func aDraftLeftInTheOldStoreIsAdoptedAndTheKeyRetired() async throws {
-        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID().uuidString)")
-        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID.v7())")
+        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID.v7())"))
         let challenge = makeChallenge("written by the previous version")
         try defaults.set(JSONEncoder().encode(challenge), forKey: "activeChallenge")
         let activeRepository = FileActiveChallengeRepository(
@@ -100,9 +100,9 @@ struct ActiveChallengeRepositoryTests {
     /// A write that cannot land has to say so. Before this it went to the log
     /// only, so the draft on screen and the draft on disk diverged in silence.
     @Test func aWriteThatCannotLandSaysSoAndClearsWhenOneSucceeds() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID.v7())"))
         // A path under an existing *file*, so creating the directory fails.
-        let blocker = URL.temporaryDirectory.appending(path: "blocker-\(UUID().uuidString)")
+        let blocker = URL.temporaryDirectory.appending(path: "blocker-\(UUID.v7())")
         try Data("not a directory".utf8).write(to: blocker)
         let unwritable = FileActiveChallengeRepository(
             directory: blocker.appending(path: "drafts"), legacyDefaults: defaults
@@ -114,7 +114,7 @@ struct ActiveChallengeRepositoryTests {
         #expect(unwritable.didFailToPersist)
 
         let writable = FileActiveChallengeRepository(
-            directory: URL.temporaryDirectory.appending(path: "drafts-\(UUID().uuidString)"),
+            directory: URL.temporaryDirectory.appending(path: "drafts-\(UUID.v7())"),
             legacyDefaults: defaults
         )
         writable.save(makeChallenge("this one lands"))
@@ -124,10 +124,10 @@ struct ActiveChallengeRepositoryTests {
     }
 
     @Test func anUnreadableDraftFileIsNotFatal() throws {
-        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID().uuidString)")
+        let directory = URL.temporaryDirectory.appending(path: "drafts-\(UUID.v7())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data("not json".utf8).write(to: directory.appending(path: "active-draft.json"))
-        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID.v7())"))
 
         let activeRepository = FileActiveChallengeRepository(
             directory: directory, legacyDefaults: defaults
@@ -142,7 +142,7 @@ struct ActiveChallengeRepositoryTests {
         challenge.document = .fixture(photoID: nil, texts: [TextItem(content: "hi")])
         #expect(challenge.hasDraftWork)
         challenge.document = EditorDocument(layers: [])
-        challenge.photoID = "abc"
+        challenge.photoID = id("abc")
         #expect(challenge.hasDraftWork)
     }
 }
@@ -163,9 +163,11 @@ struct FilePhotoRepositoryTests {
         #expect(throws: (any Error).self) { try activeRepository.loadOriginal(id: id) }
     }
 
-    @Test func loadMissingOrInvalidIDThrows() {
+    /// The old spelling also asserted that `"../escape"` was refused. A `UUID`
+    /// cannot spell that, so the type now carries what the runtime check did.
+    @Test func loadingAnIdentityWithNoFileThrows() throws {
         let activeRepository = try makeStore()
-        #expect(throws: (any Error).self) { try activeRepository.loadOriginal(id: UUID().uuidString) }
-        #expect(throws: AppError.unexpected) { try activeRepository.loadOriginal(id: "../escape") }
+
+        #expect(throws: (any Error).self) { try activeRepository.loadOriginal(id: UUID.v7()) }
     }
 }

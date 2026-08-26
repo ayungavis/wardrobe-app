@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/api", "crates/db"]
+members = ["crates/api", "crates/db", "crates/observability", "crates/storage", "crates/worker"]
 
 [workspace.package]
 edition = "2024"
@@ -9,9 +9,30 @@ publish = false
 
 [workspace.dependencies]
 axum = "0.8"
+aws-sdk-s3 = { version = "1.96", default-features = false, features = [
+    "behavior-version-latest",
+    "rt-tokio",
+] }
+aws-smithy-http-client = { version = "1", default-features = false, features = ["rustls-ring"] }
+base64 = "0.22"
+governor = "0.10"
+tower_governor = "0.8"
+image = { version = "0.25.9", default-features = false, features = ["png", "jpeg", "webp"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+getrandom = "0.3"
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rust_decimal = "1"
+sentry = { version = "0.46", default-features = false, features = [
+    "backtrace",
+    "contexts",
+    "panic",
+    "reqwest",
+    "rustls",
+    "tokio",
+    "tower",
+    "tracing",
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
@@ -28,7 +49,7 @@ sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["request-id", "trace", "util"] }
+tower-http = { version = "0.6", features = ["request-id", "set-header", "timeout", "trace", "util"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }

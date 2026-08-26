@@ -1,10 +1,13 @@
-//! HTTP handlers.
-//!
-//! A handler's rustdoc becomes its `OpenAPI` description, so `# Errors` sections
-//! are suppressed here: for an endpoint, the failure contract is the
-//! `responses(...)` block, and duplicating it in prose would leak Rust-only
-//! detail into the document clients read.
+// clippy: a handler's error contract is the `responses(...)` list in its
+// `#[utoipa::path]`, which reaches clients through openapi.json. A `# Errors`
+// section would restate it in a place no client generator reads.
 #![allow(clippy::missing_errors_doc)]
 
+pub mod changes;
+pub mod deck;
 pub mod health;
-pub mod session;
+pub mod media;
+pub mod sessions;
+pub mod sync;
+pub mod users;
+pub mod whoami;

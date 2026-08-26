@@ -4,12 +4,11 @@ import SwiftUI
 public struct WardrobeView: View {
     @State private var isBulkScanPresented = false
     @State private var isCameraScanPresented = false
+    @State private var isConflictsPresented = false
 
     @State private var viewModel: WardrobeViewModel
     @State private var expandedCategory: GarmentCategory?
     @State private var navigationPath = NavigationPath()
-    @State private var sortOrder: SortOrder = .mostUsed
-    @State private var searchQuery = ""
     @State private var isSearching = false
     @Namespace private var pileNamespace
 
@@ -20,41 +19,23 @@ public struct WardrobeView: View {
         self.container = container
     }
 
-    private var searchResults: [WardrobeItem] {
-        WardrobeSearch.results(in: viewModel.items, matching: searchQuery)
-    }
-
-    private var isShowingSearchResults: Bool {
-        isSearching && !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    private var topItems: [WardrobeItem] {
-        viewModel.items.filter { $0.category == .top }
-    }
-
-    private var bottomItems: [WardrobeItem] {
-        viewModel.items.filter { $0.category == .bottom }
-    }
-
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-//                Image("appBG", bundle: .module)
-//                    .resizable()
-//                    .ignoresSafeArea()
-                
                 VStack(spacing: 0) {
                     topBar
 
                     ZStack {
                         Group {
-                            if isShowingSearchResults {
+                            if viewModel.isShowingSearchResults {
                                 WardrobeSearchResultsView(
-                                    items: searchResults,
+                                    items: viewModel.searchResults,
                                     thumbnailData: { viewModel.thumbnailData(for: $0) },
                                     wearCount: { viewModel.wearCount(for: $0) },
                                     onSelect: { navigationPath.append($0.id) }
                                 )
+                            } else if case .failed = viewModel.state {
+                                failedState
                             } else if viewModel.items.isEmpty {
                                 emptyState
                             } else if expandedCategory == nil {
@@ -65,16 +46,16 @@ public struct WardrobeView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        if let category = expandedCategory, !isShowingSearchResults {
+                        if let category = expandedCategory, !viewModel.isShowingSearchResults {
                             CategoryGridView(
                                 category: category,
-                                items: category == .top ? topItems : bottomItems,
+                                items: viewModel.items(in: category),
                                 thumbnailData: { viewModel.thumbnailData(for: $0) },
                                 wearCount: { viewModel.wearCount(for: $0) },
                                 namespace: pileNamespace,
                                 onClose: { close() },
                                 onSelect: { navigationPath.append($0.id) },
-                                sortOrder: $sortOrder
+                                sortOrder: $viewModel.sortOrder
                             )
                         }
                     }
@@ -82,9 +63,13 @@ public struct WardrobeView: View {
             }
             .appBackgroundStickers()
             .onTapGesture {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                
-                if searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                #if os(iOS)
+                    UIApplication.shared.sendAction(
+                        #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                    )
+                #endif
+
+                if viewModel.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
                     isSearching = false
                 }
             }
@@ -95,12 +80,33 @@ public struct WardrobeView: View {
                 .onDisappear { viewModel.load() }
             }
         }
-        .task { viewModel.load() }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                if viewModel.openConflictCount > 0 {
+                    ConflictsBannerView(count: viewModel.openConflictCount) {
+                        isConflictsPresented = true
+                    }
+                }
+                if viewModel.pendingSyncCount + viewModel.failedSyncCount > 0 {
+                    WardrobeSyncBannerView(
+                        pending: viewModel.pendingSyncCount,
+                        failed: viewModel.failedSyncCount,
+                        onRetry: { viewModel.retryFailedSync() }
+                    )
+                }
+            }
+        }
+        .sheet(
+            isPresented: $isConflictsPresented,
+            onDismiss: { viewModel.load() },
+            content: { ConflictsView(viewModel: container.makeConflictsViewModel()) }
+        )
+        .task(id: container.contentRevision.revision) { viewModel.load() }
     }
 
     private var topBar: some View {
         HStack {
-            WardrobeSearchBarView(query: $searchQuery, isActive: $isSearching)
+            WardrobeSearchBarView(query: $viewModel.searchQuery, isActive: $isSearching)
 
             if !isSearching {
                 Spacer()
@@ -118,7 +124,7 @@ public struct WardrobeView: View {
                     Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
                 }
             } label: {
-                HStack{
+                HStack {
                     if !isSearching {
                         Text("wardrobe.add.title", bundle: .module)
                     }
@@ -133,10 +139,8 @@ public struct WardrobeView: View {
                 .padding(.vertical, Spacing.sm)
                 .padding(.horizontal, isSearching ? Spacing.sm : Spacing.md)
                 .background(Capsule()
-                    //.fill(AppColor.surface)
                     .fill(.clear)
-                    .glassEffect(.clear)
-                )
+                    .glassEffect(.clear))
             }
         }
         .padding(.horizontal, Spacing.md)
@@ -156,10 +160,7 @@ public struct WardrobeView: View {
             isPresented: $isCameraScanPresented,
             onDismiss: { viewModel.load() },
             content: {
-                AddByCameraView(
-                    camera: container.makeCameraService(),
-                    review: container.makeGarmentReviewModel()
-                )
+                AddByCameraView(viewModel: container.makeAddByCameraViewModel())
             }
         )
     }
@@ -170,12 +171,26 @@ public struct WardrobeView: View {
         }
     }
 
+    private var failedState: some View {
+        ContentUnavailableView {
+            Label {
+                Text("wardrobe.failed.title", bundle: .module)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+            }
+        } description: {
+            Text("wardrobe.failed.message", bundle: .module)
+        } actions: {
+            Button { viewModel.load() } label: { Text("common.retry", bundle: .module) }
+        }
+    }
+
     private var emptyState: some View {
         ContentUnavailableView {
             Label {
                 Text("wardrobe.empty.title", bundle: .module)
             } icon: {
-                Image(systemName: "WardrobeEmpty")
+                Image("WardrobeEmpty", bundle: .module)
             }
         } description: {
             Text("wardrobe.empty.message", bundle: .module)
@@ -187,7 +202,7 @@ public struct WardrobeView: View {
             VStack(spacing: Spacing.lg) {
                 PileCardView(
                     category: .top,
-                    items: topItems,
+                    items: viewModel.items(in: .top),
                     thumbnailData: { viewModel.thumbnailData(for: $0) },
                     namespace: pileNamespace,
                     onTap: {
@@ -198,7 +213,7 @@ public struct WardrobeView: View {
                 )
                 PileCardView(
                     category: .bottom,
-                    items: bottomItems,
+                    items: viewModel.items(in: .bottom),
                     thumbnailData: { viewModel.thumbnailData(for: $0) },
                     namespace: pileNamespace,
                     onTap: {
@@ -209,20 +224,6 @@ public struct WardrobeView: View {
                 )
             }
             .padding(Spacing.md)
-        }
-    }
-}
-
-extension WardrobeView {
-    enum SortOrder: String, CaseIterable {
-        case mostUsed
-        case leastUsed
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .mostUsed: "wardrobe.sort.mostUsed"
-            case .leastUsed: "wardrobe.sort.leastUsed"
-            }
         }
     }
 }

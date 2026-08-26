@@ -1,13 +1,29 @@
 use std::env::{self, VarError};
 
-/// Everything the process needs from its environment, read once at startup.
-///
-/// Missing configuration fails here with the variable's name rather than
-/// surfacing later as a connection error nobody can trace back.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub database_url: String,
     pub bind_addr: String,
+    pub observability: wardrobe_observability::Settings,
+    pub apple_bundle_id: Option<String>,
+    pub storage: Option<wardrobe_storage::Settings>,
+    pub trusted_proxy_hops: usize,
+    pub serve_docs: bool,
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Config")
+            .field("database_url", &"[redacted]")
+            .field("bind_addr", &self.bind_addr)
+            .field("observability", &self.observability)
+            .field("apple_bundle_id", &self.apple_bundle_id)
+            .field("storage", &self.storage)
+            .field("trusted_proxy_hops", &self.trusted_proxy_hops)
+            .field("serve_docs", &self.serve_docs)
+            .finish()
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -21,22 +37,22 @@ pub enum ConfigError {
 impl Config {
     /// # Errors
     ///
-    /// Returns [`ConfigError`] naming the first variable that is missing or
-    /// unreadable.
+    /// Returns [`ConfigError`] when a required variable is absent or unusable.
     pub fn from_env() -> Result<Self, ConfigError> {
         Ok(Self {
             database_url: required("DATABASE_URL")?,
             bind_addr: bind_addr(optional("BIND_ADDR")?, optional("PORT")?),
+            observability: wardrobe_observability::Settings::from_env(),
+            apple_bundle_id: optional("APPLE_BUNDLE_ID")?,
+            storage: wardrobe_storage::Settings::from_env(),
+            trusted_proxy_hops: optional("TRUSTED_PROXY_HOPS")?
+                .and_then(|raw| raw.parse().ok())
+                .unwrap_or(crate::limit::DEFAULT_TRUSTED_HOPS),
+            serve_docs: optional("SERVE_DOCS")?.as_deref() == Some("true"),
         })
     }
 }
 
-/// Where to listen, in the order that lets one binary serve both worlds.
-///
-/// `BIND_ADDR` wins so local development can pin an interface. `PORT` is what
-/// Railway and most other platforms inject, and it must be bound on `0.0.0.0`:
-/// binding loopback there produces a process that looks healthy to itself and
-/// never receives a single request.
 fn bind_addr(explicit: Option<String>, port: Option<String>) -> String {
     match (explicit, port) {
         (Some(addr), _) => addr,
@@ -60,7 +76,42 @@ fn optional(key: &'static str) -> Result<Option<String>, ConfigError> {
 
 #[cfg(test)]
 mod tests {
-    use super::bind_addr;
+    use super::{Config, bind_addr};
+
+    #[test]
+    fn debug_output_names_no_secret() {
+        let config = Config {
+            database_url: "postgres://user:hunter2@host/db".to_owned(),
+            bind_addr: "0.0.0.0:8080".to_owned(),
+            observability: wardrobe_observability::Settings {
+                dsn: Some("https://key@sentry.io/1".to_owned()),
+                environment: "test".to_owned(),
+                traces_sample_rate: 0.0,
+                release: None,
+            },
+            apple_bundle_id: None,
+            storage: Some(wardrobe_storage::Settings {
+                endpoint: "http://localhost:9100".to_owned(),
+                region: "us-east-1".to_owned(),
+                bucket: "wardrobe".to_owned(),
+                access_key_id: "AKIAEXAMPLE".to_owned(),
+                secret_access_key: "s3cr3t-key".to_owned(),
+                path_style: true,
+                presign_ttl: std::time::Duration::from_secs(300),
+            }),
+            trusted_proxy_hops: 1,
+            serve_docs: false,
+        };
+
+        let printed = format!("{config:?}");
+
+        for secret in ["hunter2", "key@sentry.io", "AKIAEXAMPLE", "s3cr3t-key"] {
+            assert!(
+                !printed.contains(secret),
+                "a debug line is the easiest place for {secret} to escape: {printed}"
+            );
+        }
+    }
 
     #[test]
     fn an_explicit_address_wins() {
@@ -69,8 +120,6 @@ mod tests {
         assert_eq!(resolved, "127.0.0.1:9000");
     }
 
-    /// The platform case: `PORT` alone must reach every interface, or the
-    /// health check never arrives.
     #[test]
     fn a_platform_port_binds_every_interface() {
         assert_eq!(bind_addr(None, Some("3000".into())), "0.0.0.0:3000");

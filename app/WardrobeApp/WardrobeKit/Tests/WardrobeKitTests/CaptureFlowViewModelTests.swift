@@ -31,13 +31,13 @@ struct CaptureFlowViewModelTests {
     /// than skipping past it.
     @Test func initialStageIsCropWhenThePhotoIsNotFramedYet() {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString
+        challenge.photoID = UUID.v7()
         #expect(makeCaptureFlowSUT(challenge: challenge).stage == .crop)
     }
 
     /// The crop on the photo layer is what says the step is done — no second flag.
     @Test func initialStageIsEditorOnceTheCropExists() {
-        let photoID = UUID().uuidString
+        let photoID = UUID.v7()
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
         challenge.document = EditorDocument(
@@ -87,7 +87,7 @@ struct CaptureFlowViewModelTests {
     @Test func recheckDoesNotTouchEditor() {
         let camera = FakeCameraService()
         camera.permission = .denied
-        let photoID = UUID().uuidString
+        let photoID = UUID.v7()
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
         challenge.document = EditorDocument(
@@ -169,7 +169,7 @@ struct CaptureFlowViewModelTests {
         let camera = FakeCameraService()
         camera.permission = .granted
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        let photoID = UUID().uuidString
+        let photoID = UUID.v7()
         challenge.photoID = photoID
         challenge.document = .fixture(
             photoID: photoID,
@@ -199,8 +199,8 @@ struct CaptureFlowViewModelTests {
 
     /// Use Crop stores an instruction, not a second image: the original stays
     /// the only photo on disk, and the editor and exporter both read the document.
-    @Test func useCropStoresTheFramingAndOpensTheEditor() {
-        let photoID = UUID().uuidString
+    @Test func useCropStoresTheFramingAndOpensTheScanReview() {
+        let photoID = UUID.v7()
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
         challenge.document = EditorDocument(photoID: photoID)
@@ -215,7 +215,7 @@ struct CaptureFlowViewModelTests {
 
         sut.useCrop(crop)
 
-        #expect(sut.stage == .editor)
+        #expect(sut.stage == .scanReview, "main puts a scan review between crop and editor")
         #expect(activeRepository.stored?.document.firstPhotoCrop == crop)
         #expect(photoRepository.saved.isEmpty, "cropping must not write a second photo")
     }
@@ -235,7 +235,7 @@ struct CaptureFlowViewModelTests {
     /// photo goes with it.
     @Test func retakeFromCropDeletesThePhotoAndReturnsToCamera() {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        let photoID = UUID().uuidString
+        let photoID = UUID.v7()
         challenge.photoID = photoID
         let photoRepository = SpyPhotoRepository()
         let sut = makeCaptureFlowSUT(challenge: challenge, photoRepository: photoRepository)
@@ -253,7 +253,7 @@ struct CaptureFlowViewModelTests {
     /// with the crop already committed — which is exactly what the restored
     /// notice states, so no separate flag is persisted to say it twice.
     @Test func aChallengeThatArrivesMidEditIsMarkedRestored() {
-        let photoID = UUID().uuidString
+        let photoID = UUID.v7()
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
         challenge.photoID = photoID
         // The crop is stored on the photo layer, so the document has to have one
@@ -285,7 +285,7 @@ struct CaptureFlowViewModelTests {
     /// restored draft either — the work has not reached the canvas yet.
     @Test func aPhotoWaitingToBeCroppedIsNotRestored() {
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: .distantPast)
-        challenge.photoID = UUID().uuidString
+        challenge.photoID = UUID.v7()
         let camera = FakeCameraService()
         camera.permission = .granted
 

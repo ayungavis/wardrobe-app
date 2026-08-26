@@ -1,0 +1,1 @@
+typealias DeleteUsersMeResponseDTO = EmptyResponseDTO

@@ -1,3 +1,5 @@
+pub mod apple;
+
 use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -8,15 +10,11 @@ use uuid::Uuid;
 use crate::error::Error;
 use crate::state::AppState;
 
-/// An authenticated caller.
-///
-/// This extractor is the only route to an `account_id`. Handlers never read the
-/// header themselves, so an unauthenticated endpoint has to be written that way
-/// on purpose rather than by forgetting.
 #[derive(Debug, Clone, Copy)]
 pub struct Session {
     pub account_id: Uuid,
     pub session_id: Uuid,
+    pub device_id: Option<Uuid>,
 }
 
 impl FromRequestParts<AppState> for Session {
@@ -33,21 +31,12 @@ impl FromRequestParts<AppState> for Session {
     }
 }
 
-/// Looks up a session token.
-///
-/// `Ok(None)` means the token is not usable — unknown, expired, or revoked.
-/// A database failure stays an error rather than collapsing into "not
-/// authenticated", so an outage is never reported to the client as a rejected
-/// credential.
-///
 /// # Errors
 ///
-/// Returns [`Error::Internal`] when the database cannot be queried.
+/// Returns any database error unchanged.
 pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Error> {
-    // Expiry and revocation are part of the query rather than a later check, so
-    // there is no window in which a caller counts as authenticated first.
-    let row: Option<(Uuid, Uuid)> = sqlx::query_as(
-        "select id, account_id
+    let row: Option<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
+        "select id, account_id, device_id
            from session
           where token_hash = $1
             and revoked_at is null
@@ -57,14 +46,13 @@ pub async fn resolve(pool: &PgPool, token: &str) -> Result<Option<Session>, Erro
     .fetch_optional(pool)
     .await?;
 
-    Ok(row.map(|(session_id, account_id)| Session {
+    Ok(row.map(|(session_id, account_id, device_id)| Session {
         account_id,
         session_id,
+        device_id,
     }))
 }
 
-/// The stored form of a session token. Only the hash is ever persisted, so a
-/// leaked database yields no usable sessions.
 #[must_use]
 pub fn hash_token(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()
@@ -73,7 +61,6 @@ pub fn hash_token(token: &str) -> Vec<u8> {
 fn bearer(parts: &Parts) -> Option<String> {
     let value = parts.headers.get(AUTHORIZATION)?.to_str().ok()?;
     let (scheme, token) = value.split_once(' ')?;
-    // Case-insensitive per RFC 7235; some clients send "bearer".
     if !scheme.eq_ignore_ascii_case("bearer") || token.trim().is_empty() {
         return None;
     }

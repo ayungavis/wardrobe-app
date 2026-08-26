@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ChallengeCardView: View {
     let card: ChallengeCard
+    var garments = CardGarments()
     let onAccept: () -> Void
     private static let frameWidth: CGFloat = 346
     private static let frameHeight: CGFloat = 617
@@ -38,6 +39,8 @@ struct ChallengeCardView: View {
     private static let titleTextPosition = position(67, 64, 220, 60, rotation: -3)
     private static let smallTitleTextPosition = position(160, 35, 220, 60, rotation: 10)
     private static let stickyPlacement = sticker("Sticky", 53.8, 290, 261.33, 124.32)
+    private static let topGarmentPosition = position(48, 150, 110, 130, rotation: -4)
+    private static let bottomGarmentPosition = position(188, 150, 110, 130, rotation: 3)
 
     private static let cardStickers = [
         sticker("Star", 38, 39, 29, 36),
@@ -60,17 +63,20 @@ struct ChallengeCardView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
 
-                Image(Self.stickyPlacement.imageName, bundle: .module)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: cw * Self.stickyPlacement.widthFraction)
-                    .position(x: cw * Self.stickyPlacement.x, y: ch * Self.stickyPlacement.y)
+                ChallengeCardGarmentsView(
+                    garments: garments,
+                    topPosition: Self.topGarmentPosition,
+                    bottomPosition: Self.bottomGarmentPosition,
+                    width: cw,
+                    height: ch
+                )
 
-                Text(card.prompt)
-                    .font(AppFont.body)
-                    .multilineTextAlignment(.center)
-                    .frame(width: cw * Self.stickyPlacement.widthFraction * 0.8)
-                    .position(x: cw * Self.stickyPlacement.x, y: ch * Self.stickyPlacement.y)
+                ChallengeCardStickyView(
+                    card: card,
+                    placement: Self.stickyPlacement,
+                    width: cw,
+                    height: ch
+                )
 
                 PrimaryButtonView(Text("challenge.accept", bundle: .module), action: onAccept)
                     .frame(width: cw * Self.takePicPosition.widthFraction)

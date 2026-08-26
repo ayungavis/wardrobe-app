@@ -30,19 +30,26 @@
         }
       }
     },
-    "NSPhotoLibraryUsageDescription" : {
-      "comment" : "Privacy - Photo Library Usage Description",
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this."
+            "state" : "new",
+            "value" : "Finds the development backend running on your Mac over Wi-Fi. Release builds talk to the hosted API and never use the local network."
           }
-        },
-        "id" : {
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription" : {
+      "comment" : "Privacy - Location When In Use Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Menampilkan foto terbarumu di tombol galeri agar impor foto outfit lebih cepat. Kamu tetap bisa memilih foto tanpa memberi izin ini."
+            "state" : "new",
+            "value" : "Checks tomorrow's forecast near you so your challenge cards suit the weather. Your location never leaves your device — only a short weather summary is sent."
           }
         }
       }
@@ -60,6 +67,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Memungkinkanmu menyimpan foto outfit hasil edit ke galeri fotomu."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription" : {
+      "comment" : "Privacy - Photo Library Usage Description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows your most recent photo on the gallery button so you can import an outfit photo quickly. You can still pick photos without granting this."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menampilkan foto terbarumu di tombol galeri agar impor foto outfit lebih cepat. Kamu tetap bisa memilih foto tanpa memberi izin ini."
           }
         }
       }

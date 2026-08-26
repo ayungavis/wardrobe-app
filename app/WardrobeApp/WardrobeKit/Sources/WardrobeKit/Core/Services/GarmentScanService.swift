@@ -28,9 +28,16 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     }
 
     public func scan(photo: Data) async throws -> [ScannedGarment] {
-        let known = (try? repository.fingerprints()) ?? []
+        let sources: (known: [ItemFingerprint], items: [WardrobeItem])
+        do {
+            sources = try (repository.fingerprints(), repository.items())
+        } catch {
+            Log.report(error, context: Log.Context(operation: "scan.matchSources"))
+            sources = ([], [])
+        }
+        let known = sources.known
         let categories = Dictionary(
-            (try? repository.items())?.map { ($0.id, $0.category) } ?? [],
+            sources.items.map { ($0.id, $0.category) },
             uniquingKeysWith: { first, _ in first }
         )
 
@@ -42,6 +49,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
     }
 
     @concurrent
+    // swiftlint:disable:next function_parameter_count
     private static func detect(
         photo: Data,
         known: [ItemFingerprint],
@@ -65,6 +73,7 @@ public struct WardrobeGarmentScanService: GarmentScanService {
         }
     }
 
+    // swiftlint:disable:next function_parameter_count
     private nonisolated static func garment(
         category: GarmentCategory,
         cutout: GarmentCutout,
