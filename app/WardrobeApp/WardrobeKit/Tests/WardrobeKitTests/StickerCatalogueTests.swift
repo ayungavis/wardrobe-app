@@ -152,7 +152,11 @@ struct StickerCatalogueTests {
         let catalogue = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
         let strings = try #require((catalogue as? [String: Any])?["strings"] as? [String: Any])
 
-        let keys = StickerCatalogue.all.map { StickerCatalogueEntry.nameKey(for: $0.id) }
+        // An image sticker names itself from its glyph, its filename, or its category
+        // and number, so it has no key of its own; the category names it leans on are
+        // covered right here, which is why nothing goes unchecked.
+        let keys = StickerCatalogue.all.filter(\.usesLocalisedName)
+            .map { StickerCatalogueEntry.nameKey(for: $0.id) }
             + StickerCategory.allCases.map { "editor.sticker.category.\($0.rawValue)" }
 
         for key in keys {

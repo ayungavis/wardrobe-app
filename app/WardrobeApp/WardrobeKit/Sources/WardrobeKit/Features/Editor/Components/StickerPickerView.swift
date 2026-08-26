@@ -10,6 +10,11 @@ struct StickerPickerView: View {
     let onPickItem: (WardrobeSticker) -> Void
 
     @State private var category: StickerCategory
+    @State private var query = ""
+
+    private var results: [StickerCatalogueEntry] {
+        StickerCatalogue.search(query)
+    }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.sm), count: 4)
 
@@ -23,7 +28,7 @@ struct StickerPickerView: View {
         self.wardrobe = wardrobe
         self.onPick = onPick
         self.onPickItem = onPickItem
-        _category = State(initialValue: recentIDs.isEmpty ? .emoji : .recent)
+        _category = State(initialValue: recentIDs.isEmpty ? .favorite : .recent)
     }
 
     var body: some View {
@@ -38,8 +43,14 @@ struct StickerPickerView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.sm)
 
-            categoryRow
+            searchField
+                .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.md)
+
+            if query.isEmpty {
+                categoryRow
+                    .padding(.top, Spacing.md)
+            }
 
             Divider()
                 .overlay(AppColor.onMedia.opacity(0.10))
@@ -74,6 +85,38 @@ struct StickerPickerView: View {
             .accessibilityLabel(Text("common.close", bundle: .module))
             .accessibilityIdentifier("editor.sticker.close")
         }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(AppColor.onMedia.opacity(0.64))
+
+            TextField(text: $query) {
+                Text("editor.sticker.search", bundle: .module)
+            }
+            .textFieldStyle(.plain)
+            .autocorrectionDisabled()
+            #if os(iOS)
+                .textInputAutocapitalization(.never)
+            #endif
+                .accessibilityIdentifier("editor.sticker.search")
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(AppColor.onMedia.opacity(0.64))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("common.clear", bundle: .module))
+            }
+        }
+        .font(.system(size: 15))
+        .padding(.horizontal, Spacing.md)
+        .frame(height: 38)
+        .background(AppColor.onMedia.opacity(0.10), in: .capsule)
     }
 
     private var categoryRow: some View {
@@ -112,7 +155,9 @@ struct StickerPickerView: View {
 
     @ViewBuilder
     private var grid: some View {
-        if category == .wardrobe {
+        if !query.isEmpty {
+            searchGrid
+        } else if category == .wardrobe {
             wardrobeGrid
         } else {
             catalogueGrid
@@ -158,10 +203,31 @@ struct StickerPickerView: View {
         }
     }
 
+    @ViewBuilder
+    private var searchGrid: some View {
+        if results.isEmpty {
+            VStack {
+                Spacer()
+                Text("editor.sticker.search.empty", bundle: .module)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.onMedia.opacity(0.64))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.lg)
+                Spacer()
+            }
+        } else {
+            entryGrid(results)
+        }
+    }
+
     private var catalogueGrid: some View {
+        entryGrid(StickerCatalogue.entries(in: category, recentIDs: recentIDs))
+    }
+
+    private func entryGrid(_ entries: [StickerCatalogueEntry]) -> some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Spacing.md) {
-                ForEach(StickerCatalogue.entries(in: category, recentIDs: recentIDs)) { entry in
+                ForEach(entries) { entry in
                     Button {
                         EditorHaptics.commit.play()
                         onPick(entry)
@@ -188,7 +254,7 @@ struct StickerPickerView: View {
             switch category {
             case .recent: !recentIDs.isEmpty
             case .wardrobe: !wardrobe.isEmpty
-            case .emoji, .stickers: true
+            default: true
             }
         }
     }
