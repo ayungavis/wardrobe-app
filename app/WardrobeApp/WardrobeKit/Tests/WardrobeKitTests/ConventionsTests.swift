@@ -116,6 +116,27 @@ private let typeKeywords: Set<String> = ["struct", "class", "enum"]
 
 private let modifiers: Set<String> = ["public", "internal", "private", "fileprivate", "final"]
 
+private func backgroundArguments(in source: String) -> [Substring] {
+    var arguments: [Substring] = []
+    var search = source.startIndex
+
+    while let opening = source.range(of: ".background(", range: search ..< source.endIndex) {
+        var depth = 1
+        var index = opening.upperBound
+        while index < source.endIndex, depth > 0 {
+            switch source[index] {
+            case "(": depth += 1
+            case ")": depth -= 1
+            default: break
+            }
+            index = source.index(after: index)
+        }
+        arguments.append(source[opening.upperBound ..< index])
+        search = index
+    }
+    return arguments
+}
+
 private func colonOutsideGenerics(in head: Substring) -> Substring.Index? {
     var depth = 0
     for index in head.indices {
@@ -179,6 +200,22 @@ struct ConventionsTests {
     /// C4: a store file declares stores and storage entities, nothing else. A
     /// domain-shaped value defined inside `Core/Stores/` is a repository concern
     /// wearing the wrong address, and the domain layer ends up importing it.
+    @Test func glassEffectIsNeverBuriedInABackgroundShape() throws {
+        for file in try sources() {
+            let source = file.lines.joined(separator: "\n")
+            for argument in backgroundArguments(in: source) where argument.contains("glassEffect") {
+                Issue.record(
+                    """
+                    \(file.path) applies glassEffect to a shape inside .background(...). \
+                    The glass then samples its own backdrop and loses it when the hierarchy is \
+                    rebuilt — dismissing a sheet leaves the bare rim behind. Apply \
+                    .glassEffect(_:in:) to the content instead.
+                    """
+                )
+            }
+        }
+    }
+
     @Test func storeFilesDeclareOnlyStoresAndEntities() throws {
         var offenders: [String] = []
         for file in try sources() where file.path.contains("/Core/Stores/") {
