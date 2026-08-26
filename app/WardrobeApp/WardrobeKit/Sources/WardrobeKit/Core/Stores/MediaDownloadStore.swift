@@ -102,6 +102,9 @@ final class MediaDownloadEntity {
         case let .itemIllustration(illustrationID):
             destinationKind = "itemIllustration"
             destinationRef = illustrationID
+        case let .outfitTemplate(requestID):
+            destinationKind = "outfitTemplate"
+            destinationRef = requestID
         }
         apply(download)
     }
@@ -120,6 +123,7 @@ final class MediaDownloadEntity {
         case "photoOriginal": .photoOriginal(photoID: destinationRef)
         case "itemCutout": .itemCutout(itemID: destinationRef)
         case "itemIllustration": .itemIllustration(illustrationID: destinationRef)
+        case "outfitTemplate": .outfitTemplate(requestID: destinationRef)
         default: nil
         }
         guard let destination else { return nil }

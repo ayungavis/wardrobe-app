@@ -1276,6 +1276,52 @@
           }
         ]
       },
+      "OutfitTemplate": {
+        "type": "object",
+        "required": [
+          "id",
+          "requestId",
+          "mediaObjectId",
+          "template",
+          "model",
+          "promptVersion",
+          "changeSeq"
+        ],
+        "properties": {
+          "changeSeq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaObjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      },
       "Photo": {
         "type": "object",
         "required": [
@@ -1421,6 +1467,24 @@
               },
               "record": {
                 "$ref": "#/components/schemas/ItemIllustration"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "record",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "outfitTemplate"
+                ]
+              },
+              "record": {
+                "$ref": "#/components/schemas/OutfitTemplate"
               }
             }
           },

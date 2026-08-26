@@ -2,6 +2,7 @@ pub mod challenge;
 pub mod illustration;
 pub mod inference;
 pub mod openrouter;
+pub mod template;
 
 use std::future::Future;
 
@@ -25,6 +26,7 @@ pub fn kinds(illustration: bool, storage: bool, challenge: bool) -> Vec<&'static
     }
     if challenge {
         kinds.push(wardrobe_db::CHALLENGE_DECK);
+        kinds.push(wardrobe_db::OUTFIT_TEMPLATE);
     }
     kinds
 }

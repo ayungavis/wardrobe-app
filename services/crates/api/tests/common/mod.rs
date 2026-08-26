@@ -319,6 +319,19 @@ pub async fn seed_loop(pool: &PgPool, account: Uuid, base: &Base) -> sqlx::Resul
     .await?;
 
     sqlx::query(
+        "insert into outfit_template
+             (id, account_id, request_id, media_object_id, template, model, prompt_version,
+              change_seq)
+         values ($1, $2, $3, $4, 'blisterGreen', 'a-model', 'p1', 13)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(Uuid::now_v7())
+    .bind(base.media)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
         "insert into active_challenge
              (id, account_id, card_id, accepted_at, local_date, time_zone, photo_id, change_seq)
          values ($1, $2, $3, now(), current_date, 'Asia/Jakarta', $4, 8)",
@@ -362,7 +375,7 @@ pub async fn seed_loop(pool: &PgPool, account: Uuid, base: &Base) -> sqlx::Resul
         .execute(pool)
         .await?;
 
-    sqlx::query("update account set change_seq = 12 where id = $1")
+    sqlx::query("update account set change_seq = 13 where id = $1")
         .bind(account)
         .execute(pool)
         .await?;

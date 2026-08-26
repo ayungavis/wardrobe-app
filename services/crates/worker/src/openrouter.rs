@@ -6,11 +6,15 @@ pub const DEFAULT_BASE_URL: &str = "https://openrouter.ai/api/v1";
 pub const DEFAULT_RESOLUTION: &str = "1K";
 pub const DEFAULT_ASPECT_RATIO: &str = "1:1";
 
+pub struct Reference<'a> {
+    pub bytes: &'a [u8],
+    pub content_type: &'a str,
+}
+
 pub struct Ask<'a> {
     pub model: &'a str,
     pub prompt: &'a str,
-    pub cutout: &'a [u8],
-    pub content_type: &'a str,
+    pub references: &'a [Reference<'a>],
     pub resolution: &'a str,
     pub aspect_ratio: &'a str,
     pub seed: i64,
@@ -91,11 +95,18 @@ struct Usage {
 ///
 #[must_use]
 pub fn payload(ask: &Ask<'_>) -> serde_json::Value {
-    let data_uri = format!(
-        "data:{};base64,{}",
-        ask.content_type,
-        STANDARD.encode(ask.cutout)
-    );
+    let references: Vec<serde_json::Value> = ask
+        .references
+        .iter()
+        .map(|reference| {
+            let data_uri = format!(
+                "data:{};base64,{}",
+                reference.content_type,
+                STANDARD.encode(reference.bytes)
+            );
+            serde_json::json!({ "type": "image_url", "image_url": { "url": data_uri } })
+        })
+        .collect();
     serde_json::json!({
         "model": ask.model,
         "prompt": ask.prompt,
@@ -103,9 +114,7 @@ pub fn payload(ask: &Ask<'_>) -> serde_json::Value {
         "aspect_ratio": ask.aspect_ratio,
         "n": 1,
         "seed": ask.seed,
-        "input_references": [
-            { "type": "image_url", "image_url": { "url": data_uri } }
-        ],
+        "input_references": references,
         "provider": { "zdr": true }
     })
 }

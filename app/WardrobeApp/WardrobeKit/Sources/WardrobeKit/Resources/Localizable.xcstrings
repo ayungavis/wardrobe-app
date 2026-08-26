@@ -4672,6 +4672,91 @@
         }
       }
     },
+    "editor.template.blisterCream": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, cream"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, krem"
+          }
+        }
+      }
+    },
+    "editor.template.blisterGreen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, green"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, hijau"
+          }
+        }
+      }
+    },
+    "editor.template.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your photo and the garments on the canvas are sent to make the page."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotomu dan garmen yang ada di kanvas dikirim untuk membuat halamannya."
+          }
+        }
+      }
+    },
+    "editor.template.lookbook": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lookbook"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lookbook"
+          }
+        }
+      }
+    },
+    "editor.template.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Templates"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Template"
+          }
+        }
+      }
+    },
     "editor.text.alignment": {
       "localizations": {
         "en": {

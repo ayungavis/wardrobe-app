@@ -22,8 +22,9 @@ async fn stage(pool: &PgPool) -> sqlx::Result<Stage> {
     let (token, account) = session(pool, Duration::days(1), false).await?;
     let media = Uuid::now_v7();
     sqlx::query(
-        "insert into media_object (id, account_id, kind, storage_key, content_type)
-         values ($1, $2, 'original', $3, 'image/jpeg')",
+        "insert into media_object
+             (id, account_id, kind, storage_key, content_type, uploaded_at)
+         values ($1, $2, 'original', $3, 'image/jpeg', now())",
     )
     .bind(media)
     .bind(account)
@@ -189,6 +190,36 @@ async fn buried(pool: &PgPool, table: &str, account: Uuid) -> i64 {
     .fetch_one(pool)
     .await
     .expect("buried")
+}
+
+async fn queue_template(pool: &PgPool, stage: &Stage, request: Uuid, template: &str) -> Value {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", stage.token))
+        .body(Body::from(
+            json!({ "mutations": [{
+                "id": Uuid::now_v7(), "name": "generateOutfitTemplate",
+                "args": {
+                    "requestId": request, "template": template,
+                    "personMediaId": stage.media, "garments": []
+                }
+            }]})
+            .to_string(),
+        ))
+        .expect("request");
+    let response = call(pool.clone(), request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["results"][0].clone()
+}
+
+async fn template_jobs(pool: &PgPool, account: Uuid) -> i64 {
+    sqlx::query_scalar("select count(*) from job where account_id = $1 and kind = 'outfitTemplate'")
+        .bind(account)
+        .fetch_one(pool)
+        .await
+        .expect("jobs")
 }
 
 async fn count(pool: &PgPool, table: &str, account: Uuid) -> i64 {
@@ -901,5 +932,73 @@ async fn a_completion_belonging_to_someone_else_is_not_found(pool: PgPool) -> sq
     let result = delete_completion(&pool, &stage, Uuid::now_v7()).await;
 
     assert_ne!(result["status"], "applied");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn queueing_a_template_is_idempotent_per_request_and_style(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let request = Uuid::now_v7();
+
+    queue_template(&pool, &stage, request, "blisterGreen").await;
+    queue_template(&pool, &stage, request, "blisterGreen").await;
+    assert_eq!(template_jobs(&pool, stage.account).await, 1);
+
+    queue_template(&pool, &stage, request, "lookbook").await;
+
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        2,
+        "a different style is a different picture, not a replay"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_template_referencing_media_this_account_does_not_own_is_not_found(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let request = Uuid::now_v7();
+
+    let request_body = json!({ "mutations": [{
+        "id": Uuid::now_v7(), "name": "generateOutfitTemplate",
+        "args": {
+            "requestId": request, "template": "lookbook",
+            "personMediaId": Uuid::now_v7(), "garments": []
+        }
+    }]});
+    let http = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", stage.token))
+        .body(Body::from(request_body.to_string()))
+        .expect("request");
+    let response = call(pool.clone(), http).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let result = body_json(response).await["results"][0].clone();
+
+    assert_ne!(result["status"], "applied");
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        0,
+        "a job pointing at objects we do not own would hand another account's photo to a model"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_unknown_template_name_is_refused(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+
+    let result = queue_template(&pool, &stage, Uuid::now_v7(), "whatever").await;
+
+    assert_ne!(result["status"], "applied");
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        0,
+        "an unknown style would reach the worker with no prompt behind it"
+    );
     Ok(())
 }

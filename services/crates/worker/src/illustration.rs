@@ -269,8 +269,10 @@ pub async fn render_for(
         &Ask {
             model: &pinned.model,
             prompt: &prompt,
-            cutout: &bytes,
-            content_type: "image/png",
+            references: &[openrouter::Reference {
+                bytes: &bytes,
+                content_type: "image/png",
+            }],
             resolution: &settings.resolution,
             aspect_ratio: &settings.aspect_ratio,
             seed: pinned.seed,

@@ -13,6 +13,7 @@ enum SyncMutation: Sendable {
     case completeChallenge(CompleteChallengeArgsDTO)
     case upsertChallengeContext(UpsertChallengeContextArgsDTO)
     case generateChallengeDeck(GenerateChallengeDeckArgsDTO)
+    case generateOutfitTemplate(GenerateOutfitTemplateArgsDTO)
 
     var name: String {
         switch self {
@@ -26,6 +27,7 @@ enum SyncMutation: Sendable {
         case .completeChallenge: Self.completeChallengeName
         case .upsertChallengeContext: "upsertChallengeContext"
         case .generateChallengeDeck: "generateChallengeDeck"
+        case .generateOutfitTemplate: "generateOutfitTemplate"
         }
     }
 
@@ -34,18 +36,30 @@ enum SyncMutation: Sendable {
     }
 
     func encodedArguments() throws -> Data {
-        let encoder = JSONEncoder.api
+        guard let arguments else { throw AppError.unexpected }
+        return try JSONEncoder.api.encode(arguments)
+    }
+
+    private var arguments: (any Encodable & Sendable)? {
         switch self {
-        case let .upsertItem(args): return try encoder.encode(args)
-        case let .deleteItem(args): return try encoder.encode(args)
-        case let .deleteCompletion(args): return try encoder.encode(args)
-        case let .mergeItems(args): return try encoder.encode(args)
-        case let .regenerateIllustration(args): return try encoder.encode(args)
-        case let .upsertPreferences(args): return try encoder.encode(args)
-        case let .resolveCompletion(args): return try encoder.encode(args)
-        case let .completeChallenge(args): return try encoder.encode(args)
-        case let .upsertChallengeContext(args): return try encoder.encode(args)
-        case let .generateChallengeDeck(args): return try encoder.encode(args)
+        case let .upsertItem(args): args
+        case let .deleteItem(args): args
+        case let .deleteCompletion(args): args
+        case let .mergeItems(args): args
+        case let .regenerateIllustration(args): args
+        default: laterArguments
+        }
+    }
+
+    private var laterArguments: (any Encodable & Sendable)? {
+        switch self {
+        case let .upsertPreferences(args): args
+        case let .resolveCompletion(args): args
+        case let .completeChallenge(args): args
+        case let .upsertChallengeContext(args): args
+        case let .generateChallengeDeck(args): args
+        case let .generateOutfitTemplate(args): args
+        default: nil
         }
     }
 }
