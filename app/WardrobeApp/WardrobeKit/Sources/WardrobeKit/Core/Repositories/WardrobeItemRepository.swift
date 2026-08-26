@@ -29,10 +29,16 @@ public protocol WardrobeItemRepository: AnyObject {
 public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     let context: ModelContext
     private let outbox: (any OutboxRepository)?
+    let calendar: Calendar
 
-    public init(context: ModelContext, outbox: (any OutboxRepository)? = nil) {
+    public init(
+        context: ModelContext,
+        outbox: (any OutboxRepository)? = nil,
+        calendar: Calendar = .current
+    ) {
         self.context = context
         self.outbox = outbox
+        self.calendar = calendar
     }
 
     public static var schema: Schema {
@@ -189,30 +195,6 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
             Log.report(error, context: Log.Context(operation: "wardrobe.fetchItem"))
             return nil
         }
-    }
-
-    func stageInsert(wear: WearRecord) {
-        context.insert(WearRecordEntity(wear))
-    }
-
-    func stageApply(wear: WearRecord, deletedAt: Date?) throws {
-        let wearID = wear.id
-        let existing = try context.fetch(
-            FetchDescriptor<WearRecordEntity>(predicate: #Predicate { $0.id == wearID })
-        ).first
-        if deletedAt != nil {
-            if let existing {
-                context.delete(existing)
-            }
-            return
-        }
-        if let existing {
-            existing.itemID = wear.itemID
-            existing.completionID = wear.completionID
-            existing.wornAt = wear.wornAt
-            return
-        }
-        context.insert(WearRecordEntity(wear))
     }
 
     public func commitStaged() throws {
