@@ -1,9 +1,16 @@
-import { defineRailway, github, postgres, preserve, project, service } from "railway/iac";
+import {
+  defineRailway,
+  github,
+  postgres,
+  preserve,
+  project,
+  service,
+} from "railway/iac";
 
 export default defineRailway(() => {
   const db = postgres("postgres");
   const source = github("ayungavis/wardrobe-app", {
-    branch: "feat/llm-service",
+    branch: "main",
     rootDirectory: "services",
   });
 

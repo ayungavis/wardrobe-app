@@ -14,8 +14,8 @@
 // at Railway. For phone-against-local-Mac testing use this Mac's .local name
 // (or its LAN address) here instead.
 API_BASE_URL[sdk=iphonesimulator*] = http:/$()/127.0.0.1:8080
-// API_BASE_URL[sdk=iphoneos*] = https:/$()/wardrobe-app-api.up.railway.app
-API_BASE_URL[sdk=iphoneos*] = http:/$()/Wahyus-MacBook-Pro-M5.local:8080
+API_BASE_URL[sdk=iphoneos*] = https:/$()/wardrobe-app-api.up.railway.app
+//API_BASE_URL[sdk=iphoneos*] = http:/$()/Wahyus-MacBook-Pro-M5.local:8080
 SENTRY_DSN = https:/$()/20d03438cf41ffe30a30fa9c28f6f19a@o447656.ingest.us.sentry.io/4511867550171136
 SENTRY_ENVIRONMENT = development
 CONSENT_AI_PROVIDER = Seedream (ByteDance)
