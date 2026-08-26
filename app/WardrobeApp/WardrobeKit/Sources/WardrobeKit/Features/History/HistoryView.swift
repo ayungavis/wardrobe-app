@@ -21,38 +21,41 @@ public struct HistoryView: View {
     public var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                VStack {
+                VStack(spacing: 0) {
                     header
-                    if case .idle = viewModel.state {
-                        ProgressView()
-                    } else if viewModel.completions.isEmpty {
-                        emptyState
-                    } else {
-                        ScrollView {
-                            LazyVGrid(columns: columns, spacing: Spacing.md) {
-                                ForEach(viewModel.completions) { completion in
-                                    Button {
-                                        navigationPath.append(completion.id)
-                                    } label: {
-                                        VStack(spacing: Spacing.xs) {
-                                            HistoryPolaroidCardView(
-                                                completion: completion,
-                                                previewData: viewModel.previewData(for: completion)
-                                            )
-                                            .task { await viewModel.renderMissingPreview(for: completion) }
+                    Group {
+                        if case .idle = viewModel.state {
+                            ProgressView()
+                        } else if viewModel.completions.isEmpty {
+                            emptyState
+                        } else {
+                            ScrollView {
+                                LazyVGrid(columns: columns, spacing: Spacing.md) {
+                                    ForEach(viewModel.completions) { completion in
+                                        Button {
+                                            navigationPath.append(completion.id)
+                                        } label: {
+                                            VStack(spacing: Spacing.xs) {
+                                                HistoryPolaroidCardView(
+                                                    completion: completion,
+                                                    previewData: viewModel.previewData(for: completion)
+                                                )
+                                                .task { await viewModel.renderMissingPreview(for: completion) }
 
-                                            Text(verbatim: viewModel.syncState(for: completion).label)
-                                                .font(.caption2)
-                                                .foregroundStyle(AppColor.textSecondary)
+                                                Text(verbatim: viewModel.syncState(for: completion).label)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(AppColor.textSecondary)
+                                            }
                                         }
+                                        .rotationEffect(.degrees(-3))
+                                        .buttonStyle(.plain)
                                     }
-                                    .rotationEffect(.degrees(-3))
-                                    .buttonStyle(.plain)
                                 }
+                                .padding(Spacing.lg)
                             }
-                            .padding(Spacing.lg)
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .appBackgroundStickers()
@@ -117,11 +120,14 @@ public struct HistoryView: View {
     }
 
     private var emptyState: some View {
-        VStack {
-            Text("history.empty.title", bundle: .module)
-                .font(AppFont.title)
-                .foregroundStyle(AppColor.textSecondary)
-                .multilineTextAlignment(.center)
+        ContentUnavailableView {
+            Label {
+                Text("history.empty.title", bundle: .module)
+            } icon: {
+                Image(systemName: "photo.on.rectangle.angled")
+            }
+        } description: {
+            Text("history.empty.message", bundle: .module)
         }
     }
 }
