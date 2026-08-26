@@ -6,13 +6,22 @@ struct StickerPlacement: Identifiable {
     let x: CGFloat
     let y: CGFloat
     let widthFraction: CGFloat
+    let heightFraction: CGFloat
     let rotation: Double
 
-    init(_ imageName: String, x: CGFloat, y: CGFloat, width: CGFloat, rotation: Double = 0) {
+    init(
+        _ imageName: String,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        height: CGFloat = 0,
+        rotation: Double = 0
+    ) {
         self.imageName = imageName
         self.x = x
         self.y = y
         widthFraction = width
+        heightFraction = height
         self.rotation = rotation
     }
 
@@ -30,6 +39,7 @@ struct StickerPlacement: Identifiable {
         x = (figmaX + figmaWidth / 2) / frameWidth
         y = (figmaY + figmaHeight / 2) / frameHeight
         widthFraction = figmaWidth / frameWidth
+        heightFraction = figmaHeight / frameHeight
         self.rotation = rotation
     }
 }
