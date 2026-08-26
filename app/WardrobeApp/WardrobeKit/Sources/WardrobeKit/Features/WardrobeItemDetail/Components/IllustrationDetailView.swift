@@ -15,7 +15,7 @@ struct IllustrationDetailView: View {
 
             if let image {
                 #if os(iOS)
-                    ZoomableImageView(image: image) { dismiss() }
+                    ZoomableImageView(image: image)
                         .ignoresSafeArea()
                 #endif
             } else {

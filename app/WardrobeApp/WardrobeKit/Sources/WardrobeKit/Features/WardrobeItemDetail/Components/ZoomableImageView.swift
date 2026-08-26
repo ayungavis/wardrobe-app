@@ -5,28 +5,22 @@
 
     struct ZoomableImageView: UIViewRepresentable {
         let image: CGImage
-        let onDismiss: () -> Void
 
         func makeUIView(context _: Context) -> ZoomingScrollView {
-            ZoomingScrollView(image: image, onDismiss: onDismiss)
+            ZoomingScrollView(image: image)
         }
 
         func updateUIView(_ uiView: ZoomingScrollView, context _: Context) {
             uiView.show(image)
-            uiView.onDismiss = onDismiss
         }
     }
 
-    final class ZoomingScrollView: UIScrollView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
+    final class ZoomingScrollView: UIScrollView, UIScrollViewDelegate {
         private static let margin: CGFloat = 24
-        private static let dismissAfter: CGFloat = 120
 
         private let content = UIImageView()
         private var laidOut: CGSize = .zero
-        var onDismiss: () -> Void
-
-        init(image: CGImage, onDismiss: @escaping () -> Void) {
-            self.onDismiss = onDismiss
+        init(image: CGImage) {
             super.init(frame: .zero)
 
             content.contentMode = .scaleAspectFit
@@ -43,10 +37,6 @@
             let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
             doubleTap.numberOfTapsRequired = 2
             addGestureRecognizer(doubleTap)
-
-            let drag = UIPanGestureRecognizer(target: self, action: #selector(handleDrag))
-            drag.delegate = self
-            addGestureRecognizer(drag)
         }
 
         @available(*, unavailable)
@@ -69,7 +59,6 @@
             if bounds.size != laidOut {
                 laidOut = bounds.size
                 zoomScale = minimumZoomScale
-                content.transform = .identity
                 content.frame = CGRect(
                     origin: .zero, size: ZoomLayout.fitted(in: bounds.size, margin: Self.margin)
                 )
@@ -107,38 +96,6 @@
                 to: CGRect(x: point.x - side / 2, y: point.y - side / 2, width: side, height: side),
                 animated: true
             )
-        }
-
-        // MARK: Drag to dismiss
-
-        // ponytail: the transform is also what the scroll view drives while zooming,
-        // so the zoomScale guard is what keeps the two off each other. Move the
-        // drag onto a wrapper view if they ever need to run together.
-        @objc private func handleDrag(_ recognizer: UIPanGestureRecognizer) {
-            guard zoomScale == minimumZoomScale else { return }
-            let translation = recognizer.translation(in: self)
-
-            switch recognizer.state {
-            case .changed:
-                guard translation.y > 0 else { return }
-                let shrink = max(0.8, 1 - translation.y / (bounds.height * 2))
-                content.transform = CGAffineTransform(translationX: translation.x, y: translation.y)
-                    .scaledBy(x: shrink, y: shrink)
-            case .ended, .cancelled, .failed:
-                guard translation.y > Self.dismissAfter else {
-                    UIView.animate(withDuration: 0.25) { self.content.transform = .identity }
-                    return
-                }
-                onDismiss()
-            default:
-                break
-            }
-        }
-
-        func gestureRecognizer(
-            _: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
-        ) -> Bool {
-            true
         }
     }
 #endif
