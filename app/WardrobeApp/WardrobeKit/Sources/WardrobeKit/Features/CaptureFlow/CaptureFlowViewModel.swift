@@ -19,6 +19,8 @@ public final class CaptureFlowViewModel {
     public private(set) var libraryAccess: PhotoLibraryAccess = .notDetermined
     public private(set) var recentAssets: [PhotoAsset] = []
     public private(set) var isTipsPresented = false
+    public internal(set) var timer: CaptureTimer = .off
+    public internal(set) var countdown: Int?
     public var isGalleryPresented = false
 
     private let library: PhotoLibraryService
@@ -31,6 +33,7 @@ public final class CaptureFlowViewModel {
     public let review: GarmentReviewModel
 
     private let camera: CameraService
+    let sleep: @Sendable (Duration) async throws -> Void
     let wardrobeRepository: WardrobeItemRepository
     let thumbnails: GarmentThumbnailRepository
     let syncNow: () async -> Void
@@ -47,6 +50,7 @@ public final class CaptureFlowViewModel {
     private(set) var flipTask: Task<Void, Never>?
     private(set) var importTask: Task<Void, Never>?
     private(set) var thumbnailTask: Task<Void, Never>?
+    var countdownTask: Task<Void, Never>?
     var completionTask: Task<Void, Never>?
 
     public init(
@@ -63,10 +67,12 @@ public final class CaptureFlowViewModel {
         preferences: AccountPreferencesRepository,
         outbox: any OutboxRepository,
         uploads: any MediaUploadRepository,
-        syncNow: @escaping () async -> Void = {}
+        syncNow: @escaping () async -> Void = {},
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.challenge = challenge
         self.camera = camera
+        self.sleep = sleep
         self.activeRepository = activeRepository
         self.completedRepository = completedRepository
         self.photoRepository = photoRepository
@@ -165,6 +171,7 @@ public final class CaptureFlowViewModel {
 
     public func cameraDisappeared() {
         sessionTask?.cancel()
+        cancelCountdown()
         camera.stopSession()
     }
 
@@ -192,7 +199,7 @@ public final class CaptureFlowViewModel {
 
     // MARK: Capture (FR-016)
 
-    public func capture() {
+    func captureNow() {
         guard !isCapturing else { return }
         isCapturing = true
 

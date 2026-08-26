@@ -39,6 +39,7 @@ final class FakeCameraService: CameraService {
     private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
     private(set) var focusPoints: [CGPoint] = []
     private(set) var isConfigured = false
+    private(set) var captureCount = 0
 
     /// Mirrors AVFCameraService: the device is only attached inside startSession,
     /// and until it is there is nothing to zoom, so a single option is reported.
@@ -89,7 +90,8 @@ final class FakeCameraService: CameraService {
     }
 
     func capturePhoto() async throws -> Data {
-        try captureResult.get()
+        captureCount += 1
+        return try captureResult.get()
     }
 }
 

@@ -13,6 +13,8 @@ struct CameraStageView: View {
 
             CameraViewfinderView(model: viewModel)
 
+            countdownOverlay
+
             VStack {
                 topBar
                 Spacer()
@@ -28,6 +30,7 @@ struct CameraStageView: View {
             .padding(Spacing.xl)
         }
         .sensoryFeedback(.impact, trigger: viewModel.isCapturing) { _, new in new }
+        .sensoryFeedback(.impact, trigger: viewModel.countdown)
         .task {
             viewModel.cameraAppeared()
             viewModel.prepareLibraryAccess()
@@ -62,7 +65,32 @@ struct CameraStageView: View {
 
             Spacer()
 
-            Color.clear.frame(width: 44, height: 44)
+            CaptureTimerButtonView(timer: viewModel.timer) {
+                viewModel.cycleTimer()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var countdownOverlay: some View {
+        if let countdown = viewModel.countdown {
+            Text(countdown, format: .number)
+                .font(.system(size: 120, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColor.onMedia)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy, value: countdown)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var shutterCore: some View {
+        if viewModel.countdown == nil {
+            Circle().fill(AppColor.onMedia.opacity(0.35))
+        } else {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(AppColor.onMedia)
+                .padding(Spacing.lg)
         }
     }
 
@@ -74,10 +102,14 @@ struct CameraStageView: View {
                 Circle()
                     .strokeBorder(AppColor.onMedia, lineWidth: 5)
                     .frame(width: 80, height: 80)
-                    .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(Spacing.sm))
+                    .overlay(shutterCore.padding(Spacing.sm))
             }
             .disabled(viewModel.isCapturing)
-            .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
+            .accessibilityLabel(
+                viewModel.countdown == nil
+                    ? Text("capture.camera.capture", bundle: .module)
+                    : Text("capture.camera.cancelTimer", bundle: .module)
+            )
 
             HStack {
                 GalleryButtonView(thumbnail: viewModel.galleryThumbnail) {

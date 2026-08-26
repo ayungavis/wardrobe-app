@@ -33,7 +33,8 @@ func makeCaptureFlowSUT(
         thumbnails: thumbnails,
         preferences: InMemoryAccountPreferencesRepository(),
         outbox: outbox,
-        uploads: uploads
+        uploads: uploads,
+        sleep: { _ in }
     )
 }
 
