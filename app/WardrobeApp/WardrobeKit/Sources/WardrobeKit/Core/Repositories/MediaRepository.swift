@@ -4,6 +4,7 @@ import Foundation
 public protocol MediaRepository: AnyObject {
     func upload(_ data: Data, id: UUID, kind: MediaKind, contentType: String) async throws
     func data(for id: UUID) async throws -> Data
+    func downloadURL(for id: UUID) async throws -> URL
     func clearCache() throws
 }
 
@@ -54,6 +55,12 @@ public final class ServerMediaRepository: MediaRepository {
         let downloaded = try await fetch(grant)
         try cache.store(downloaded, for: id)
         return downloaded
+    }
+
+    public func downloadURL(for id: UUID) async throws -> URL {
+        let grant = try await client.send(GetMediaIdEndpoint(id: id))
+        guard let url = URL(string: grant.url) else { throw AppError.serverRejected }
+        return url
     }
 
     public func clearCache() throws {

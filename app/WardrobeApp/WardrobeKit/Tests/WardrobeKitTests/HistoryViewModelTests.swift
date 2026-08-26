@@ -18,7 +18,8 @@ struct HistoryViewModelTests {
             photoRepository: photoRepository,
             wardrobeRepository: InMemoryWardrobeItemRepository(),
             thumbnails: InMemoryGarmentThumbnailRepository(),
-            previews: previews
+            previews: previews,
+            saver: SpyPhotoLibrarySaver()
         )
     }
 

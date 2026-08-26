@@ -276,7 +276,9 @@ public final class AppContainer {
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
             previews: completionPreviewRepository,
-            downloads: makeMediaDownloadRepository()
+            downloads: makeMediaDownloadRepository(),
+            saver: Self.defaultLibrarySaver(),
+            media: makeMediaRepository()
         )
     }
 }

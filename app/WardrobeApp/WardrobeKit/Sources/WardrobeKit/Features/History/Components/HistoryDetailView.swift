@@ -4,7 +4,7 @@ import SwiftUI
 public struct HistoryDetailView: View {
     public let completion: CompletedChallenge
     public let previewData: Data?
-    let viewModel: HistoryViewModel
+    @Bindable var viewModel: HistoryViewModel
 
     let onSelectGarment: (UUID) -> Void
 
@@ -51,6 +51,58 @@ public struct HistoryDetailView: View {
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
         #endif
+            .toolbar { toolbar }
+            .sheet(isPresented: $viewModel.isSharePresented) {
+                ShareQRSheetView(state: viewModel.share) { viewModel.share(completion) }
+            }
+            .alert(
+                Text("common.errorTitle", bundle: .module),
+                isPresented: Binding(
+                    get: { viewModel.alertError != nil },
+                    set: {
+                        if !$0 {
+                            viewModel.alertError = nil
+                        }
+                    }
+                )
+            ) {
+                Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
+            } message: {
+                Text(viewModel.alertError?.userMessage ?? "")
+            }
+            .alert(
+                Text("history.detail.saved", bundle: .module),
+                isPresented: Binding(
+                    get: { viewModel.didSave },
+                    set: {
+                        if !$0 {
+                            viewModel.acknowledgeSave()
+                        }
+                    }
+                )
+            ) {
+                Button(role: .cancel) {} label: { Text("common.ok", bundle: .module) }
+            }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .confirmationAction) {
+            Button {
+                viewModel.share(completion)
+            } label: {
+                Image(systemName: "qrcode")
+            }
+            .accessibilityLabel(Text("history.detail.share", bundle: .module))
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button {
+                viewModel.save(completion)
+            } label: {
+                Image(systemName: "square.and.arrow.down")
+            }
+            .accessibilityLabel(Text("history.detail.save", bundle: .module))
+        }
     }
 
     private var receiptContent: some View {

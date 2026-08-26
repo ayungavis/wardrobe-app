@@ -20,6 +20,14 @@ public final class HistoryViewModel {
     private let downloads: (any MediaDownloadRepository)?
     private var renderedPreviews: [UUID: Data] = [:]
 
+    public internal(set) var share: Loadable<CompletionShare> = .idle
+    public var isSharePresented = false
+    public var alertError: AppError?
+    public internal(set) var didSave = false
+    var shareTask: Task<Void, Never>?
+    let saver: PhotoLibrarySaveService
+    let media: (any MediaRepository)?
+
     public init(
         completedRepository: CompletedChallengeRepository,
         outbox: any OutboxRepository,
@@ -28,7 +36,9 @@ public final class HistoryViewModel {
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
         previews: CompletionPreviewRepository,
-        downloads: (any MediaDownloadRepository)? = nil
+        downloads: (any MediaDownloadRepository)? = nil,
+        saver: PhotoLibrarySaveService,
+        media: (any MediaRepository)? = nil
     ) {
         self.completedRepository = completedRepository
         self.outbox = outbox
@@ -38,6 +48,8 @@ public final class HistoryViewModel {
         self.thumbnails = thumbnails
         self.previews = previews
         self.downloads = downloads
+        self.saver = saver
+        self.media = media
     }
 
     public func retryFailedRestores() {

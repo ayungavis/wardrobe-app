@@ -1,7 +1,7 @@
 # TestFlight auto-deploy. Setup runbook: docs/testflight-setup.md
 # Note: build number = github.run_number — renaming this file resets it,
 # and App Store Connect rejects non-increasing build numbers.
-name: testflight
+name: TestFlight
 
 on:
   push:
