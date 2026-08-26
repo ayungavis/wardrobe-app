@@ -158,6 +158,8 @@ public final class AppContainer {
             itemID: itemID,
             repository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
+            completions: completedChallengeRepository,
+            photos: photoRepository,
             syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }

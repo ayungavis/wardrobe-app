@@ -20,17 +20,23 @@ public final class WardrobeItemDetailViewModel {
     private let itemID: UUID
     private let repository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
+    private let completions: CompletedChallengeRepository?
+    private let photos: PhotoRepository?
     private let syncNow: () async -> Void
 
     init(
         itemID: UUID,
         repository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
+        completions: CompletedChallengeRepository? = nil,
+        photos: PhotoRepository? = nil,
         syncNow: @escaping () async -> Void = {}
     ) {
         self.itemID = itemID
         self.repository = repository
         self.thumbnails = thumbnails
+        self.completions = completions
+        self.photos = photos
         self.syncNow = syncNow
     }
 
@@ -159,6 +165,27 @@ public final class WardrobeItemDetailViewModel {
         } catch {
             Log.report(error)
         }
+    }
+
+    func cutoutData() -> Data? {
+        item.flatMap { try? thumbnails.data(forFile: $0.cutoutFile) }
+    }
+
+    // ponytail: the newest wear names the outfit the item was cut from. An item
+    // worn many times shows the latest photo, which is the one worth recognising.
+    func originalPhotoData() -> Data? {
+        guard let completions, let photos else { return nil }
+        let stored = completions.load()
+        for wear in wears.sorted(by: { $0.wornAt > $1.wornAt }) {
+            guard let completionID = wear.completionID,
+                  let completion = stored.first(where: { $0.id == completionID }),
+                  let data = try? photos.loadOriginal(id: completion.photoID)
+            else {
+                continue
+            }
+            return data
+        }
+        return nil
     }
 
     private func push() {

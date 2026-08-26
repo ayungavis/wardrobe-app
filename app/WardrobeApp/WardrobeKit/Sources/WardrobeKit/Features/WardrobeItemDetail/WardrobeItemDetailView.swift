@@ -127,11 +127,14 @@ public struct WardrobeItemDetailView: View {
                 Text("wardrobe.detail.delete.message", bundle: .module)
             }
             .sheet(isPresented: $isRegeneratePresented) {
-                RegenerateIllustrationView { note in
+                RegenerateIllustrationView(
+                    cutout: viewModel.cutoutData(),
+                    original: viewModel.originalPhotoData()
+                ) { note in
                     viewModel.regenerateIllustration(note: note)
                     isRegeneratePresented = false
                 }
-                .presentationDetents([.fraction(0.42)])
+                .presentationDetents([.fraction(0.72), .large])
             }
             .confirmationDialog(
                 Text("wardrobe.detail.merge.title", bundle: .module),

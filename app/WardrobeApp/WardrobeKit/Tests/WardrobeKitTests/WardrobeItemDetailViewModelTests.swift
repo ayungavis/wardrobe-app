@@ -4,6 +4,47 @@ import Testing
 
 @MainActor
 struct WardrobeItemDetailViewModelTests {
+    @Test func theRegenerateSheetCanShowWhatTheItemReallyLooksLike() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        let photos = SpyPhotoRepository()
+        let completions = InMemoryCompletedChallengeRepository()
+
+        let cutout = try SampleCameraService.makeSampleJPEG(width: 40, height: 40)
+        thumbnails.files["cut.png"] = cutout
+        let original = try SampleCameraService.makeSampleJPEG(width: 80, height: 120)
+        let photoID = try photos.saveOriginal(original)
+        let completion = CompletedChallenge(
+            card: ChallengeCard(id: UUID(), prompt: "p"),
+            photoID: photoID,
+            document: EditorDocument(id: UUID(), layers: []),
+            completedAt: Date()
+        )
+        completions.append(completion)
+
+        let item = WardrobeItem(category: .top, cutoutFile: "cut.png",
+                                createdAt: Date(), updatedAt: Date())
+        try repository.insert(
+            item,
+            fingerprint: nil,
+            wear: WearRecord(itemID: item.id, completionID: completion.id, wornAt: Date())
+        )
+
+        let sut = WardrobeItemDetailViewModel(
+            itemID: item.id,
+            repository: repository,
+            thumbnails: thumbnails,
+            completions: completions,
+            photos: photos
+        )
+        sut.load()
+        await sut.loadTask?.value
+
+        #expect(sut.cutoutData() == cutout)
+        #expect(sut.originalPhotoData() == original,
+                "asking for a better drawing is easier when you can see what it is drawing")
+    }
+
     @Test func askingForANewIllustrationPushesItStraightAway() async throws {
         let repository = InMemoryWardrobeItemRepository()
         let item = WardrobeItem(category: .top, cutoutFile: "a.png",

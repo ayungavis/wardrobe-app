@@ -6284,6 +6284,23 @@
         }
       }
     },
+    "wardrobe.detail.regenerate.cutout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cut-out"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cut-out"
+          }
+        }
+      }
+    },
     "wardrobe.detail.regenerate.disclaimer": {
       "extractionState": "manual",
       "localizations": {
@@ -6331,6 +6348,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "mis. ini celana pendek, bukan baju"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.original": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo it came from"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto asalnya"
           }
         }
       }
