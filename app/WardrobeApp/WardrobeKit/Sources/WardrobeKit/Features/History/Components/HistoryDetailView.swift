@@ -10,7 +10,6 @@ public struct HistoryDetailView: View {
 
     @State private var garments: [(item: WardrobeItem, wearCount: Int)] = []
     @State private var isDeleteConfirmationPresented = false
-    @Environment(\.dismiss) private var dismiss
 
     public init(
         completion: CompletedChallenge,
@@ -72,10 +71,9 @@ public struct HistoryDetailView: View {
             } message: {
                 Text(viewModel.alertError?.userMessage ?? "")
             }
-            .confirmationDialog(
+            .alert(
                 Text("history.detail.delete.title", bundle: .module),
-                isPresented: $isDeleteConfirmationPresented,
-                titleVisibility: .visible
+                isPresented: $isDeleteConfirmationPresented
             ) {
                 Button(role: .destructive) {
                     viewModel.delete(completion)
@@ -85,11 +83,6 @@ public struct HistoryDetailView: View {
                 Button(role: .cancel) {} label: { Text("common.cancel", bundle: .module) }
             } message: {
                 Text("history.detail.delete.message", bundle: .module)
-            }
-            .onChange(of: viewModel.didDelete) { _, deleted in
-                if deleted {
-                    dismiss()
-                }
             }
             .alert(
                 Text("history.detail.saved", bundle: .module),

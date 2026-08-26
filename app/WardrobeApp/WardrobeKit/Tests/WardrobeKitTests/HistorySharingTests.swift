@@ -63,6 +63,16 @@ struct HistorySharingTests {
         #expect(setup.sut.didDelete, "the screen dismisses on this")
     }
 
+    @Test func theDeleteFlagResetsSoASecondDeleteCanFire() throws {
+        let setup = try makeSUT()
+        setup.sut.delete(setup.completion)
+        #expect(setup.sut.didDelete)
+
+        setup.sut.acknowledgeDelete()
+
+        #expect(!setup.sut.didDelete, "History pops on this flag; a stuck flag pops every later push too")
+    }
+
     @Test func savingWritesThePreviewToThePhotoLibrary() async throws {
         let setup = try makeSUT()
 

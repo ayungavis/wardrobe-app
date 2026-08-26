@@ -38,6 +38,10 @@ public extension HistoryViewModel {
         }
     }
 
+    func acknowledgeDelete() {
+        didDelete = false
+    }
+
     func acknowledgeSave() {
         didSave = false
     }
