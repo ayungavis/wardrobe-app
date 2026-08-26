@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ChallengeDeckView: View {
     let cards: [ChallengeCard]
+    var garments: (ChallengeCard) -> CardGarments = { _ in CardGarments() }
     let onAccept: (ChallengeCard) -> Void
 
     @State private var currentIndex = 0
@@ -47,6 +48,7 @@ struct ChallengeDeckView: View {
 
         ChallengeCardView(
             card: cards[index],
+            garments: garments(cards[index]),
             onAccept: { onAccept(cards[index]) }
         )
         .rotationEffect(rotation(for: index))

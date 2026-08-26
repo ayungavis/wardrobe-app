@@ -13,6 +13,7 @@ use utoipa::{Modify, openapi::OpenApi as OpenApiDoc};
     ),
     modifiers(&SecurityAddon),
     tags(
+        (name = "challenge", description = "The daily challenge deck"),
         (name = "health", description = "Liveness and readiness"),
         (name = "session", description = "Session lifecycle and identity"),
     )

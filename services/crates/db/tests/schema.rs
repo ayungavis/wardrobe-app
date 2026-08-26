@@ -325,7 +325,7 @@ async fn a_training_permitting_provider_cannot_be_allowlisted(pool: PgPool) -> s
 async fn a_capability_has_exactly_one_configuration(pool: PgPool) -> sqlx::Result<()> {
     let insert = "insert into ai_model_config
                       (capability, model_class, active_model, prompt_version, updated_by)
-                  values ('challenge_text', 'text', $1, 'v1', 'tests')";
+                  values ('item_attributes', 'text', $1, 'v1', 'tests')";
 
     sqlx::query(insert).bind("model-a").execute(&pool).await?;
     let second = sqlx::query(insert).bind("model-b").execute(&pool).await;

@@ -332,7 +332,7 @@ async fn an_illustration_job_waits_because_no_registered_kind_claims_it(
         .execute(&pool)
         .await?;
 
-    for kind in wardrobe_worker::kinds(false, false) {
+    for kind in wardrobe_worker::kinds(false, false, false) {
         assert_eq!(
             run_one(&pool, kind, |_| async { Ok(()) }).await?,
             None,
@@ -360,7 +360,7 @@ async fn a_styling_job_waits_until_an_object_store_is_configured(pool: PgPool) -
         .execute(&pool)
         .await?;
 
-    for kind in wardrobe_worker::kinds(true, false) {
+    for kind in wardrobe_worker::kinds(true, false, false) {
         assert_eq!(run_one(&pool, kind, |_| async { Ok(()) }).await?, None);
     }
     assert_eq!(
@@ -369,7 +369,7 @@ async fn a_styling_job_waits_until_an_object_store_is_configured(pool: PgPool) -
         "with nowhere to read the generation from, the job waits rather than failing"
     );
 
-    for kind in wardrobe_worker::kinds(true, true) {
+    for kind in wardrobe_worker::kinds(true, true, true) {
         run_one(&pool, kind, |_| async { Ok(()) }).await?;
     }
     assert_eq!(

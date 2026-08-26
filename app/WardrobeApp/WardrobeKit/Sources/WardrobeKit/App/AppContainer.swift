@@ -3,7 +3,7 @@ import SwiftData
 
 @MainActor
 public final class AppContainer {
-    private let challengeRepository: ChallengeRepository
+    let challengeRepository: ChallengeRepository?
     let activeChallengeRepository: ActiveChallengeRepository
     let completedChallengeRepository: CompletedChallengeRepository
     let photoRepository: PhotoRepository
@@ -11,13 +11,14 @@ public final class AppContainer {
     let preferencesRepository: AccountPreferencesRepository
     let contentRevision = ContentRevisionModel()
     let completionPreviewRepository: CompletionPreviewRepository
+    public let weatherRepository: any WeatherRepository
     let onboarding: OnboardingModel
     private let session: SessionService
     private let sessionTokenRepository: SessionTokenRepository
     private let cameraService: CameraService
 
     public init(
-        challengeRepository: ChallengeRepository = MockChallengeRepository(),
+        challengeRepository: ChallengeRepository? = nil,
         activeChallengeRepository: ActiveChallengeRepository = FileActiveChallengeRepository(),
         completedChallengeRepository: CompletedChallengeRepository? = nil,
         photoRepository: PhotoRepository = FilePhotoRepository(),
@@ -26,7 +27,8 @@ public final class AppContainer {
         appleAccountRepository: AppleAccountRepository = StoredAppleAccountRepository(),
         session: SessionService? = nil,
         sessionTokenRepository: SessionTokenRepository = StoredSessionTokenRepository(),
-        cameraService: CameraService? = nil
+        cameraService: CameraService? = nil,
+        weather: (any WeatherRepository)? = nil
     ) {
         self.challengeRepository = challengeRepository
         self.activeChallengeRepository = activeChallengeRepository
@@ -48,6 +50,7 @@ public final class AppContainer {
             session: session
         )
         self.cameraService = cameraService ?? Self.defaultCameraService()
+        weatherRepository = weather ?? Self.defaultWeatherRepository()
     }
 
     var baseURL: URL {
@@ -99,15 +102,6 @@ public final class AppContainer {
 
     public func makeOnboardingViewModel() -> OnboardingViewModel {
         OnboardingViewModel(onboarding: onboarding)
-    }
-
-    public func makeChallengeViewModel() -> ChallengeViewModel {
-        ChallengeViewModel(
-            challengeRepository: challengeRepository,
-            activeRepository: activeChallengeRepository,
-            completedRepository: completedChallengeRepository,
-            photoRepository: photoRepository
-        )
     }
 
     public func makeCaptureFlowViewModel(challenge: ActiveChallenge) -> CaptureFlowViewModel {

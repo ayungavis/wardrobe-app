@@ -13,7 +13,8 @@ public final class DevMenuViewModel {
     private(set) var outbox: [OutboxEnvelope] = []
     private(set) var cursor: Int64 = 0
     private(set) var pullState: Loadable<PullOutcome> = .idle
-    private(set) var pullTask: Task<Void, Never>?
+    var deckState: Loadable<String> = .idle
+    var pullTask: Task<Void, Never>?
     private(set) var reconcileState: Loadable<ReconcileOutcome> = .idle
     private(set) var diagnostics: [DiagnosticEntry] = []
     private(set) var mediaState: Loadable<String> = .idle
@@ -28,13 +29,13 @@ public final class DevMenuViewModel {
     private let previews: CompletionPreviewRepository
     private let onboarding: OnboardingModel
     private let session: any SessionService
-    private let client: any AuthenticatedAPIClient
+    let client: any AuthenticatedAPIClient
     private let plainClient: any APIClient
     let baseURL: URL
     private let tokens: any SessionTokenRepository
-    private let outboxRepository: any OutboxRepository
+    let outboxRepository: any OutboxRepository
     private let feed: any ChangeFeedRepository
-    private let coordinator: any SyncService
+    let coordinator: any SyncService
     private let diagnosticsStore: any DiagnosticsStore
     private let media: any MediaRepository
     private let uploadQueue: any MediaUploadRepository

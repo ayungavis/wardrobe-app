@@ -4,6 +4,7 @@
 #![allow(clippy::missing_errors_doc)]
 
 pub mod changes;
+pub mod deck;
 pub mod health;
 pub mod media;
 pub mod sessions;

@@ -21,7 +21,7 @@ public struct ChallengeView: View {
             ZStack {
                 Group {
                     if viewModel.hasCompletedToday {
-                        CompletedTodayView(onAccept: viewModel.accept)
+                        CompletedTodayView(weather: container.weatherRepository, onAccept: viewModel.accept)
                     } else if let active = viewModel.activeChallenge {
                         ActiveChallengeStateView(
                             challenge: active,
@@ -67,11 +67,11 @@ public struct ChallengeView: View {
                 }
             )
         }
-        .task { viewModel.onAppear() }
+        .task(id: container.contentRevision.revision) { viewModel.onAppear() }
         .sheet(
             isPresented: $isProfilePresented,
             onDismiss: { viewModel.refreshActiveChallenge() },
-            content: { ProfileView(viewModel: container.makeProfileViewModel()) }
+            content: { ProfileView(viewModel: container.makeProfileViewModel(), weather: container.weatherRepository) }
         )
         .confirmationDialog(
             Text("challenge.abandon.confirm.title", bundle: .module),
@@ -111,36 +111,17 @@ public struct ChallengeView: View {
         switch viewModel.deck {
         case .idle, .loading:
             ProgressView()
-        case let .failed(error):
-            errorView(error)
+        case .failed:
+            deckView(CuratedChallengeRepository.deck)
         case let .loaded(cards):
             deckView(cards)
         }
     }
 
-    private func errorView(_ error: AppError) -> some View {
-        ContentUnavailableView {
-            Label {
-                Text("challenge.error.title", bundle: .module)
-            } icon: {
-                Image(systemName: "wifi.exclamationmark")
-            }
-        } description: {
-            Text(error.userMessage)
-        } actions: {
-            Button {
-                viewModel.load()
-            } label: {
-                Text("common.retry", bundle: .module)
-            }
-        }
-    }
-
     private func deckView(_ cards: [ChallengeCard]) -> some View {
-        // ponytail: paged TabView as the stacked-carousel stand-in; revisit
-        // when the real card-deck design lands (FR-007 also needs non-swipe
-        // browsing buttons for VoiceOver).
-        ChallengeDeckView(cards: cards) { card in
+        // ponytail: FR-007 still owes non-swipe browsing buttons for VoiceOver,
+        // and the new card art makes them more valuable, not less.
+        ChallengeDeckView(cards: cards, garments: viewModel.garments(for:)) { card in
             viewModel.accept(card)
         }
         .padding(.horizontal, Spacing.xl)

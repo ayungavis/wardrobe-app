@@ -2,6 +2,7 @@ pub mod account;
 pub mod auth;
 pub mod changes;
 pub mod config;
+pub mod deck;
 pub mod deletion;
 pub mod error;
 pub mod limit;
@@ -60,6 +61,7 @@ fn authenticated_router() -> OpenApiRouter<AppState> {
         .routes(routes!(routes::sessions::sign_out))
         .routes(routes!(routes::sync::sync))
         .routes(routes!(routes::changes::changes))
+        .routes(routes!(routes::deck::deck))
         .routes(routes!(routes::media::reserve))
         .routes(routes!(routes::media::download))
         .routes(routes!(routes::users::delete_me))

@@ -1,4 +1,7 @@
+pub mod challenge;
 pub mod illustration;
+pub mod inference;
+pub mod openrouter;
 
 use std::future::Future;
 
@@ -12,13 +15,16 @@ use wardrobe_storage::Storage;
 pub const SWEEP_MEDIA: &str = "sweepMedia";
 
 #[must_use]
-pub fn kinds(illustration: bool, storage: bool) -> Vec<&'static str> {
+pub fn kinds(illustration: bool, storage: bool, challenge: bool) -> Vec<&'static str> {
     let mut kinds = vec![SWEEP_MEDIA];
     if illustration {
         kinds.push(wardrobe_db::ILLUSTRATION);
     }
     if storage {
         kinds.push(wardrobe_db::STYLISE_ILLUSTRATION);
+    }
+    if challenge {
+        kinds.push(wardrobe_db::CHALLENGE_DECK);
     }
     kinds
 }

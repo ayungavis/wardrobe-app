@@ -146,6 +146,6 @@ enum CompletionSyncPlanner {
     }
 
     private static func localDate(_ date: Date) -> String {
-        date.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+        LocalDay.string(from: date)
     }
 }

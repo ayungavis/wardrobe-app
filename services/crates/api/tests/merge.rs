@@ -330,8 +330,11 @@ async fn a_generated_card_moves_with_the_completion_that_cites_it(
     let (destination, source, _, arriving) = two_full_accounts(&pool).await?;
     let card = Uuid::now_v7();
     sqlx::query(
-        "insert into challenge_card (id, account_id, source, prompt_text, locale, model, prompt_version)
-         values ($1, $2, 'generated', 'Wear something red', 'en', 'a/model', 'v1')",
+        "insert into challenge_card
+             (id, account_id, source, title, prompt_text, locale, model, prompt_version,
+              local_date, deck_index)
+         values ($1, $2, 'generated', 'Seeing red', 'Wear something red', 'en', 'a/model', 'v1',
+                 date '2026-08-27', 0)",
     )
     .bind(card)
     .bind(source)

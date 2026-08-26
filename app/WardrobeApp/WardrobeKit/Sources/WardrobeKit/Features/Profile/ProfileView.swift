@@ -3,16 +3,19 @@ import SwiftUI
 
 public struct ProfileView: View {
     @State private var viewModel: ProfileViewModel
+    private let weather: any WeatherRepository
     @Environment(\.dismiss) private var dismiss
 
-    public init(viewModel: ProfileViewModel) {
+    public init(viewModel: ProfileViewModel, weather: any WeatherRepository) {
         _viewModel = State(wrappedValue: viewModel)
+        self.weather = weather
     }
 
     public var body: some View {
         NavigationStack {
             List {
                 accountSection
+                WeatherSettingsView(weather: weather)
                 if viewModel.isSignedIn {
                     signOutSection
                 }

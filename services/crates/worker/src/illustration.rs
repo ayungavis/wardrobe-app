@@ -1,28 +1,23 @@
 pub mod image;
-pub mod openrouter;
 pub mod sticker;
 
-use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wardrobe_db::ClaimedJob;
 use wardrobe_storage::Storage;
 
+pub use crate::inference::Provider;
+use crate::inference::{self, Accounting, Pinned};
+pub use crate::openrouter;
 use openrouter::{Ask, Failure, Rejection};
 
 pub const STYLE_VERSION: &str = "v1";
-const CAPABILITY: &str = "illustration";
+pub const CAPABILITY: &str = "illustration";
 const MAX_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 const QUALITY_ATTEMPTS: i64 = 2;
 const DEFAULT_PROMPT: &str = "Redraw this single garment as a clean flat-lay product illustration on \
      a plain background. Draw the garment only. Do not draw a person, a body, a mannequin, or anyone \
      wearing it.";
-
-pub struct Provider {
-    pub client: reqwest::Client,
-    pub base_url: String,
-    pub api_key: String,
-}
 
 struct Settings {
     active_model: String,
@@ -38,74 +33,33 @@ struct Cutout {
     storage_key: String,
 }
 
-/// # Errors
-///
-/// Returns any database error unchanged.
-pub async fn ready(pool: &PgPool) -> sqlx::Result<bool> {
-    let (enabled,): (bool,) = sqlx::query_as(
-        "select exists (
-             select 1 from ai_model_config
-              where capability = $1 and enabled
-         ) and exists (
-             select 1 from ai_provider_allowlist where revoked_at is null
-         )",
-    )
-    .bind(CAPABILITY)
-    .fetch_one(pool)
-    .await?;
-    Ok(enabled)
-}
-
 fn positive(configured: Option<i64>) -> Option<u64> {
     configured
         .filter(|value| *value > 0)
         .and_then(|value| u64::try_from(value).ok())
 }
 
-#[derive(sqlx::FromRow)]
-struct ConfigRow {
-    active_model: String,
-    alternate_model: Option<String>,
-    prompt_version: String,
-    prompt: Option<String>,
-    resolution: Option<String>,
-    aspect_ratio: Option<String>,
-    max_input_bytes: Option<i64>,
-    max_input_pixels: Option<i64>,
-}
-
 async fn settings(pool: &PgPool) -> Result<Settings, &'static str> {
-    let row: Option<ConfigRow> = sqlx::query_as(
-        "select active_model, alternate_model, prompt_version,
-                params->>'prompt' as prompt,
-                params->>'resolution' as resolution,
-                params->>'aspectRatio' as aspect_ratio,
-                (params->>'maxInputBytes')::bigint as max_input_bytes,
-                (params->>'maxInputPixels')::bigint as max_input_pixels
-           from ai_model_config
-          where capability = $1 and enabled",
-    )
-    .bind(CAPABILITY)
-    .fetch_optional(pool)
-    .await
-    .map_err(|_| "database")?;
-
-    let row = row.ok_or("capability_disabled")?;
+    let config = inference::config(pool, CAPABILITY).await?;
     Ok(Settings {
-        active_model: row.active_model,
-        alternate_model: row.alternate_model,
-        prompt_version: row.prompt_version,
-        prompt: row.prompt.unwrap_or_else(|| DEFAULT_PROMPT.to_owned()),
-        resolution: row
-            .resolution
+        prompt: config
+            .text("prompt")
+            .unwrap_or_else(|| DEFAULT_PROMPT.to_owned()),
+        resolution: config
+            .text("resolution")
             .unwrap_or_else(|| openrouter::DEFAULT_RESOLUTION.to_owned()),
-        aspect_ratio: row
-            .aspect_ratio
+        aspect_ratio: config
+            .text("aspectRatio")
             .unwrap_or_else(|| openrouter::DEFAULT_ASPECT_RATIO.to_owned()),
         bounds: image::Bounds {
-            max_bytes: positive(row.max_input_bytes).unwrap_or(image::DEFAULT_MAX_BYTES),
-            max_pixels: positive(row.max_input_pixels).unwrap_or(image::DEFAULT_MAX_PIXELS),
+            max_bytes: positive(config.integer("maxInputBytes"))
+                .unwrap_or(image::DEFAULT_MAX_BYTES),
+            max_pixels: positive(config.integer("maxInputPixels"))
+                .unwrap_or(image::DEFAULT_MAX_PIXELS),
         },
+        active_model: config.active_model,
+        alternate_model: config.alternate_model,
+        prompt_version: config.prompt_version,
     })
 }
 
@@ -145,152 +99,6 @@ async fn set_state(
         .await
         .map(|_| ())
         .map_err(|_| "database")
-}
-
-// ------------------------------------------------------------------- limits
-
-async fn within_limits(pool: &PgPool, account: Uuid) -> Result<bool, &'static str> {
-    let limits: Vec<(String, i32, Option<i64>, Option<Decimal>)> = sqlx::query_as(
-        "select scope, window_seconds, max_requests, max_cost_usd
-           from ai_usage_limit
-          where enabled and (capability is null or capability = $1)",
-    )
-    .bind(CAPABILITY)
-    .fetch_all(pool)
-    .await
-    .map_err(|_| "database")?;
-
-    for (scope, window_seconds, max_requests, max_cost_usd) in limits {
-        let scoped = (scope == "account").then_some(account);
-        let (requests, cost): (i64, Option<Decimal>) = sqlx::query_as(
-            "select count(*), coalesce(sum(cost_usd), 0)
-               from ai_inference_attempt
-              where capability = $1
-                and created_at > now() - make_interval(secs => $2)
-                and ($3::uuid is null or account_id = $3)",
-        )
-        .bind(CAPABILITY)
-        .bind(f64::from(window_seconds))
-        .bind(scoped)
-        .fetch_one(pool)
-        .await
-        .map_err(|_| "database")?;
-
-        if max_requests.is_some_and(|max| requests >= max) {
-            return Ok(false);
-        }
-        if max_cost_usd.is_some_and(|max| cost.unwrap_or_default() >= max) {
-            return Ok(false);
-        }
-    }
-
-    Ok(true)
-}
-
-// -------------------------------------------------------------- the attempt
-
-struct Pinned {
-    model: String,
-    seed: i64,
-    attempt_no: i32,
-    another_model_available: bool,
-    quality_attempts_left: bool,
-}
-
-fn fresh_seed() -> i64 {
-    let bytes = Uuid::now_v7().into_bytes();
-    let raw = u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
-    i64::from(raw & 0x7FFF_FFFF)
-}
-
-async fn pin(pool: &PgPool, job: Uuid, settings: &Settings) -> Result<Pinned, &'static str> {
-    let earlier: Vec<(String, Option<i64>, String)> = sqlx::query_as(
-        "select model, seed, status from ai_inference_attempt
-          where job_id = $1 order by attempt_no",
-    )
-    .bind(job)
-    .fetch_all(pool)
-    .await
-    .map_err(|_| "database")?;
-
-    let attempt_no = i32::try_from(earlier.len()).unwrap_or(i32::MAX) + 1;
-    let invalid_so_far = earlier
-        .iter()
-        .filter(|(_, _, status)| status == "invalid_output")
-        .count();
-    let invalid_so_far = i64::try_from(invalid_so_far).unwrap_or(i64::MAX);
-    let unused_alternate = settings
-        .alternate_model
-        .as_ref()
-        .filter(|alternate| !earlier.iter().any(|(model, _, _)| &model == alternate));
-
-    let Some((first_model, first_seed, last_status)) = earlier.last() else {
-        return Ok(Pinned {
-            model: settings.active_model.clone(),
-            seed: fresh_seed(),
-            attempt_no,
-            another_model_available: settings.alternate_model.is_some(),
-            quality_attempts_left: QUALITY_ATTEMPTS > 0,
-        });
-    };
-
-    let escalating = matches!(last_status.as_str(), "refused" | "invalid_output");
-    let (model, seed) = match unused_alternate {
-        Some(alternate) if escalating => (alternate.clone(), fresh_seed()),
-        _ => (first_model.clone(), first_seed.unwrap_or_else(fresh_seed)),
-    };
-
-    Ok(Pinned {
-        model,
-        seed,
-        attempt_no,
-        another_model_available: unused_alternate.is_some(),
-        quality_attempts_left: invalid_so_far < QUALITY_ATTEMPTS,
-    })
-}
-
-struct Accounting<'a> {
-    status: &'a str,
-    provider_route: Option<String>,
-    latency_ms: Option<i32>,
-    input_tokens: Option<i64>,
-    output_tokens: Option<i64>,
-    http_status: Option<i32>,
-}
-
-async fn record(
-    pool: &PgPool,
-    job: &ClaimedJob,
-    account: Uuid,
-    pinned: &Pinned,
-    settings: &Settings,
-    accounting: &Accounting<'_>,
-) -> Result<(), &'static str> {
-    sqlx::query(
-        "insert into ai_inference_attempt
-             (id, account_id, job_id, capability, attempt_no, model, prompt_version,
-              provider_route, status, latency_ms, input_tokens, output_tokens, seed,
-              http_status)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
-    )
-    .bind(Uuid::now_v7())
-    .bind(account)
-    .bind(job.id)
-    .bind(CAPABILITY)
-    .bind(pinned.attempt_no)
-    .bind(&pinned.model)
-    .bind(&settings.prompt_version)
-    .bind(accounting.provider_route.as_ref())
-    .bind(accounting.status)
-    .bind(accounting.latency_ms)
-    .bind(accounting.input_tokens)
-    .bind(accounting.output_tokens)
-    .bind(pinned.seed)
-    .bind(accounting.http_status)
-    .execute(pool)
-    .await
-    .map(|_| ())
-    .map_err(|_| "database")
 }
 
 // ------------------------------------------------------------------ the work
@@ -396,7 +204,14 @@ pub async fn render_for(
         return Ok(());
     };
     let settings = settings(pool).await?;
-    let pinned = pin(pool, job.id, &settings).await?;
+    let pinned = inference::pin(
+        pool,
+        job.id,
+        &settings.active_model,
+        settings.alternate_model.as_deref(),
+        QUALITY_ATTEMPTS,
+    )
+    .await?;
     let prompt = describe(
         &settings.prompt,
         subject(pool, item).await?.as_ref(),
@@ -407,13 +222,14 @@ pub async fn render_for(
         return set_state(pool, account, item, "failed").await;
     };
 
-    if !within_limits(pool, account).await? {
-        record(
+    if !inference::within_limits(pool, CAPABILITY, account).await? {
+        inference::record(
             pool,
+            CAPABILITY,
             job,
             account,
             &pinned,
-            &settings,
+            &settings.prompt_version,
             &Accounting {
                 status: "skipped_limit",
                 provider_route: None,
@@ -490,12 +306,13 @@ async fn settle(
                 provider.status = rejection.http_status,
                 "the provider declined the render"
             );
-            record(
+            inference::record(
                 work.pool,
+                CAPABILITY,
                 work.job,
                 work.account,
                 work.pinned,
-                work.settings,
+                &work.settings.prompt_version,
                 &Accounting {
                     status: failure.status(),
                     provider_route: None,
@@ -521,12 +338,13 @@ async fn settle(
             &work.settings.aspect_ratio,
         )
         .is_err();
-    record(
+    inference::record(
         work.pool,
+        CAPABILITY,
         work.job,
         work.account,
         work.pinned,
-        work.settings,
+        &work.settings.prompt_version,
         &Accounting {
             status: if unusable {
                 "invalid_output"
@@ -742,20 +560,4 @@ async fn publish(
     .map_err(|_| "database")?;
 
     tx.commit().await.map_err(|_| "database")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::fresh_seed;
-
-    #[test]
-    fn a_seed_always_fits_the_providers_int32() {
-        for _ in 0..100 {
-            assert!(
-                fresh_seed() <= i64::from(i32::MAX),
-                "the provider refuses any seed above 2147483647, and the uuid \
-                 variant byte would otherwise set the top bit every single time"
-            );
-        }
-    }
 }

@@ -9,7 +9,9 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use wardrobe_db::ClaimedJob;
 use wardrobe_storage::Storage;
+use wardrobe_worker::challenge;
 use wardrobe_worker::illustration::{self, Provider};
+use wardrobe_worker::inference;
 use wardrobe_worker::{SWEEP_GRACE_HOURS, SWEEP_MEDIA, kinds};
 
 fn main() -> ExitCode {
@@ -115,6 +117,7 @@ fn poll_seconds() -> u64 {
 fn announce(readiness: Readiness, has_storage: bool, has_provider: bool) {
     tracing::info!(
         illustration = readiness.illustration,
+        challenge = readiness.challenge,
         sweep = has_storage,
         "job kinds enabled"
     );
@@ -131,6 +134,7 @@ fn announce(readiness: Readiness, has_storage: bool, has_provider: bool) {
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Readiness {
     illustration: bool,
+    challenge: bool,
     config: bool,
 }
 
@@ -142,18 +146,27 @@ async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provid
         );
         return Readiness {
             illustration: false,
+            challenge: false,
             config: false,
         };
     }
 
-    let config = illustration::ready(pool).await.unwrap_or(false);
+    let config = inference::ready(pool, illustration::CAPABILITY)
+        .await
+        .unwrap_or(false);
+    let challenge_config = challenge::ready(pool).await.unwrap_or(false);
     let readiness = Readiness {
         illustration: provider.is_some() && storage.is_some() && config,
+        challenge: provider.is_some() && challenge_config,
         config,
     };
 
     let mut claimed = 0;
-    for kind in kinds(readiness.illustration, storage.is_some()) {
+    for kind in kinds(
+        readiness.illustration,
+        storage.is_some(),
+        readiness.challenge,
+    ) {
         let outcome =
             wardrobe_worker::run_one(pool, kind, |job| handle(pool, storage, provider, job)).await;
         match outcome {
@@ -179,7 +192,7 @@ async fn tick(pool: &PgPool, storage: Option<&Storage>, provider: Option<&Provid
 
 async fn prepare(pool: &PgPool) -> sqlx::Result<()> {
     let mut conn = pool.acquire().await?;
-    for kind in kinds(true, true) {
+    for kind in kinds(true, true, true) {
         let reclaimed = wardrobe_db::reclaim_stalled(
             &mut conn,
             kind,
@@ -197,6 +210,7 @@ async fn prepare(pool: &PgPool) -> sqlx::Result<()> {
     drop(conn);
 
     wardrobe_worker::enqueue_sweep(pool, Utc::now()).await?;
+    challenge::enqueue_decks(pool).await?;
     Ok(())
 }
 
@@ -218,6 +232,16 @@ async fn handle(
                     .map_err(|_| "database")?;
             illustration::render_for(pool, storage, provider, &job, job.attempts >= max_attempts)
                 .await
+        }
+        wardrobe_db::CHALLENGE_DECK => {
+            let provider = provider.ok_or("provider_unconfigured")?;
+            let max_attempts: i32 =
+                sqlx::query_scalar("select max_attempts from job where id = $1")
+                    .bind(job.id)
+                    .fetch_one(pool)
+                    .await
+                    .map_err(|_| "database")?;
+            challenge::generate_for(pool, provider, &job, job.attempts >= max_attempts).await
         }
         wardrobe_db::STYLISE_ILLUSTRATION => {
             let storage = storage.ok_or("object_store_unconfigured")?;

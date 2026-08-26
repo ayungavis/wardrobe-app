@@ -31,6 +31,11 @@ public struct RootView: View {
         .task {
             container.startDiagnostics()
             await container.startSession()
+            // ponytail: onChange(of: scenePhase) never fires for the initial value, and
+            // when it does it can run before this context is queued. A cold launch would
+            // then leave the zone sitting in the outbox and never get a deck.
+            await container.weatherRepository.refresh(now: Date())
+            await container.syncCoordinator.reconcile(.mutationQueued)
             container.reachability.observe {
                 Task { await container.syncCoordinator.reconcile(.connectivityRestored) }
             }
@@ -38,7 +43,9 @@ public struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             presentConsentIfNeeded()
+            challenge.refreshForForeground()
             Task { await container.syncCoordinator.reconcile(.foreground) }
+            Task { await container.weatherRepository.refresh(now: Date()) }
         }
         .onChange(of: container.onboarding.isSignedIn) { _, signedIn in
             guard signedIn else { return }
@@ -46,7 +53,10 @@ public struct RootView: View {
         }
         .onChange(of: tab) { _, opened in
             presentConsentIfNeeded()
-            guard opened != .challenge else { return }
+            guard opened != .challenge else {
+                challenge.refreshForForeground()
+                return
+            }
             Task { await container.syncCoordinator.reconcile(.tabOpened) }
         }
         // ponytail: only the Challenge screen is refreshed after a dev reset. Wardrobe

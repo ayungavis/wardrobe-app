@@ -42,6 +42,18 @@
         }
       }
     },
+    "NSLocationWhenInUseUsageDescription" : {
+      "comment" : "Privacy - Location When In Use Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Checks tomorrow's forecast near you so your challenge cards suit the weather. Your location never leaves your device — only a short weather summary is sent."
+          }
+        }
+      }
+    },
     "NSPhotoLibraryAddUsageDescription" : {
       "comment" : "Privacy - Photo Library Additions Usage Description",
       "localizations" : {

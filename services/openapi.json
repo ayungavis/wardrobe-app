@@ -40,6 +40,73 @@
         }
       }
     },
+    "/v1/challenges/deck": {
+      "get": {
+        "tags": [
+          "challenge"
+        ],
+        "summary": "Returns the day's generated deck, or the curated catalog when none exists.",
+        "operationId": "deck",
+        "parameters": [
+          {
+            "name": "localDate",
+            "in": "query",
+            "description": "The user-local calendar date, computed on the device.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "The device's locale, used to pick curated copy; defaults to `en`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The day's deck",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unusable query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unusable token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/v1/changes": {
       "get": {
         "tags": [
@@ -834,6 +901,67 @@
             "type": "integer",
             "format": "int64",
             "description": "Pass this back as `since`; it never moves past a record this page omitted."
+          }
+        }
+      },
+      "DeckCard": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt"
+        ],
+        "properties": {
+          "bottomItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "DeckResponse": {
+        "type": "object",
+        "description": "The day's challenge cards.",
+        "required": [
+          "localDate",
+          "source",
+          "cards"
+        ],
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeckCard"
+            }
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string",
+            "description": "`generated` or `curated`; `curated` means generation was unavailable."
           }
         }
       },
@@ -1744,6 +1872,10 @@
     }
   },
   "tags": [
+    {
+      "name": "challenge",
+      "description": "The daily challenge deck"
+    },
     {
       "name": "health",
       "description": "Liveness and readiness"

@@ -49,6 +49,12 @@ struct DevMenuView: View {
                     entries: viewModel.diagnostics,
                     onClear: { viewModel.clearDiagnostics() }
                 )
+                DevChallengeSectionView(
+                    state: viewModel.deckState,
+                    onGenerate: viewModel.generateDeck,
+                    onFetch: viewModel.fetchDeck
+                )
+
                 DevSyncSectionView(
                     cursor: viewModel.cursor,
                     state: viewModel.pullState,

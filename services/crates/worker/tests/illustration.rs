@@ -375,6 +375,31 @@ async fn a_refusal_moves_to_the_alternate_as_its_own_pinned_attempt(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_rate_limited_provider_moves_to_the_alternate(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, Some("alternate/model")).await?;
+    let scene = scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(&server, ResponseTemplate::new(429)).await;
+
+    assert_eq!(run(&pool, &server, false).await, Outcome::Retrying);
+    sqlx::query("update job set status = 'pending', run_after = now() where id = $1")
+        .bind(scene.job)
+        .execute(&pool)
+        .await?;
+    assert_eq!(run(&pool, &server, true).await, Outcome::Succeeded);
+
+    let rows = attempts(&pool, scene.job).await;
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].1, "primary/model");
+    assert_eq!(
+        rows[1].1, "alternate/model",
+        "a provider out of quota answers 429 forever; retrying the same model until the \
+         attempts run out never reaches the alternate the fallback chain exists for (FR-075)"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_refusal_records_the_http_status(pool: PgPool) -> sqlx::Result<()> {
     configure(&pool, None).await?;
     let scene = scene(&pool, true).await?;
@@ -633,7 +658,7 @@ async fn an_item_without_a_cutout_never_reaches_the_provider(pool: PgPool) -> sq
 async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
     pool: PgPool,
 ) -> sqlx::Result<()> {
-    assert!(!illustration::ready(&pool).await?);
+    assert!(!wardrobe_worker::inference::ready(&pool, illustration::CAPABILITY).await?);
 
     sqlx::query(
         "insert into ai_model_config
@@ -643,7 +668,7 @@ async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
     .execute(&pool)
     .await?;
     assert!(
-        !illustration::ready(&pool).await?,
+        !wardrobe_worker::inference::ready(&pool, illustration::CAPABILITY).await?,
         "an empty allowlist means off, never open"
     );
 
@@ -653,7 +678,7 @@ async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
     )
     .execute(&pool)
     .await?;
-    assert!(illustration::ready(&pool).await?);
+    assert!(wardrobe_worker::inference::ready(&pool, illustration::CAPABILITY).await?);
     Ok(())
 }
 

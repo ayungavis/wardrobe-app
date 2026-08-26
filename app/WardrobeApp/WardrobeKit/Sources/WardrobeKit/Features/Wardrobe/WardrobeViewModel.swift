@@ -105,8 +105,7 @@ public final class WardrobeViewModel {
     }
 
     public func thumbnailData(for item: WardrobeItem) -> Data? {
-        item.illustrationFile.flatMap { try? thumbnails.data(forFile: $0) }
-            ?? (try? thumbnails.data(forFile: item.cutoutFile))
+        GarmentImage.data(for: item, in: thumbnails)
     }
 
     public func wearCount(for item: WardrobeItem) -> Int {

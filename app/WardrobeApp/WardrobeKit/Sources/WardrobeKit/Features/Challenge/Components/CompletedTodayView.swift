@@ -2,6 +2,7 @@ import DesignSystem
 import SwiftUI
 
 public struct CompletedTodayView: View {
+    let weather: (any WeatherRepository)?
     let onAccept: (ChallengeCard) -> Void
 
     public var body: some View {
@@ -20,6 +21,10 @@ public struct CompletedTodayView: View {
             Text("challenge.empty.text", bundle: .module)
                 .font(AppFont.body.weight(.bold))
                 .opacity(0.3)
+
+            if let weather {
+                WeatherOptInView(weather: weather)
+            }
         }
     }
 }

@@ -170,6 +170,112 @@ pub async fn render(
     })
 }
 
+pub struct Chat<'a> {
+    pub model: &'a str,
+    pub system: &'a str,
+    pub user: &'a str,
+    pub schema: serde_json::Value,
+    pub seed: i64,
+}
+
+pub struct Answered {
+    pub content: String,
+    pub provider_route: Option<String>,
+    pub input_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct ChatBody {
+    #[serde(default)]
+    choices: Vec<Choice>,
+    #[serde(default)]
+    provider: Option<String>,
+    #[serde(default)]
+    usage: Option<Usage>,
+}
+
+#[derive(Deserialize)]
+struct Choice {
+    #[serde(default)]
+    message: Option<Message>,
+}
+
+#[derive(Deserialize)]
+struct Message {
+    #[serde(default)]
+    content: Option<String>,
+}
+
+#[must_use]
+pub fn chat_payload(ask: &Chat<'_>) -> serde_json::Value {
+    serde_json::json!({
+        "model": ask.model,
+        "messages": [
+            { "role": "system", "content": ask.system },
+            { "role": "user", "content": ask.user }
+        ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": { "name": "reply", "strict": true, "schema": ask.schema }
+        },
+        "seed": ask.seed,
+        "provider": { "zdr": true }
+    })
+}
+
+/// # Errors
+///
+/// Classifies the status exactly as [`render`] does, and returns
+/// [`Failure::InvalidOutput`] when the reply carries no message content.
+pub async fn chat(
+    client: &reqwest::Client,
+    base_url: &str,
+    api_key: &str,
+    ask: &Chat<'_>,
+) -> Result<Answered, Rejection> {
+    let response = client
+        .post(format!("{base_url}/chat/completions"))
+        .bearer_auth(api_key)
+        .json(&chat_payload(ask))
+        .send()
+        .await
+        .map_err(|_| Rejection::plain(Failure::Unavailable))?;
+
+    let status = response.status().as_u16();
+    if !(200..300).contains(&status) {
+        return Err(Rejection {
+            failure: classify(status),
+            http_status: Some(status),
+        });
+    }
+
+    let body: ChatBody = response
+        .json()
+        .await
+        .map_err(|_| Rejection::plain(Failure::InvalidOutput))?;
+    let [choice] = body.choices.as_slice() else {
+        return Err(Rejection::plain(Failure::InvalidOutput));
+    };
+    let content = choice
+        .message
+        .as_ref()
+        .and_then(|message| message.content.as_deref())
+        .map(str::trim)
+        .filter(|content| !content.is_empty())
+        .ok_or(Rejection::plain(Failure::InvalidOutput))?;
+
+    Ok(Answered {
+        content: content.to_owned(),
+        provider_route: body.provider,
+        input_tokens: body.usage.as_ref().and_then(|usage| usage.prompt_tokens),
+        output_tokens: body
+            .usage
+            .as_ref()
+            .and_then(|usage| usage.completion_tokens),
+    })
+}
+
 fn classify(status: u16) -> Failure {
     match status {
         402 | 429 => Failure::Unavailable,

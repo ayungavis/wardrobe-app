@@ -10,6 +10,8 @@ enum SyncMutation: Sendable {
     case upsertPreferences(UpsertPreferencesArgsDTO)
     case resolveCompletion(ResolveCompletionArgsDTO)
     case completeChallenge(CompleteChallengeArgsDTO)
+    case upsertChallengeContext(UpsertChallengeContextArgsDTO)
+    case generateChallengeDeck(GenerateChallengeDeckArgsDTO)
 
     var name: String {
         switch self {
@@ -20,6 +22,8 @@ enum SyncMutation: Sendable {
         case .upsertPreferences: "upsertPreferences"
         case .resolveCompletion: "resolveCompletion"
         case .completeChallenge: Self.completeChallengeName
+        case .upsertChallengeContext: "upsertChallengeContext"
+        case .generateChallengeDeck: "generateChallengeDeck"
         }
     }
 
@@ -37,6 +41,8 @@ enum SyncMutation: Sendable {
         case let .upsertPreferences(args): return try encoder.encode(args)
         case let .resolveCompletion(args): return try encoder.encode(args)
         case let .completeChallenge(args): return try encoder.encode(args)
+        case let .upsertChallengeContext(args): return try encoder.encode(args)
+        case let .generateChallengeDeck(args): return try encoder.encode(args)
         }
     }
 }

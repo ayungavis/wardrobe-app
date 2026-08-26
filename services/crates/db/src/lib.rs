@@ -11,6 +11,7 @@ pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
 pub const ILLUSTRATION: &str = "illustration";
 pub const STYLISE_ILLUSTRATION: &str = "styliseIllustration";
+pub const CHALLENGE_DECK: &str = "challengeDeck";
 pub const STYLE_VERSION: &str = "v1";
 
 #[must_use]
