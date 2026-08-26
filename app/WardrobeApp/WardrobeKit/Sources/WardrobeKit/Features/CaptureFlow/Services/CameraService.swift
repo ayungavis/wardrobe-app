@@ -11,7 +11,7 @@ public protocol CameraService: AnyObject {
     var displayZoomFactor: CGFloat { get }
     var zoomOptions: [CGFloat] { get }
     func requestPermission() async -> CameraPermission
-    func startSession() async throws
+    func startSession(facing: CameraFacing) async throws
     func stopSession()
     func toggleCamera() async throws
     func toggleFlash()

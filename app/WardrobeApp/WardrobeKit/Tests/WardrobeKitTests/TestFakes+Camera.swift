@@ -69,11 +69,12 @@ final class FakeCameraService: CameraService {
         return permission
     }
 
-    func startSession() async throws {
+    func startSession(facing: CameraFacing) async throws {
         if let startError {
             throw startError
         }
         isConfigured = true
+        isUsingFrontCamera = facing == .front
     }
 
     func stopSession() {

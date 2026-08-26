@@ -77,6 +77,8 @@ struct CameraControlTests {
         let sut = makeSUT(camera: camera)
         sut.cameraAppeared()
         await sut.sessionTask?.value
+        sut.flipCamera() // the ultra-wide floor only exists on the back camera
+        await sut.flipTask?.value
 
         sut.setDisplayZoom(0.5)
         #expect(sut.displayZoomFactor == 0.5)
@@ -89,22 +91,48 @@ struct CameraControlTests {
         #expect(sut.displayZoomFactor == 0.5)
     }
 
+    @Test func theChallengeCameraOpensFacingTheUser() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let sut = makeSUT(camera: camera)
+
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
+
+        #expect(sut.isUsingFrontCamera, "an outfit photo is taken of the person holding the phone")
+    }
+
+    @Test func reopeningTheChallengeCameraReturnsToTheFront() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let sut = makeSUT(camera: camera)
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
+        sut.flipCamera()
+        await sut.flipTask?.value
+        #expect(!sut.isUsingFrontCamera)
+
+        sut.cameraDisappeared()
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
+
+        #expect(sut.isUsingFrontCamera, "the flip lasts for that session only; opening the screen asks again")
+    }
+
     @Test func backCameraOffersUltraWidePresetAndFrontDoesNot() async {
         let camera = FakeCameraService()
         camera.permission = .granted
         let sut = makeSUT(camera: camera)
         sut.cameraAppeared()
         await sut.sessionTask?.value
+        #expect(sut.isUsingFrontCamera, "the challenge camera opens facing the user")
+        #expect(sut.zoomOptions == [1, 2])
 
-        #expect(sut.zoomOptions == [0.5, 1, 2])
-        #expect(!sut.isUsingFrontCamera)
-
-        sut.setDisplayZoom(2)
         sut.flipCamera()
         await sut.flipTask?.value
 
-        #expect(sut.isUsingFrontCamera)
-        #expect(sut.zoomOptions == [1, 2])
+        #expect(!sut.isUsingFrontCamera)
+        #expect(sut.zoomOptions == [0.5, 1, 2])
         #expect(sut.displayZoomFactor == CameraZoom.standard) // new lens starts at 1x
     }
 
@@ -114,8 +142,7 @@ struct CameraControlTests {
         let sut = makeSUT(camera: camera)
         sut.cameraAppeared()
         await sut.sessionTask?.value
-        sut.flipCamera()
-        await sut.flipTask?.value
+        #expect(sut.zoomOptions == [1, 2])
 
         sut.toggleFrontZoom()
         #expect(sut.displayZoomFactor == 2)

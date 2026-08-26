@@ -154,7 +154,7 @@ public final class AddByCameraViewModel {
         sessionTask?.cancel()
         sessionTask = Task {
             do {
-                try await camera.startSession()
+                try await camera.startSession(facing: .back)
                 // ponytail: the device is only attached inside startSession, so the
                 // zoom presets do not exist until it returns.
                 syncCameraState()

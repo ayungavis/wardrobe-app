@@ -165,6 +165,17 @@ struct WardrobeCameraControlTests {
         #expect(sut.capturedThumbnails.isEmpty, "a stale thumbnail would credit the retake with a photo it does not have")
     }
 
+    @Test func theWardrobeCameraOpensFacingAway() async {
+        let (sut, camera) = makeSUT()
+        camera.permission = .granted
+        try? await camera.startSession(facing: .front)
+
+        await sut.onAppear()
+        await sut.settle()
+
+        #expect(!sut.isUsingFrontCamera, "the service is shared with the challenge camera; each screen has to claim its side")
+    }
+
     @Test func theWardrobeCameraForwardsZoomToTheService() async {
         let (sut, camera) = makeSUT()
         await sut.onAppear()
