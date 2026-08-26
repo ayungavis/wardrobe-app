@@ -92,6 +92,25 @@ struct WardrobeItemDetailViewModelTests {
                 "tapping the hero has to open the illustration, not the cut-out it replaced")
     }
 
+    @Test func theDetailScreenReloadsWhenAPullLands() {
+        let repository = InMemoryWardrobeItemRepository()
+        let item = WardrobeItem(category: .top, cutoutFile: "c.png", createdAt: Date(), updatedAt: Date())
+        try? repository.insert(item, fingerprint: nil, wear: nil)
+        let revision = ContentRevisionModel()
+        let sut = WardrobeItemDetailViewModel(
+            itemID: item.id, repository: repository,
+            thumbnails: InMemoryGarmentThumbnailRepository(), revision: revision
+        )
+        let before = sut.contentRevision
+
+        revision.bump()
+
+        #expect(
+            sut.contentRevision != before,
+            "the detail screen keys its .task on this; without it a landed pull never reaches the screen"
+        )
+    }
+
     private func makeSUT(
         itemID: UUID,
         repository: InMemoryWardrobeItemRepository,

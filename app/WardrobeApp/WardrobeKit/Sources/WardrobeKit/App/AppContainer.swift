@@ -147,6 +147,11 @@ public final class AppContainer {
         CropViewModel(photoID: photoID, photoRepository: photoRepository)
     }
 
+    public var isAwaitingIllustration: Bool {
+        ((try? makeWardrobeItemRepository().items()) ?? [])
+            .contains { $0.status == .pending || $0.status == .processing }
+    }
+
     public func makeWardrobeItemDetailViewModel(itemID: UUID) -> WardrobeItemDetailViewModel {
         WardrobeItemDetailViewModel(
             itemID: itemID,
@@ -156,7 +161,8 @@ public final class AppContainer {
             photos: photoRepository,
             syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) },
             scanner: makeGarmentScanService(allowsMatching: false),
-            uploads: makeMediaUploadRepository()
+            uploads: makeMediaUploadRepository(),
+            revision: contentRevision
         )
     }
 

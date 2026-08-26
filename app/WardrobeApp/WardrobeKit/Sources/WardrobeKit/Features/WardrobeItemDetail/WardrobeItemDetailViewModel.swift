@@ -25,6 +25,7 @@ public final class WardrobeItemDetailViewModel {
     private let syncNow: () async -> Void
     private let scanner: GarmentScanService?
     private let uploads: (any MediaUploadRepository)?
+    private let revision: ContentRevisionModel?
 
     private(set) var candidates: [ScannedGarment] = []
     private(set) var chosenCandidateID: UUID?
@@ -39,7 +40,8 @@ public final class WardrobeItemDetailViewModel {
         photos: PhotoRepository? = nil,
         syncNow: @escaping () async -> Void = {},
         scanner: GarmentScanService? = nil,
-        uploads: (any MediaUploadRepository)? = nil
+        uploads: (any MediaUploadRepository)? = nil,
+        revision: ContentRevisionModel? = nil
     ) {
         self.itemID = itemID
         self.repository = repository
@@ -49,6 +51,7 @@ public final class WardrobeItemDetailViewModel {
         self.syncNow = syncNow
         self.scanner = scanner
         self.uploads = uploads
+        self.revision = revision
     }
 
     // MARK: Derived from the wear records
@@ -210,6 +213,10 @@ public final class WardrobeItemDetailViewModel {
 
     var isRegenerating: Bool {
         item.map { $0.status == .pending || $0.status == .processing } ?? false
+    }
+
+    var contentRevision: Int {
+        revision?.revision ?? 0
     }
 
     var chosenCandidate: ScannedGarment? {

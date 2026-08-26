@@ -50,6 +50,17 @@ public struct RootView: View {
                 Task { await container.syncCoordinator.reconcile(.connectivityRestored) }
             }
         }
+        // ponytail: a heartbeat rather than a push. It only reaches the network
+        // while the server still owes an illustration; replace it the day push
+        // notifications exist.
+        .task {
+            while !Task.isCancelled {
+                let waiting = container.isAwaitingIllustration
+                try? await Task.sleep(for: waiting ? .seconds(3) : .seconds(10))
+                guard !Task.isCancelled, container.isAwaitingIllustration else { continue }
+                _ = await container.syncCoordinator.reconcile(.manual)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             presentConsentIfNeeded()

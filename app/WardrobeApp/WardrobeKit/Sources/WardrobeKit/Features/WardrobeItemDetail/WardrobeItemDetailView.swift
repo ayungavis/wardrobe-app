@@ -107,7 +107,7 @@ public struct WardrobeItemDetailView: View {
                 }
             }
         #endif
-            .task {
+            .task(id: viewModel.contentRevision) {
                 viewModel.load()
             }
             .onChange(of: viewModel.item) { _, newItem in
