@@ -5,6 +5,7 @@ enum SyncTrigger: String, Sendable, CaseIterable {
     case tabOpened
     case signedIn
     case connectivityRestored
+    case mutationQueued
     case manual
 }
 

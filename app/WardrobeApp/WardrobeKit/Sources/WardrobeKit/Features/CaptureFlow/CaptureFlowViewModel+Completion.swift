@@ -56,6 +56,7 @@ public extension CaptureFlowViewModel {
         isCompleted = true
         let cardID = challenge.card.id.uuidString
         Log.ui.info("Challenge completed: \(cardID, privacy: .public)")
+        await syncNow()
     }
 
     // ponytail: stored at full export size, roughly 300 KB a completion.

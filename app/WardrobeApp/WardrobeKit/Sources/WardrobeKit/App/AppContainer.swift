@@ -124,7 +124,8 @@ public final class AppContainer {
             thumbnails: garmentThumbnailRepository,
             preferences: preferencesRepository,
             outbox: makeOutboxRepository(),
-            uploads: makeMediaUploadRepository()
+            uploads: makeMediaUploadRepository(),
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }
 
@@ -156,7 +157,8 @@ public final class AppContainer {
         WardrobeItemDetailViewModel(
             itemID: itemID,
             repository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
+            thumbnails: garmentThumbnailRepository,
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }
 

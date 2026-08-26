@@ -33,6 +33,7 @@ public final class CaptureFlowViewModel {
     private let camera: CameraService
     let wardrobeRepository: WardrobeItemRepository
     let thumbnails: GarmentThumbnailRepository
+    let syncNow: () async -> Void
     private let preferences: AccountPreferencesRepository
     let activeRepository: ActiveChallengeRepository
     let completedRepository: CompletedChallengeRepository
@@ -61,7 +62,8 @@ public final class CaptureFlowViewModel {
         thumbnails: GarmentThumbnailRepository,
         preferences: AccountPreferencesRepository,
         outbox: any OutboxRepository,
-        uploads: any MediaUploadRepository
+        uploads: any MediaUploadRepository,
+        syncNow: @escaping () async -> Void = {}
     ) {
         self.challenge = challenge
         self.camera = camera
@@ -72,6 +74,7 @@ public final class CaptureFlowViewModel {
         self.library = library
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
+        self.syncNow = syncNow
         self.preferences = preferences
         self.outbox = outbox
         self.uploads = uploads

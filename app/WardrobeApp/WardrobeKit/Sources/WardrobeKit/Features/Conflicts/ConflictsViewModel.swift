@@ -30,6 +30,8 @@ public final class ConflictsViewModel {
     private let completions: CompletedChallengeRepository
     private let outbox: any OutboxRepository
     private let previews: CompletionPreviewRepository?
+    private let syncNow: () async -> Void
+    private(set) var syncTask: Task<Void, Never>?
     private let calendar: Calendar
 
     public init(
@@ -37,12 +39,14 @@ public final class ConflictsViewModel {
         completions: CompletedChallengeRepository,
         outbox: any OutboxRepository,
         previews: CompletionPreviewRepository? = nil,
+        syncNow: @escaping () async -> Void = {},
         calendar: Calendar = .current
     ) {
         self.wardrobe = wardrobe
         self.completions = completions
         self.outbox = outbox
         self.previews = previews
+        self.syncNow = syncNow
         self.calendar = calendar
     }
 
@@ -90,6 +94,7 @@ public final class ConflictsViewModel {
         try outbox.stage(mutation.queued(), at: Date())
         try completions.commitStaged()
         Log.ui.info("Completion conflict resolved")
+        push()
         load()
     }
 
@@ -102,10 +107,16 @@ public final class ConflictsViewModel {
         do {
             try wardrobe.resolveConflict(conflict, choosing: choice)
             Log.ui.info("Item conflict resolved: \(conflict.field.rawValue, privacy: .public)")
+            push()
         } catch {
             Log.report(error)
         }
         load()
+    }
+
+    private func push() {
+        syncTask?.cancel()
+        syncTask = Task { [syncNow] in await syncNow() }
     }
 
     private func currentValue(of conflict: ItemConflict, in item: WardrobeItem?) -> String? {

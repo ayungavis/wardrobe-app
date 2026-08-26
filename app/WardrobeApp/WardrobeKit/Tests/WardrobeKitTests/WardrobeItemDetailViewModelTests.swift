@@ -4,6 +4,28 @@ import Testing
 
 @MainActor
 struct WardrobeItemDetailViewModelTests {
+    @Test func askingForANewIllustrationPushesItStraightAway() async throws {
+        let repository = InMemoryWardrobeItemRepository()
+        let item = WardrobeItem(category: .top, cutoutFile: "a.png",
+                                createdAt: Date(), updatedAt: Date())
+        try repository.insert(item, fingerprint: nil, wear: nil)
+        let pushes = Pushes()
+        let sut = WardrobeItemDetailViewModel(
+            itemID: item.id,
+            repository: repository,
+            thumbnails: InMemoryGarmentThumbnailRepository(),
+            syncNow: { await pushes.record() }
+        )
+        sut.load()
+        await sut.loadTask?.value
+
+        sut.regenerateIllustration(note: "shorts")
+        await sut.syncTask?.value
+
+        #expect(await pushes.count == 1,
+                "a queue nobody drains until the next tab switch feels broken to the person waiting")
+    }
+
     private let version = "v1+vision2"
 
     private func makeSUT(
@@ -189,5 +211,13 @@ struct WardrobeItemDetailViewModelTests {
         #expect(repository.storedItems.map(\.id) == [survivor.id])
         #expect(repository.storedWears.count == 2)
         #expect(repository.storedFingerprints.count == 1)
+    }
+}
+
+actor Pushes {
+    private(set) var count = 0
+
+    func record() {
+        count += 1
     }
 }

@@ -15,18 +15,23 @@ public final class WardrobeItemDetailViewModel {
     private(set) var state: Loadable<Detail> = .idle
     private(set) var loadTask: Task<Void, Never>?
 
+    private(set) var syncTask: Task<Void, Never>?
+
     private let itemID: UUID
     private let repository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
+    private let syncNow: () async -> Void
 
     init(
         itemID: UUID,
         repository: WardrobeItemRepository,
-        thumbnails: GarmentThumbnailRepository
+        thumbnails: GarmentThumbnailRepository,
+        syncNow: @escaping () async -> Void = {}
     ) {
         self.itemID = itemID
         self.repository = repository
         self.thumbnails = thumbnails
+        self.syncNow = syncNow
     }
 
     // MARK: Derived from the wear records
@@ -125,6 +130,7 @@ public final class WardrobeItemDetailViewModel {
             }
             isDeleted = true
             Log.ui.info("Wardrobe: item deleted")
+            push()
         } catch {
             Log.report(error)
         }
@@ -148,10 +154,16 @@ public final class WardrobeItemDetailViewModel {
                 try? thumbnails.delete(file: illustration)
             }
             Log.ui.info("Wardrobe: items merged")
+            push()
             load()
         } catch {
             Log.report(error)
         }
+    }
+
+    private func push() {
+        syncTask?.cancel()
+        syncTask = Task { [syncNow] in await syncNow() }
     }
 
     var isRegenerating: Bool {
@@ -163,6 +175,7 @@ public final class WardrobeItemDetailViewModel {
         do {
             try repository.regenerateIllustration(itemID: item.id, note: note)
             Log.ui.info("Wardrobe: illustration asked for again")
+            push()
             load()
         } catch {
             Log.report(error)
@@ -181,6 +194,7 @@ public final class WardrobeItemDetailViewModel {
                 state = .loaded(Detail(item: updated, wears: detail.wears, similar: detail.similar))
             }
             Log.ui.info("Wardrobe: item updated")
+            push()
         } catch {
             Log.report(error)
         }
