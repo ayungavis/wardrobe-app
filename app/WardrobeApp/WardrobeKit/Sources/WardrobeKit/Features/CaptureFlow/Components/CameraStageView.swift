@@ -44,7 +44,8 @@ struct CameraStageView: View {
                 assets: viewModel.recentAssets,
                 thumbnail: { await viewModel.thumbnail(forAsset: $0) },
                 onPick: { viewModel.importAsset(id: $0) },
-                onPickData: { viewModel.usePickedPhoto($0) }
+                onPickData: { viewModel.usePickedPhoto($0) },
+                onLoadMore: { viewModel.loadMoreAssets() }
             )
         }
     }

@@ -10,6 +10,7 @@ struct PhotoLibraryGridView: View {
     let thumbnail: @Sendable (String) async -> CGImage?
     let onPick: (String) -> Void
     let onPickData: (Data) -> Void
+    let onLoadMore: () -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
@@ -49,6 +50,11 @@ struct PhotoLibraryGridView: View {
                         PhotoGridCellView(assetID: asset.id, thumbnail: thumbnail)
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        if asset == assets.last {
+                            onLoadMore()
+                        }
+                    }
                 }
             }
         }

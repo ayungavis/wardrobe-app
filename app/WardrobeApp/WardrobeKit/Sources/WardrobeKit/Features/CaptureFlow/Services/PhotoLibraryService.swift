@@ -4,22 +4,55 @@ import Foundation
 public protocol PhotoLibraryService: Sendable {
     func access() async -> PhotoLibraryAccess
     func requestAccess() async -> PhotoLibraryAccess
-    func recentAssets(limit: Int) async -> [PhotoAsset]
+    func assets(from offset: Int, limit: Int) async -> [PhotoAsset]
+    func resetAssetPaging() async
     func thumbnail(for id: String, maxPixel: CGFloat) async -> CGImage?
     func imageData(for id: String) async -> Data?
 }
 
 public extension PhotoLibraryService {
     func latestPhotoThumbnail(maxPixel: CGFloat) async -> CGImage? {
-        guard let asset = await recentAssets(limit: 1).first else { return nil }
+        guard let asset = await assets(from: 0, limit: 1).first else { return nil }
         return await thumbnail(for: asset.id, maxPixel: maxPixel)
     }
 }
 
 #if os(iOS)
     import Photos
+    import Synchronization
+
+    private final class PendingImageRequest: Sendable {
+        private struct State {
+            var request: PHImageRequestID?
+            var isCancelled = false
+        }
+
+        private let state = Mutex(State())
+
+        func adopt(_ request: PHImageRequestID, cancelling manager: PHImageManager) {
+            let cancelNow = state.withLock { state -> Bool in
+                state.request = request
+                return state.isCancelled
+            }
+            if cancelNow {
+                manager.cancelImageRequest(request)
+            }
+        }
+
+        func cancel(with manager: PHImageManager) {
+            let request = state.withLock { state -> PHImageRequestID? in
+                state.isCancelled = true
+                return state.request
+            }
+            if let request {
+                manager.cancelImageRequest(request)
+            }
+        }
+    }
 
     public actor PHPhotoLibraryService: PhotoLibraryService {
+        private var fetched: PHFetchResult<PHAsset>?
+
         public init() {}
 
         public func access() async -> PhotoLibraryAccess {
@@ -30,18 +63,25 @@ public extension PhotoLibraryService {
             await Self.map(PHPhotoLibrary.requestAuthorization(for: .readWrite))
         }
 
-        public func recentAssets(limit: Int) async -> [PhotoAsset] {
+        public func resetAssetPaging() {
+            fetched = nil
+        }
+
+        public func assets(from offset: Int, limit: Int) async -> [PhotoAsset] {
             guard await access().canBrowse else { return [] }
 
+            let result = fetched ?? Self.fetchAll()
+            fetched = result
+
+            guard offset < result.count else { return [] }
+            let upper = min(offset + limit, result.count)
+            return (offset ..< upper).map { PhotoAsset(id: result.object(at: $0).localIdentifier) }
+        }
+
+        private static func fetchAll() -> PHFetchResult<PHAsset> {
             let options = PHFetchOptions()
             options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            options.fetchLimit = limit
-
-            var assets: [PhotoAsset] = []
-            PHAsset.fetchAssets(with: .image, options: options).enumerateObjects { asset, _, _ in
-                assets.append(PhotoAsset(id: asset.localIdentifier))
-            }
-            return assets
+            return PHAsset.fetchAssets(with: .image, options: options)
         }
 
         public func thumbnail(for id: String, maxPixel: CGFloat) async -> CGImage? {
@@ -50,18 +90,28 @@ public extension PhotoLibraryService {
             let options = PHImageRequestOptions()
             options.isNetworkAccessAllowed = false
             options.resizeMode = .fast
-            options.deliveryMode = .highQualityFormat
+            // ponytail: fastFormat calls the handler exactly once. opportunistic
+            // calls it twice, and a checked continuation resumed twice traps.
+            options.deliveryMode = .fastFormat
 
             let size = CGSize(width: maxPixel, height: maxPixel)
-            return await withCheckedContinuation { continuation in
-                PHImageManager.default().requestImage(
-                    for: asset,
-                    targetSize: size,
-                    contentMode: .aspectFill,
-                    options: options
-                ) { image, _ in
-                    continuation.resume(returning: image?.cgImage)
+            let manager = PHImageManager.default()
+            let pending = PendingImageRequest()
+
+            return await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    let request = manager.requestImage(
+                        for: asset,
+                        targetSize: size,
+                        contentMode: .aspectFill,
+                        options: options
+                    ) { image, _ in
+                        continuation.resume(returning: image?.cgImage)
+                    }
+                    pending.adopt(request, cancelling: manager)
                 }
+            } onCancel: {
+                pending.cancel(with: manager)
             }
         }
 
@@ -106,9 +156,11 @@ public extension PhotoLibraryService {
             .denied
         }
 
-        public func recentAssets(limit _: Int) async -> [PhotoAsset] {
+        public func assets(from _: Int, limit _: Int) async -> [PhotoAsset] {
             []
         }
+
+        public func resetAssetPaging() async {}
 
         public func thumbnail(for _: String, maxPixel _: CGFloat) async -> CGImage? {
             nil

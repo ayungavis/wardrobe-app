@@ -200,6 +200,19 @@ struct ConventionsTests {
     /// C4: a store file declares stores and storage entities, nothing else. A
     /// domain-shaped value defined inside `Core/Stores/` is a repository concern
     /// wearing the wrong address, and the domain layer ends up importing it.
+    @Test func storeFilesDeclareOnlyStoresAndEntities() throws {
+        var offenders: [String] = []
+        for file in try sources() where file.path.contains("/Core/Stores/") {
+            for (index, line) in file.lines.enumerated() {
+                guard let name = Self.declaredType(on: line) else { continue }
+                if !name.hasSuffix("Store"), !name.hasSuffix("Entity") {
+                    offenders.append("\(file.name):\(index + 1) declares \(name)")
+                }
+            }
+        }
+        #expect(offenders.isEmpty, "\(offenders)")
+    }
+
     @Test func glassEffectIsNeverBuriedInABackgroundShape() throws {
         for file in try sources() {
             let source = file.lines.joined(separator: "\n")
@@ -214,19 +227,6 @@ struct ConventionsTests {
                 )
             }
         }
-    }
-
-    @Test func storeFilesDeclareOnlyStoresAndEntities() throws {
-        var offenders: [String] = []
-        for file in try sources() where file.path.contains("/Core/Stores/") {
-            for (index, line) in file.lines.enumerated() {
-                guard let name = Self.declaredType(on: line) else { continue }
-                if !name.hasSuffix("Store"), !name.hasSuffix("Entity") {
-                    offenders.append("\(file.name):\(index + 1) declares \(name)")
-                }
-            }
-        }
-        #expect(offenders.isEmpty, "\(offenders)")
     }
 
     /// C5: every file under `Core/Services/` is `<Name>Service.swift`, per the
