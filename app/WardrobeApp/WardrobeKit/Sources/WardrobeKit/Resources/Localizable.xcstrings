@@ -6600,6 +6600,23 @@
         }
       }
     },
+    "wardrobe.detail.illustration.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View illustration"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lihat ilustrasi"
+          }
+        }
+      }
+    },
     "wardrobe.detail.illustration.pending": {
       "localizations": {
         "en": {
