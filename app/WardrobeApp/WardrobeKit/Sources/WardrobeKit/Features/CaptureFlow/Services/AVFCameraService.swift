@@ -39,10 +39,12 @@
             return permission
         }
 
-        public func startSession() async throws {
+        public func startSession(facing: CameraFacing) async throws {
             guard permission == .granted else { throw AppError.cameraUnavailable }
+            let wanted: AVCaptureDevice.Position = facing == .front ? .front : .back
 
             if !isConfigured {
+                position = wanted
                 // ponytail: configuration on the main actor; move to a session
                 // queue if Instruments shows startup jank.
                 session.beginConfiguration()
@@ -59,6 +61,8 @@
                 session.commitConfiguration()
                 adoptInput(input)
                 isConfigured = true
+            } else if position != wanted {
+                try use(wanted)
             }
 
             guard !session.isRunning else { return }
@@ -67,8 +71,11 @@
         }
 
         public func toggleCamera() async throws {
-            guard isConfigured, let oldInput = currentInput else { return }
-            let newPosition: AVCaptureDevice.Position = position == .back ? .front : .back
+            try use(position == .back ? .front : .back)
+        }
+
+        private func use(_ newPosition: AVCaptureDevice.Position) throws {
+            guard isConfigured, let oldInput = currentInput, newPosition != position else { return }
 
             session.beginConfiguration()
             session.removeInput(oldInput)

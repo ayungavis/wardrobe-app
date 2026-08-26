@@ -46,9 +46,7 @@ struct CategoryGridView: View {
                     .foregroundStyle(AppColor.textPrimary)
                     .padding(.vertical, Spacing.sm)
                     .padding(.horizontal, Spacing.md)
-                    .background(Capsule()
-                        .fill(.clear)
-                        .glassEffect(.clear))
+                    .glassEffect(.regular, in: .capsule)
                 }
             }
             .padding(Spacing.lg)

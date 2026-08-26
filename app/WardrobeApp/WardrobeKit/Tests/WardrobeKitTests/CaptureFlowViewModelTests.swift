@@ -295,3 +295,21 @@ struct CaptureFlowViewModelTests {
         #expect(!sut.didResumeDraft)
     }
 }
+
+@MainActor
+struct ChallengeCameraZoomTests {
+    @Test func theChallengeCameraLearnsItsZoomOptionsOnceTheSessionStarts() async {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let sut = makeCaptureFlowSUT(camera: camera)
+
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
+
+        #expect(
+            sut.zoomOptions == camera.zoomOptions,
+            "the device is attached inside startSession, so syncing before it leaves one zoom option and a dead pinch"
+        )
+        #expect(sut.zoomOptions.count > 1)
+    }
+}

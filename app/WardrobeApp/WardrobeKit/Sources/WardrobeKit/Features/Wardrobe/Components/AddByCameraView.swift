@@ -140,38 +140,64 @@ struct AddByCameraView: View {
     }
 
     private var cameraContent: some View {
-        ZStack(alignment: .bottom) {
-            #if os(iOS)
-                if let session = viewModel.previewSession {
-                    CameraPreviewView(session: session)
-                        .ignoresSafeArea()
-                }
-            #endif
+        ZStack {
+            CameraViewfinderView(model: viewModel)
 
-            VStack(spacing: Spacing.md) {
-                if viewModel.capturedCount > 0 {
-                    Text("bulkScan.captured \(viewModel.capturedCount)", bundle: .module)
-                        .font(AppFont.caption)
-                        .foregroundStyle(AppColor.onMedia)
-                        .padding(.horizontal, Spacing.md)
-                        .padding(.vertical, Spacing.sm)
-                        .background(Capsule().fill(.ultraThinMaterial))
+            VStack {
+                cameraTopBar
+                Spacer()
+                CameraZoomControlView(
+                    options: viewModel.zoomOptions,
+                    selected: viewModel.displayZoomFactor,
+                    isFrontCamera: viewModel.isUsingFrontCamera,
+                    onSelect: viewModel.setDisplayZoom,
+                    onToggle: viewModel.toggleFrontZoom
+                )
+                captureBar
+            }
+            .padding(Spacing.xl)
+        }
+        .sensoryFeedback(.impact, trigger: viewModel.isCapturing) { _, new in new }
+    }
+
+    private var cameraTopBar: some View {
+        HStack {
+            Spacer()
+            MediaCircleButtonView(systemName: viewModel.isFlashOn ? "bolt.fill" : "bolt.slash") {
+                viewModel.toggleFlash()
+            }
+            .accessibilityLabel(Text("capture.camera.flash", bundle: .module))
+            Spacer()
+        }
+    }
+
+    private var captureBar: some View {
+        ZStack {
+            Button {
+                viewModel.capture()
+            } label: {
+                Circle()
+                    .strokeBorder(AppColor.onMedia, lineWidth: 5)
+                    .frame(width: 80, height: 80)
+                    .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(Spacing.sm))
+            }
+            .disabled(viewModel.isCapturing)
+            .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
+
+            HStack {
+                CapturedStackView(
+                    thumbnails: viewModel.capturedThumbnails,
+                    count: viewModel.capturedCount
+                ) {
+                    Task { await viewModel.beginReview() }
                 }
 
-                Button {
-                    viewModel.capture()
-                } label: {
-                    Circle()
-                        .fill(AppColor.onMedia)
-                        .frame(width: 72, height: 72)
-                        .overlay(
-                            Circle()
-                                .stroke(AppColor.onMedia.opacity(0.5), lineWidth: 4)
-                                .frame(width: 84, height: 84)
-                        )
+                Spacer()
+
+                MediaCircleButtonView(systemName: "arrow.triangle.2.circlepath.camera") {
+                    viewModel.flipCamera()
                 }
-                .disabled(viewModel.isCapturing)
-                .padding(.bottom, Spacing.xl)
+                .accessibilityLabel(Text("capture.camera.flip", bundle: .module))
             }
         }
     }

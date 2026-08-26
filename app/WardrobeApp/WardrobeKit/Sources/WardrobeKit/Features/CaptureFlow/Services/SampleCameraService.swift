@@ -17,9 +17,6 @@ public final class SampleCameraService: CameraService {
             if arguments.contains("-cameraGranted") {
                 permission = .granted
             }
-            if arguments.contains("-frontCamera") {
-                isUsingFrontCamera = true
-            }
         #endif
     }
 
@@ -37,7 +34,10 @@ public final class SampleCameraService: CameraService {
         isUsingFrontCamera ? [1, 2] : CameraZoom.presets
     }
 
-    public func startSession() async throws {}
+    public func startSession(facing: CameraFacing) async throws {
+        isUsingFrontCamera = facing == .front
+    }
+
     public func stopSession() {}
 
     public func toggleCamera() async throws {

@@ -109,3 +109,102 @@ struct AddByCameraViewModelTests {
         #expect(sut.alertError == .cameraUnavailable)
     }
 }
+
+@MainActor
+struct WardrobeCameraControlTests {
+    private func makeSUT() -> (AddByCameraViewModel, FakeCameraService) {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let review = GarmentReviewModel(
+            scanner: FakeGarmentScanService(),
+            photoRepository: SpyPhotoRepository(),
+            wardrobeRepository: InMemoryWardrobeItemRepository(),
+            thumbnails: InMemoryGarmentThumbnailRepository()
+        )
+        return (AddByCameraViewModel(camera: camera, review: review), camera)
+    }
+
+    @Test func theCameraKeepsAThumbnailForEachCapture() async {
+        let (sut, camera) = makeSUT()
+        camera.captureResult = .success(jpegFixture())
+        await sut.onAppear()
+
+        sut.capture()
+        await sut.settle()
+        sut.capture()
+        await sut.settle()
+
+        #expect(sut.capturedCount == 2)
+        #expect(sut.capturedThumbnails.count == 2, "the stack shows what was taken, not just how many")
+    }
+
+    @Test func theStackKeepsOnlyTheThreeMostRecentCaptures() async {
+        let (sut, camera) = makeSUT()
+        camera.captureResult = .success(jpegFixture())
+        await sut.onAppear()
+
+        for _ in 0 ..< 4 {
+            sut.capture()
+            await sut.settle()
+        }
+
+        #expect(sut.capturedCount == 4, "the badge counts every photo")
+        #expect(sut.capturedThumbnails.count == 3, "a long bulk scan must not pile up decoded images")
+    }
+
+    @Test func retakingClearsTheCapturedStack() async {
+        let (sut, camera) = makeSUT()
+        camera.captureResult = .success(jpegFixture())
+        await sut.onAppear()
+        sut.capture()
+        await sut.settle()
+
+        sut.resumeCapturing()
+
+        #expect(sut.capturedCount == 0)
+        #expect(sut.capturedThumbnails.isEmpty, "a stale thumbnail would credit the retake with a photo it does not have")
+    }
+
+    @Test func theWardrobeCameraOpensFacingAway() async {
+        let (sut, camera) = makeSUT()
+        camera.permission = .granted
+        try? await camera.startSession(facing: .front)
+
+        await sut.onAppear()
+        await sut.settle()
+
+        #expect(!sut.isUsingFrontCamera, "the service is shared with the challenge camera; each screen has to claim its side")
+    }
+
+    @Test func theWardrobeCameraForwardsZoomToTheService() async {
+        let (sut, camera) = makeSUT()
+        await sut.onAppear()
+        await sut.settle()
+
+        sut.setDisplayZoom(2)
+
+        #expect(camera.displayZoomFactor == 2)
+        #expect(sut.displayZoomFactor == 2, "the view reads the model, so it has to mirror the service")
+    }
+
+    @Test func theWardrobeCameraForwardsFocusFlashAndFlip() async {
+        let (sut, camera) = makeSUT()
+        await sut.onAppear()
+        await sut.settle()
+
+        sut.focus(at: CGPoint(x: 0.25, y: 0.75))
+        sut.toggleFlash()
+
+        #expect(camera.focusPoints == [CGPoint(x: 0.25, y: 0.75)])
+        #expect(camera.isFlashOn)
+        #expect(sut.isFlashOn)
+    }
+
+    @Test func theWardrobeCameraReportsTheServicesZoomOptions() async {
+        let (sut, camera) = makeSUT()
+        await sut.onAppear()
+        await sut.settle()
+
+        #expect(sut.zoomOptions == camera.zoomOptions, "the presets belong to the device, not the view")
+    }
+}

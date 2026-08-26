@@ -105,42 +105,42 @@ public struct WardrobeView: View {
     }
 
     private var topBar: some View {
-        HStack {
-            WardrobeSearchBarView(query: $viewModel.searchQuery, isActive: $isSearching)
+        GlassEffectContainer {
+            HStack {
+                WardrobeSearchBarView(query: $viewModel.searchQuery, isActive: $isSearching)
 
-            if !isSearching {
-                Spacer()
-            }
+                if !isSearching {
+                    Spacer()
+                }
 
-            Menu {
-                Button {
-                    isCameraScanPresented = true
-                } label: {
-                    Label { Text("wardrobe.add.camera", bundle: .module) } icon: { Image(systemName: "camera") }
-                }
-                Button {
-                    isBulkScanPresented = true
-                } label: {
-                    Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
-                }
-            } label: {
-                HStack {
-                    if !isSearching {
-                        Text("wardrobe.add.title", bundle: .module)
+                Menu {
+                    Button {
+                        isCameraScanPresented = true
+                    } label: {
+                        Label { Text("wardrobe.add.camera", bundle: .module) } icon: { Image(systemName: "camera") }
                     }
-                    Image(systemName: "plus.app")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 20, height: 20)
+                    Button {
+                        isBulkScanPresented = true
+                    } label: {
+                        Label { Text("wardrobe.add.photos", bundle: .module) } icon: { Image(systemName: "photo.on.rectangle") }
+                    }
+                } label: {
+                    HStack {
+                        if !isSearching {
+                            Text("wardrobe.add.title", bundle: .module)
+                        }
+                        Image(systemName: "plus.app")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 20, height: 20)
+                    }
+                    .font(AppFont.roundedTitle2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(AppColor.textPrimary)
+                    .padding(.vertical, Spacing.sm)
+                    .padding(.horizontal, isSearching ? Spacing.sm : Spacing.md)
+                    .glassEffect(.regular, in: .capsule)
                 }
-                .font(AppFont.roundedTitle2)
-                .fontWeight(.semibold)
-                .foregroundStyle(AppColor.textPrimary)
-                .padding(.vertical, Spacing.sm)
-                .padding(.horizontal, isSearching ? Spacing.sm : Spacing.md)
-                .background(Capsule()
-                    .fill(.clear)
-                    .glassEffect(.clear))
             }
         }
         .padding(.horizontal, Spacing.md)

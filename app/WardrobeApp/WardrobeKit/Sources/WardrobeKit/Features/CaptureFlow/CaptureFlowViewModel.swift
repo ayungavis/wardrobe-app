@@ -19,6 +19,8 @@ public final class CaptureFlowViewModel {
     public private(set) var libraryAccess: PhotoLibraryAccess = .notDetermined
     public private(set) var recentAssets: [PhotoAsset] = []
     public private(set) var isTipsPresented = false
+    public internal(set) var timer: CaptureTimer = .off
+    public internal(set) var countdown: Int?
     public var isGalleryPresented = false
 
     private let library: PhotoLibraryService
@@ -31,6 +33,7 @@ public final class CaptureFlowViewModel {
     public let review: GarmentReviewModel
 
     private let camera: CameraService
+    let sleep: @Sendable (Duration) async throws -> Void
     let wardrobeRepository: WardrobeItemRepository
     let thumbnails: GarmentThumbnailRepository
     let syncNow: () async -> Void
@@ -47,6 +50,10 @@ public final class CaptureFlowViewModel {
     private(set) var flipTask: Task<Void, Never>?
     private(set) var importTask: Task<Void, Never>?
     private(set) var thumbnailTask: Task<Void, Never>?
+    var countdownTask: Task<Void, Never>?
+    private(set) var assetsTask: Task<Void, Never>?
+    private var hasMoreAssets = true
+    private var isLoadingAssets = false
     var completionTask: Task<Void, Never>?
 
     public init(
@@ -63,10 +70,12 @@ public final class CaptureFlowViewModel {
         preferences: AccountPreferencesRepository,
         outbox: any OutboxRepository,
         uploads: any MediaUploadRepository,
-        syncNow: @escaping () async -> Void = {}
+        syncNow: @escaping () async -> Void = {},
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.challenge = challenge
         self.camera = camera
+        self.sleep = sleep
         self.activeRepository = activeRepository
         self.completedRepository = completedRepository
         self.photoRepository = photoRepository
@@ -151,7 +160,10 @@ public final class CaptureFlowViewModel {
         sessionTask?.cancel()
         sessionTask = Task {
             do {
-                try await camera.startSession()
+                try await camera.startSession(facing: .front)
+                // ponytail: the device is only attached inside startSession, so the
+                // zoom presets do not exist until it returns.
+                syncCameraState()
             } catch is CancellationError {
             } catch {
                 Log.report(error, logger: Log.ui)
@@ -162,6 +174,8 @@ public final class CaptureFlowViewModel {
 
     public func cameraDisappeared() {
         sessionTask?.cancel()
+        assetsTask?.cancel()
+        cancelCountdown()
         camera.stopSession()
     }
 
@@ -189,7 +203,7 @@ public final class CaptureFlowViewModel {
 
     // MARK: Capture (FR-016)
 
-    public func capture() {
+    func captureNow() {
         guard !isCapturing else { return }
         isCapturing = true
 
@@ -285,20 +299,33 @@ public extension CaptureFlowViewModel {
             libraryAccess = access
 
             guard access.canBrowse else { return }
-            let assets = await library.recentAssets(limit: Self.recentAssetLimit)
+            await library.resetAssetPaging()
+            let assets = await library.assets(from: 0, limit: Self.assetPageSize)
             var thumbnail: CGImage?
             if let newest = assets.first {
                 thumbnail = await library.thumbnail(for: newest.id, maxPixel: 120)
             }
             guard !Task.isCancelled else { return }
             recentAssets = assets
+            hasMoreAssets = assets.count == Self.assetPageSize
             galleryThumbnail = thumbnail
         }
     }
 
-    // ponytail: newest 120 photos, no paging — plenty for picking an outfit
-    // shot; add paging if anyone scrolls to the bottom and complains.
-    private static let recentAssetLimit = 120
+    func loadMoreAssets() {
+        guard hasMoreAssets, !isLoadingAssets, libraryAccess.canBrowse else { return }
+        isLoadingAssets = true
+        assetsTask = Task { [library] in
+            defer { isLoadingAssets = false }
+            let offset = recentAssets.count
+            let page = await library.assets(from: offset, limit: Self.assetPageSize)
+            guard !Task.isCancelled else { return }
+            recentAssets.append(contentsOf: page)
+            hasMoreAssets = page.count == Self.assetPageSize
+        }
+    }
+
+    private static let assetPageSize = 60
 
     func importAsset(id: String) {
         importTask?.cancel()

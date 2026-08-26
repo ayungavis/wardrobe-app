@@ -189,6 +189,7 @@ actor FakePhotoLibrary: PhotoLibraryService {
     private var thumbnailImage: CGImage?
     private var data: Data?
     private(set) var requestAccessCount = 0
+    private(set) var fetchCount = 0
 
     init(
         access: PhotoLibraryAccess = .notDetermined,
@@ -214,9 +215,13 @@ actor FakePhotoLibrary: PhotoLibraryService {
         return currentAccess
     }
 
-    func recentAssets(limit: Int) async -> [PhotoAsset] {
-        currentAccess.canBrowse ? Array(assets.prefix(limit)) : []
+    func assets(from offset: Int, limit: Int) async -> [PhotoAsset] {
+        fetchCount += 1
+        guard currentAccess.canBrowse, offset < assets.count else { return [] }
+        return Array(assets[offset ..< min(offset + limit, assets.count)])
     }
+
+    func resetAssetPaging() async {}
 
     func thumbnail(for _: String, maxPixel _: CGFloat) async -> CGImage? {
         thumbnailImage

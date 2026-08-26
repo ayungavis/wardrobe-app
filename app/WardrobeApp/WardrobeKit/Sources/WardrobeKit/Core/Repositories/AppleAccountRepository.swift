@@ -16,11 +16,11 @@ public struct StoredAppleAccountRepository: AppleAccountRepository {
     }
 
     public func load() -> AppleAccount? {
-        store.load(AppleAccount.self, forKey: Self.key)
+        store.load(AppleAccount.self, forKey: Self.key)?.normalized
     }
 
     public func save(_ account: AppleAccount) throws {
-        try store.save(load().map { $0.merged(with: account) } ?? account, forKey: Self.key)
+        try store.save((load().map { $0.merged(with: account) } ?? account).normalized, forKey: Self.key)
     }
 
     public func clear() throws {

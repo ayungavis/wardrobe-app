@@ -51,6 +51,23 @@
         }
       }
     },
+    "capture.camera.cancelTimer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel timer"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batalkan timer"
+          }
+        }
+      }
+    },
     "capture.camera.capture": {
       "localizations": {
         "en": {
@@ -127,6 +144,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamera contoh (perangkat ini tanpa kamera)"
+          }
+        }
+      }
+    },
+    "capture.camera.timer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Self-timer"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer otomatis"
+          }
+        }
+      }
+    },
+    "capture.camera.timer.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mati"
           }
         }
       }

@@ -15,6 +15,47 @@ struct AppleAccountTests {
         #expect(merged.email == "ada@example.com")
     }
 
+    @Test func appleSendsAnEmptyNameAsAnEmptyStringNotNil() {
+        let formatted = PersonNameComponents().formatted(.name(style: .medium))
+
+        #expect(
+            formatted.isEmpty,
+            """
+            This is the platform behaviour the normalisation below exists for: after the first \
+            authorisation Apple returns empty name components, and formatting those yields an \
+            empty string rather than nil.
+            """
+        )
+    }
+
+    @Test func aBlankAppleNameNeverBecomesAnAccountField() {
+        let profile = AppleProfile(fullName: "", email: "   ")
+
+        #expect(profile.fullName == nil)
+        #expect(profile.email == nil, "a blank field renders as an empty row, which reads as a broken screen")
+    }
+
+    @Test func anAccountAlreadyStoredBlankHealsWhenItIsRead() throws {
+        let store = InMemorySecureStore()
+        let accounts = StoredAppleAccountRepository(store: store)
+        try store.save(AppleAccount(accountID: Self.one, fullName: "", email: ""), forKey: "appleAccount")
+
+        let loaded = try #require(accounts.load())
+
+        #expect(loaded.accountID == Self.one)
+        #expect(loaded.fullName == nil, "an account stored blank before the fix has to heal on read")
+        #expect(loaded.email == nil)
+    }
+
+    @Test func aLaterSignInWithABlankNameKeepsTheStoredOne() {
+        let first = AppleAccount(accountID: Self.one, fullName: "Ada Lovelace", email: "ada@example.com")
+
+        let merged = first.merged(with: AppleAccount(accountID: Self.one, fullName: "", email: ""))
+
+        #expect(merged.fullName == "Ada Lovelace", "a repeat sign-in sends nothing; it must not erase what is known")
+        #expect(merged.email == "ada@example.com")
+    }
+
     @Test func newerDetailsWin() {
         let first = AppleAccount(accountID: Self.one, fullName: "Ada", email: nil)
 

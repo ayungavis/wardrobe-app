@@ -5,30 +5,15 @@ struct CameraStageView: View {
     let viewModel: CaptureFlowViewModel
     let onClose: () -> Void
 
-    @State private var viewfinderSize: CGSize = .zero
-    @State private var zoomStartValue: CGFloat?
-    @State private var focusIndicator: FocusIndicator?
-
-    private struct FocusIndicator: Equatable, Identifiable {
-        let id = UUID()
-        let point: CGPoint
-    }
-
     var body: some View {
         @Bindable var viewModel = viewModel
 
         return ZStack {
             AppColor.mediaBackground.ignoresSafeArea()
 
-            viewfinder
-                .onGeometryChange(for: CGSize.self) { proxy in
-                    proxy.size
-                } action: { newSize in
-                    viewfinderSize = newSize
-                }
-                .gesture(focusTapGesture)
-                .simultaneousGesture(zoomGesture)
-                .overlay { focusSquare }
+            CameraViewfinderView(model: viewModel)
+
+            countdownOverlay
 
             VStack {
                 topBar
@@ -45,6 +30,7 @@ struct CameraStageView: View {
             .padding(Spacing.xl)
         }
         .sensoryFeedback(.impact, trigger: viewModel.isCapturing) { _, new in new }
+        .sensoryFeedback(.impact, trigger: viewModel.countdown)
         .task {
             viewModel.cameraAppeared()
             viewModel.prepareLibraryAccess()
@@ -58,7 +44,8 @@ struct CameraStageView: View {
                 assets: viewModel.recentAssets,
                 thumbnail: { await viewModel.thumbnail(forAsset: $0) },
                 onPick: { viewModel.importAsset(id: $0) },
-                onPickData: { viewModel.usePickedPhoto($0) }
+                onPickData: { viewModel.usePickedPhoto($0) },
+                onLoadMore: { viewModel.loadMoreAssets() }
             )
         }
     }
@@ -79,7 +66,32 @@ struct CameraStageView: View {
 
             Spacer()
 
-            Color.clear.frame(width: 44, height: 44)
+            CaptureTimerButtonView(timer: viewModel.timer) {
+                viewModel.cycleTimer()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var countdownOverlay: some View {
+        if let countdown = viewModel.countdown {
+            Text(countdown, format: .number)
+                .font(.system(size: 120, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColor.onMedia)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy, value: countdown)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var shutterCore: some View {
+        if viewModel.countdown == nil {
+            Circle().fill(AppColor.onMedia.opacity(0.35))
+        } else {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(AppColor.onMedia)
+                .padding(Spacing.lg)
         }
     }
 
@@ -91,10 +103,14 @@ struct CameraStageView: View {
                 Circle()
                     .strokeBorder(AppColor.onMedia, lineWidth: 5)
                     .frame(width: 80, height: 80)
-                    .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(Spacing.sm))
+                    .overlay(shutterCore.padding(Spacing.sm))
             }
             .disabled(viewModel.isCapturing)
-            .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
+            .accessibilityLabel(
+                viewModel.countdown == nil
+                    ? Text("capture.camera.capture", bundle: .module)
+                    : Text("capture.camera.cancelTimer", bundle: .module)
+            )
 
             HStack {
                 GalleryButtonView(thumbnail: viewModel.galleryThumbnail) {
@@ -107,135 +123,6 @@ struct CameraStageView: View {
                 .accessibilityLabel(Text("capture.camera.flip", bundle: .module))
             }
         }
-    }
-
-    @ViewBuilder
-    private var viewfinder: some View {
-        if let session = viewModel.previewSession {
-            #if os(iOS)
-                CameraPreviewView(session: session)
-                    .ignoresSafeArea()
-            #endif
-        } else {
-            VStack(spacing: Spacing.md) {
-                Image(systemName: "camera.viewfinder")
-                    .font(.system(size: 72))
-                Text("capture.camera.samplePlaceholder", bundle: .module)
-                    .font(AppFont.caption)
-            }
-            .foregroundStyle(AppColor.onMedia.opacity(0.6))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    @ViewBuilder
-    private var focusSquare: some View {
-        if let focusIndicator, viewfinderSize != .zero {
-            RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(AppColor.onMedia, lineWidth: 1.5)
-                .frame(width: 72, height: 72)
-                .position(
-                    x: focusIndicator.point.x * viewfinderSize.width,
-                    y: focusIndicator.point.y * viewfinderSize.height
-                )
-                .allowsHitTesting(false)
-                .task(id: focusIndicator.id) {
-                    try? await Task.sleep(for: .seconds(1.2))
-                    self.focusIndicator = nil
-                }
-        }
-    }
-
-    // MARK: Gestures & actions
-
-    private var focusTapGesture: some Gesture {
-        SpatialTapGesture()
-            .onEnded { value in
-                guard viewfinderSize != .zero else { return }
-                let point = CGPoint(
-                    x: min(1, max(0, value.location.x / viewfinderSize.width)),
-                    y: min(1, max(0, value.location.y / viewfinderSize.height))
-                )
-                viewModel.focus(at: point)
-                focusIndicator = FocusIndicator(point: point)
-            }
-    }
-
-    private var zoomGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let start = zoomStartValue ?? viewModel.displayZoomFactor
-                zoomStartValue = start
-                viewModel.setDisplayZoom(start * value.magnification)
-            }
-            .onEnded { _ in zoomStartValue = nil }
-    }
-}
-
-private struct CameraZoomControlView: View {
-    let options: [CGFloat]
-    let selected: CGFloat
-    let isFrontCamera: Bool
-    let onSelect: (CGFloat) -> Void
-    let onToggle: () -> Void
-
-    var body: some View {
-        Group {
-            if options.count < 2 {
-                EmptyView()
-            } else if isFrontCamera {
-                frontToggle
-            } else {
-                presetRow
-            }
-        }
-        .padding(.bottom, Spacing.lg)
-    }
-
-    private var presetRow: some View {
-        HStack(spacing: Spacing.xs) {
-            ForEach(options, id: \.self) { option in
-                Button {
-                    onSelect(option)
-                } label: {
-                    Text(verbatim: Self.label(for: option))
-                        .font(AppFont.caption.weight(.semibold))
-                        .foregroundStyle(isSelected(option) ? AppColor.accent : AppColor.onMedia)
-                        .frame(width: 44, height: 44)
-                        .background(isSelected(option) ? AppColor.onMedia.opacity(0.25) : .clear, in: Circle())
-                }
-                .accessibilityLabel(Text(verbatim: Self.label(for: option)))
-                .accessibilityAddTraits(isSelected(option) ? [.isSelected] : [])
-            }
-        }
-        .padding(.horizontal, Spacing.xs)
-        .background(.ultraThinMaterial, in: Capsule())
-        .environment(\.colorScheme, .dark)
-    }
-
-    private var frontToggle: some View {
-        Button(action: onToggle) {
-            Image(systemName: isZoomedIn ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppColor.onMedia)
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
-                .environment(\.colorScheme, .dark)
-        }
-        .accessibilityLabel(Text(isZoomedIn ? "capture.camera.zoomOut" : "capture.camera.zoomIn", bundle: .module))
-    }
-
-    private var isZoomedIn: Bool {
-        guard let last = options.last else { return false }
-        return selected >= last
-    }
-
-    private func isSelected(_ option: CGFloat) -> Bool {
-        abs(selected - option) < 0.05
-    }
-
-    private static func label(for option: CGFloat) -> String {
-        option == option.rounded() ? "\(Int(option))x" : "\(option)x"
     }
 }
 
