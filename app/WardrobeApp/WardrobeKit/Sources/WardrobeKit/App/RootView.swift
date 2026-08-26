@@ -71,7 +71,10 @@ public struct RootView: View {
         }
         .sheet(
             isPresented: $isDevMenuPresented,
-            onDismiss: { challenge.refreshActiveChallenge() },
+            onDismiss: {
+                challenge.refreshActiveChallenge()
+                challenge.reloadDeck()
+            },
             content: {
                 DevMenuView(
                     viewModel: container.makeDevMenuViewModel(),

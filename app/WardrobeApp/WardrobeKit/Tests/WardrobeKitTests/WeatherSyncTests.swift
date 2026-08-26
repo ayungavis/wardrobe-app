@@ -126,6 +126,24 @@ struct WeatherSyncTests {
                 "a day of foregrounding must not flood the outbox with identical context")
     }
 
+    @Test func anUnchangedContextIsQueuedAgainAfterTheOutboxDrains() async throws {
+        let harness = makeSUT()
+        let sut = harness.sut
+        let outbox = harness.outbox
+
+        await sut.refresh(now: today())
+        for entry in try contexts(outbox) {
+            try outbox.acknowledge(id: entry.id)
+        }
+        await sut.refresh(now: today())
+
+        let queued = try contexts(outbox).count
+        #expect(
+            queued == 1,
+            "a dev reset mints a new account while zone and locale stay identical; suppressing the resend strands it"
+        )
+    }
+
     @Test func aChangedSummaryReplacesTheQueuedOne() async throws {
         let harness = makeSUT()
         let sut = harness.sut
@@ -192,7 +210,14 @@ struct WeatherSyncTests {
 
         #expect(sut.lastSummary() == nil,
                 "sending nothing beats sending a summary stamped with the wrong day")
-        #expect(try contexts(outbox).isEmpty)
+
+        let queued = try #require(try contexts(outbox).first)
+        let payload = try #require(
+            try JSONSerialization.jsonObject(with: queued.payload) as? [String: Any]
+        )
+        #expect(payload["weather"] == nil, "a forecast for the wrong day is not sent at all")
+        #expect(payload["timeZone"] as? String == "Asia/Jakarta",
+                "the zone is reported regardless: it is what lets the server queue a deck")
     }
 
     @Test func noCoordinateReachesTheOutboxPayload() async throws {

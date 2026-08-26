@@ -60,6 +60,11 @@ public final class ChallengeViewModel {
         load()
     }
 
+    public func reloadDeck() {
+        deckDay = nil
+        load()
+    }
+
     public func load() {
         loadTask?.cancel()
         if case .loaded = deck {} else {

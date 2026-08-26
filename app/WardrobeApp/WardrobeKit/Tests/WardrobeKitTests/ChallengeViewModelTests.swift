@@ -301,6 +301,28 @@ struct ChallengeDeckRefreshTests {
         #expect(!sut.isShowingCuratedDeck)
     }
 
+    @Test func aRegeneratedDeckIsPickedUpTheSameDay() async {
+        let repository = ControlledChallengeRepository()
+        let stamp = Date(timeIntervalSince1970: 1_787_000_000)
+        let sut = makeSUT(repository: repository) { stamp }
+
+        sut.onAppear()
+        await repository.resolveNext(cards: [card("before")])
+        await sut.loadTask?.value
+
+        sut.reloadDeck()
+        await repository.resolveNext(cards: [card("after")])
+        await sut.loadTask?.value
+
+        #expect(await repository.fetches == 2,
+                "the day key that spares a good deck from being refetched must not also strand a regenerated one")
+        if case let .loaded(cards) = sut.deck {
+            #expect(cards.map(\.prompt) == ["after"])
+        } else {
+            Issue.record("the regenerated deck must be the loaded one")
+        }
+    }
+
     @Test func dayRolloverAlsoReopensTheDeckAfterYesterdaysCompletion() async {
         let repository = ControlledChallengeRepository()
         nonisolated(unsafe) var stamp = Date(timeIntervalSince1970: 1_787_000_000)

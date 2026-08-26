@@ -12,10 +12,3 @@ struct ChallengeWeatherArgsDTO: Encodable, Sendable {
     let highC: Int
     let lowC: Int
 }
-
-extension UpsertChallengeContextArgsDTO {
-    var signature: String {
-        let weather = weather.map { "\($0.localDate)|\($0.condition)|\($0.highC)|\($0.lowC)" } ?? "-"
-        return "\(timeZone)|\(locale ?? "-")|\(weather)"
-    }
-}
