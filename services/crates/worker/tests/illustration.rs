@@ -457,6 +457,63 @@ async fn a_regeneration_note_reaches_the_prompt(pool: PgPool) -> sqlx::Result<()
     Ok(())
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn every_prompt_asks_for_the_margin_the_sticker_stage_needs(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene(&pool, true).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    run(&pool, &server, false).await;
+
+    let prompt = sent_body(&server).await["prompt"]
+        .as_str()
+        .expect("a prompt")
+        .to_owned();
+    assert!(
+        prompt.contains(illustration::sticker::FRAMING_RULE),
+        "a render that fills the frame is refused later, so the request has to ask for the margin"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_operators_own_prompt_still_carries_the_framing_rule(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene(&pool, true).await?;
+    sqlx::query("update ai_model_config set params = '{\"prompt\": \"Draw it however.\"}'::jsonb")
+        .execute(&pool)
+        .await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered_image()),
+    )
+    .await;
+
+    run(&pool, &server, false).await;
+
+    let prompt = sent_body(&server).await["prompt"]
+        .as_str()
+        .expect("a prompt")
+        .to_owned();
+    assert!(
+        prompt.starts_with("Draw it however."),
+        "the operator's words still lead"
+    );
+    assert!(
+        prompt.contains(illustration::sticker::FRAMING_RULE),
+        "the sticker stage's requirement is not a preference an override may drop"
+    );
+    Ok(())
+}
+
 // ----------------------------------------------------------------- limits
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -914,10 +971,17 @@ async fn a_real_cutout_renders_end_to_end() {
     );
 }
 
+static LIVE_PROMPT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    format!(
+        "Redraw this as a flat-lay product illustration. Garment only, no person. {}",
+        illustration::sticker::FRAMING_RULE
+    )
+});
+
 fn live_ask<'a>(model: &'a str, cutout: &'a [u8]) -> illustration::openrouter::Ask<'a> {
     illustration::openrouter::Ask {
         model,
-        prompt: "Redraw this as a flat-lay product illustration. Garment only, no person.",
+        prompt: LIVE_PROMPT.as_str(),
         cutout,
         content_type: "image/png",
         resolution: illustration::openrouter::DEFAULT_RESOLUTION,

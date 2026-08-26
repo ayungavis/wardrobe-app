@@ -346,6 +346,8 @@ fn note_of(job: &ClaimedJob) -> Option<String> {
 // back as a shirt unless the request says what it is looking at.
 fn describe(template: &str, subject: Option<&Subject>, note: Option<&str>) -> String {
     let mut prompt = template.to_owned();
+    prompt.push(' ');
+    prompt.push_str(sticker::FRAMING_RULE);
     if let Some(subject) = subject {
         let mut facts = vec![format!("category: {}", subject.category)];
         for (label, value) in [

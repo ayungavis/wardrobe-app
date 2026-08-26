@@ -42,6 +42,11 @@ impl Default for MaskBounds {
     }
 }
 
+// --- What `inspect` refuses, said in words a model can follow. It lives beside
+// the rule it mirrors so the two cannot drift apart unnoticed.
+pub const FRAMING_RULE: &str = "Centre the garment with clear empty margin on all four sides: it \
+     must not touch or run off any edge, and must not fill the frame.";
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Rejection {
     Empty,
