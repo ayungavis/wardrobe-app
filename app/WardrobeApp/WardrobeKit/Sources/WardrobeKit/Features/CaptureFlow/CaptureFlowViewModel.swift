@@ -152,6 +152,9 @@ public final class CaptureFlowViewModel {
         sessionTask = Task {
             do {
                 try await camera.startSession()
+                // ponytail: the device is only attached inside startSession, so the
+                // zoom presets do not exist until it returns.
+                syncCameraState()
             } catch is CancellationError {
             } catch {
                 Log.report(error, logger: Log.ui)

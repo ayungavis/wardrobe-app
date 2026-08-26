@@ -71,10 +71,12 @@ struct CameraControlTests {
 
     // MARK: Zoom & focus
 
-    @Test func setDisplayZoomMirrorsClampedServiceValue() {
+    @Test func setDisplayZoomMirrorsClampedServiceValue() async {
         let camera = FakeCameraService()
         camera.permission = .granted
         let sut = makeSUT(camera: camera)
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
 
         sut.setDisplayZoom(0.5)
         #expect(sut.displayZoomFactor == 0.5)
@@ -91,6 +93,9 @@ struct CameraControlTests {
         let camera = FakeCameraService()
         camera.permission = .granted
         let sut = makeSUT(camera: camera)
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
+
         #expect(sut.zoomOptions == [0.5, 1, 2])
         #expect(!sut.isUsingFrontCamera)
 
@@ -107,6 +112,8 @@ struct CameraControlTests {
         let camera = FakeCameraService()
         camera.permission = .granted
         let sut = makeSUT(camera: camera)
+        sut.cameraAppeared()
+        await sut.sessionTask?.value
         sut.flipCamera()
         await sut.flipTask?.value
 

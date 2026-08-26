@@ -109,3 +109,50 @@ struct AddByCameraViewModelTests {
         #expect(sut.alertError == .cameraUnavailable)
     }
 }
+
+@MainActor
+struct WardrobeCameraControlTests {
+    private func makeSUT() -> (AddByCameraViewModel, FakeCameraService) {
+        let camera = FakeCameraService()
+        camera.permission = .granted
+        let review = GarmentReviewModel(
+            scanner: FakeGarmentScanService(),
+            photoRepository: SpyPhotoRepository(),
+            wardrobeRepository: InMemoryWardrobeItemRepository(),
+            thumbnails: InMemoryGarmentThumbnailRepository()
+        )
+        return (AddByCameraViewModel(camera: camera, review: review), camera)
+    }
+
+    @Test func theWardrobeCameraForwardsZoomToTheService() async {
+        let (sut, camera) = makeSUT()
+        await sut.onAppear()
+        await sut.settle()
+
+        sut.setDisplayZoom(2)
+
+        #expect(camera.displayZoomFactor == 2)
+        #expect(sut.displayZoomFactor == 2, "the view reads the model, so it has to mirror the service")
+    }
+
+    @Test func theWardrobeCameraForwardsFocusFlashAndFlip() async {
+        let (sut, camera) = makeSUT()
+        await sut.onAppear()
+        await sut.settle()
+
+        sut.focus(at: CGPoint(x: 0.25, y: 0.75))
+        sut.toggleFlash()
+
+        #expect(camera.focusPoints == [CGPoint(x: 0.25, y: 0.75)])
+        #expect(camera.isFlashOn)
+        #expect(sut.isFlashOn)
+    }
+
+    @Test func theWardrobeCameraReportsTheServicesZoomOptions() async {
+        let (sut, camera) = makeSUT()
+        await sut.onAppear()
+        await sut.settle()
+
+        #expect(sut.zoomOptions == camera.zoomOptions, "the presets belong to the device, not the view")
+    }
+}

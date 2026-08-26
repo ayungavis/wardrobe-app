@@ -15,10 +15,13 @@ final class FakeCameraService: CameraService {
     private(set) var isUsingFrontCamera = false
     private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
     private(set) var focusPoints: [CGPoint] = []
+    private(set) var isConfigured = false
 
-    /// Mirrors a typical iPhone: ultra-wide on the back, none on the front.
+    /// Mirrors AVFCameraService: the device is only attached inside startSession,
+    /// and until it is there is nothing to zoom, so a single option is reported.
     var zoomOptions: [CGFloat] {
-        isUsingFrontCamera ? [1, 2] : CameraZoom.presets
+        guard isConfigured else { return [CameraZoom.standard] }
+        return isUsingFrontCamera ? [1, 2] : CameraZoom.presets
     }
 
     func toggleFlash() {
@@ -46,6 +49,7 @@ final class FakeCameraService: CameraService {
         if let startError {
             throw startError
         }
+        isConfigured = true
     }
 
     func stopSession() {
