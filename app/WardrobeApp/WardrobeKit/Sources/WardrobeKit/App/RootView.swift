@@ -9,6 +9,7 @@ public struct RootView: View {
     @State private var isConsentPresented = false
 
     private let container: AppContainer
+    @State private var isShowingSplash = true
 
     public init(container: AppContainer) {
         self.container = container
@@ -25,6 +26,15 @@ public struct RootView: View {
                 tabs
             } else {
                 OnboardingView(viewModel: container.makeOnboardingViewModel())
+            }
+            if isShowingSplash {
+                SplashScreenView {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isShowingSplash = false
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(10)
             }
         }
         .preferredColorScheme(.light)
