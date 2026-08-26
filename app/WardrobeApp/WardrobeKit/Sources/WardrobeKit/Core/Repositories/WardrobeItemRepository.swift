@@ -19,6 +19,7 @@ public protocol WardrobeItemRepository: AnyObject {
     func discardStaged()
     func update(_ item: WardrobeItem) throws
     func delete(itemID: UUID) throws
+    func deleteWears(completionID: UUID) throws
     func deleteAll() throws
 }
 

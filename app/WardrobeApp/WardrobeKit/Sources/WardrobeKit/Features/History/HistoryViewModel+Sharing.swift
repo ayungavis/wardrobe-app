@@ -1,6 +1,27 @@
 import Foundation
 
 public extension HistoryViewModel {
+    func delete(_ completion: CompletedChallenge) {
+        do {
+            try outbox.enqueue(SyncMutation.deleteCompletion(
+                DeleteCompletionArgsDTO(id: completion.id)
+            ).queued(), at: Date())
+            try wardrobeRepository.deleteWears(completionID: completion.id)
+            completedRepository.remove(id: completion.id)
+            if let file = completion.previewFile {
+                try? previews.delete(file: file)
+            }
+            photoRepository.deleteOriginals(of: completion.document, and: completion.photoID)
+            Log.ui.info("History: entry removed")
+            didDelete = true
+            load()
+        } catch {
+            Log.report(error, logger: Log.ui)
+            alertError = AppError(wrapping: error)
+        }
+        shareTask = Task { [syncNow] in await syncNow() }
+    }
+
     func save(_ completion: CompletedChallenge) {
         guard let data = previewData(for: completion) else {
             alertError = .photoSaveFailed

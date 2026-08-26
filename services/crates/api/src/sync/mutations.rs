@@ -1,4 +1,5 @@
 pub mod complete_challenge;
+pub mod delete_completion;
 pub mod delete_item;
 pub mod generate_challenge_deck;
 pub mod merge_items;

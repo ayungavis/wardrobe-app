@@ -9,6 +9,8 @@ public struct HistoryDetailView: View {
     let onSelectGarment: (UUID) -> Void
 
     @State private var garments: [(item: WardrobeItem, wearCount: Int)] = []
+    @State private var isDeleteConfirmationPresented = false
+    @Environment(\.dismiss) private var dismiss
 
     public init(
         completion: CompletedChallenge,
@@ -70,6 +72,25 @@ public struct HistoryDetailView: View {
             } message: {
                 Text(viewModel.alertError?.userMessage ?? "")
             }
+            .confirmationDialog(
+                Text("history.detail.delete.title", bundle: .module),
+                isPresented: $isDeleteConfirmationPresented,
+                titleVisibility: .visible
+            ) {
+                Button(role: .destructive) {
+                    viewModel.delete(completion)
+                } label: {
+                    Text("history.detail.delete.action", bundle: .module)
+                }
+                Button(role: .cancel) {} label: { Text("common.cancel", bundle: .module) }
+            } message: {
+                Text("history.detail.delete.message", bundle: .module)
+            }
+            .onChange(of: viewModel.didDelete) { _, deleted in
+                if deleted {
+                    dismiss()
+                }
+            }
             .alert(
                 Text("history.detail.saved", bundle: .module),
                 isPresented: Binding(
@@ -102,6 +123,15 @@ public struct HistoryDetailView: View {
                 Image(systemName: "square.and.arrow.down")
             }
             .accessibilityLabel(Text("history.detail.save", bundle: .module))
+        }
+        ToolbarItem(placement: .destructiveAction) {
+            Button(role: .destructive) {
+                isDeleteConfirmationPresented = true
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(AppColor.destructive)
+            }
+            .accessibilityLabel(Text("history.detail.delete", bundle: .module))
         }
     }
 

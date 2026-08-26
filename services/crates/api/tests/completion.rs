@@ -163,6 +163,34 @@ async fn complete(pool: &PgPool, stage: &Stage, body: &Value) -> Value {
     body_json(response).await["results"][0].clone()
 }
 
+async fn delete_completion(pool: &PgPool, stage: &Stage, completion: Uuid) -> Value {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", stage.token))
+        .body(Body::from(
+            json!({ "mutations": [{
+                "id": Uuid::now_v7(), "name": "deleteCompletion", "args": { "id": completion }
+            }]})
+            .to_string(),
+        ))
+        .expect("request");
+    let response = call(pool.clone(), request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["results"][0].clone()
+}
+
+async fn buried(pool: &PgPool, table: &str, account: Uuid) -> i64 {
+    sqlx::query_scalar(&format!(
+        "select count(*) from {table} where account_id = $1 and deleted_at is not null"
+    ))
+    .bind(account)
+    .fetch_one(pool)
+    .await
+    .expect("buried")
+}
+
 async fn count(pool: &PgPool, table: &str, account: Uuid) -> i64 {
     sqlx::query_scalar(&format!(
         "select count(*) from {table} where account_id = $1"
@@ -818,5 +846,60 @@ async fn a_tombstoned_completion_cannot_win(pool: PgPool) -> sqlx::Result<()> {
 
     assert_eq!(result["error"]["code"], "not_found");
     assert_eq!(status_of(&pool, first.completion).await, "canonical");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn deleting_a_completion_buries_the_day_it_owns(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+
+    let result = delete_completion(&pool, &stage, ticket.completion).await;
+
+    assert_eq!(result["status"], "applied");
+    for table in [
+        "challenge_completion",
+        "wear_record",
+        "canvas_document",
+        "photo",
+        "photo_derivative",
+    ] {
+        assert_eq!(buried(&pool, table, stage.account).await, 1, "{table}");
+    }
+    assert_eq!(
+        buried(&pool, "wardrobe_item", stage.account).await,
+        0,
+        "deleting a day must not take the garment out of the wardrobe"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn deleting_the_same_completion_twice_changes_nothing(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let ticket = fresh();
+    complete(&pool, &stage, &args(&stage, &ticket, "2026-08-21")).await;
+    delete_completion(&pool, &stage, ticket.completion).await;
+    let after_first = change_seq(&pool, stage.account).await;
+
+    let result = delete_completion(&pool, &stage, ticket.completion).await;
+
+    assert_eq!(result["status"], "applied");
+    assert_eq!(
+        change_seq(&pool, stage.account).await,
+        after_first,
+        "a replayed outbox entry must not churn the feed"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_completion_belonging_to_someone_else_is_not_found(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+
+    let result = delete_completion(&pool, &stage, Uuid::now_v7()).await;
+
+    assert_ne!(result["status"], "applied");
     Ok(())
 }

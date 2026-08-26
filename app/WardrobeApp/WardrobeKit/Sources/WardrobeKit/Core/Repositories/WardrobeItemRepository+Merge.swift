@@ -15,6 +15,16 @@ public extension SwiftDataWardrobeItemRepository {
         try context.save()
     }
 
+    func deleteWears(completionID: UUID) throws {
+        let descriptor = FetchDescriptor<WearRecordEntity>(
+            predicate: #Predicate { $0.completionID == completionID }
+        )
+        for entity in try context.fetch(descriptor) {
+            context.delete(entity)
+        }
+        try context.save()
+    }
+
     func regenerateIllustration(itemID: UUID, note: String?) throws {
         let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         try stage(.regenerateIllustration(RegenerateIllustrationArgsDTO(

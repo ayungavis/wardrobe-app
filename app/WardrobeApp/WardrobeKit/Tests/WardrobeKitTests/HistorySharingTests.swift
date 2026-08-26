@@ -7,6 +7,8 @@ import Testing
 struct HistorySharingTests {
     private struct Setup {
         let sut: HistoryViewModel
+        let outbox: StoredOutboxRepository
+        let wardrobe: InMemoryWardrobeItemRepository
         let completion: CompletedChallenge
         let saver: SpyPhotoLibrarySaver
         let media: StubMediaRepository?
@@ -28,19 +30,37 @@ struct HistorySharingTests {
         }
         completedRepository.stored = [completion]
 
+        let outbox = StoredOutboxRepository(store: InMemoryOutboxStore())
+        let wardrobe = InMemoryWardrobeItemRepository()
+        wardrobe.storedWears = [
+            WearRecord(itemID: UUID(), completionID: completion.id, wornAt: Date()),
+        ]
         let sut = HistoryViewModel(
             completedRepository: completedRepository,
-            outbox: StoredOutboxRepository(store: InMemoryOutboxStore()),
+            outbox: outbox,
             uploads: makeInMemoryUploads(),
             photoRepository: SpyPhotoRepository(),
-            wardrobeRepository: InMemoryWardrobeItemRepository(),
+            wardrobeRepository: wardrobe,
             thumbnails: InMemoryGarmentThumbnailRepository(),
             previews: previews,
             saver: saver,
             media: media
         )
         sut.load()
-        return Setup(sut: sut, completion: completion, saver: saver, media: media)
+        return Setup(sut: sut, outbox: outbox, wardrobe: wardrobe, completion: completion, saver: saver, media: media)
+    }
+
+    @Test func deletingQueuesATombstoneAndTakesTheDayWithIt() throws {
+        let setup = try makeSUT()
+
+        setup.sut.delete(setup.completion)
+
+        #expect(try setup.outbox.entries().map(\.name) == ["deleteCompletion"],
+                "a local-only delete comes back on the next restore")
+        #expect(setup.sut.completions.isEmpty)
+        #expect(setup.wardrobe.storedWears.isEmpty,
+                "the day is gone, so the wears it recorded must not keep counting")
+        #expect(setup.sut.didDelete, "the screen dismisses on this")
     }
 
     @Test func savingWritesThePreviewToThePhotoLibrary() async throws {

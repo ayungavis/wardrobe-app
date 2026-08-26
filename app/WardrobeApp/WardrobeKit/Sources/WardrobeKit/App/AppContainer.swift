@@ -286,7 +286,8 @@ public final class AppContainer {
             previews: completionPreviewRepository,
             downloads: makeMediaDownloadRepository(),
             saver: Self.defaultLibrarySaver(),
-            media: makeMediaRepository()
+            media: makeMediaRepository(),
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }
 }
