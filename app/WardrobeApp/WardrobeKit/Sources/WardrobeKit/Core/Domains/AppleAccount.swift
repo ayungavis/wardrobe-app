@@ -11,12 +11,16 @@ public struct AppleAccount: Equatable, Codable, Sendable {
         self.email = email
     }
 
+    public var normalized: AppleAccount {
+        AppleAccount(accountID: accountID, fullName: fullName?.nonBlank, email: email?.nonBlank)
+    }
+
     public func merged(with newer: AppleAccount) -> AppleAccount {
         guard newer.accountID == accountID else { return newer }
         return AppleAccount(
             accountID: accountID,
-            fullName: newer.fullName ?? fullName,
-            email: newer.email ?? email
+            fullName: newer.fullName?.nonBlank ?? fullName,
+            email: newer.email?.nonBlank ?? email
         )
     }
 }

@@ -5,7 +5,7 @@ public struct AppleProfile: Equatable, Sendable {
     public let email: String?
 
     public init(fullName: String?, email: String?) {
-        self.fullName = fullName
-        self.email = email
+        self.fullName = fullName?.nonBlank
+        self.email = email?.nonBlank
     }
 }
