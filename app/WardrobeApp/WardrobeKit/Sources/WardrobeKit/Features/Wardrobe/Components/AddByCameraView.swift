@@ -172,35 +172,32 @@ struct AddByCameraView: View {
     }
 
     private var captureBar: some View {
-        VStack(spacing: Spacing.md) {
-            if viewModel.capturedCount > 0 {
-                Text("bulkScan.captured \(viewModel.capturedCount)", bundle: .module)
-                    .font(AppFont.caption)
-                    .foregroundStyle(AppColor.onMedia)
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
-                    .background(Capsule().fill(.ultraThinMaterial))
+        ZStack {
+            Button {
+                viewModel.capture()
+            } label: {
+                Circle()
+                    .strokeBorder(AppColor.onMedia, lineWidth: 5)
+                    .frame(width: 80, height: 80)
+                    .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(Spacing.sm))
             }
+            .disabled(viewModel.isCapturing)
+            .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
 
-            ZStack {
-                Button {
-                    viewModel.capture()
-                } label: {
-                    Circle()
-                        .strokeBorder(AppColor.onMedia, lineWidth: 5)
-                        .frame(width: 80, height: 80)
-                        .overlay(Circle().fill(AppColor.onMedia.opacity(0.35)).padding(Spacing.sm))
+            HStack {
+                CapturedStackView(
+                    thumbnails: viewModel.capturedThumbnails,
+                    count: viewModel.capturedCount
+                ) {
+                    Task { await viewModel.beginReview() }
                 }
-                .disabled(viewModel.isCapturing)
-                .accessibilityLabel(Text("capture.camera.capture", bundle: .module))
 
-                HStack {
-                    Spacer()
-                    MediaCircleButtonView(systemName: "arrow.triangle.2.circlepath.camera") {
-                        viewModel.flipCamera()
-                    }
-                    .accessibilityLabel(Text("capture.camera.flip", bundle: .module))
+                Spacer()
+
+                MediaCircleButtonView(systemName: "arrow.triangle.2.circlepath.camera") {
+                    viewModel.flipCamera()
                 }
+                .accessibilityLabel(Text("capture.camera.flip", bundle: .module))
             }
         }
     }

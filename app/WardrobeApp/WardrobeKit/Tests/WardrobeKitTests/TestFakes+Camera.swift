@@ -1,6 +1,29 @@
 import AVFoundation
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 @testable import WardrobeKit
+
+/// A real, decodable JPEG. The captured-stack thumbnails go through
+/// CGImageSource, so a byte blob would silently decode to nothing.
+func jpegFixture() -> Data {
+    let pixels = CGContext(
+        data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+    )
+    let output = NSMutableData()
+    guard let image = pixels?.makeImage(),
+          let destination = CGImageDestinationCreateWithData(
+              output, UTType.jpeg.identifier as CFString, 1, nil
+          )
+    else {
+        return Data()
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    CGImageDestinationFinalize(destination)
+    return output as Data
+}
 
 @MainActor
 final class FakeCameraService: CameraService {

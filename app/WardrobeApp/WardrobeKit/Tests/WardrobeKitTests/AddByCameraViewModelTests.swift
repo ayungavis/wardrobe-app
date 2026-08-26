@@ -124,6 +124,47 @@ struct WardrobeCameraControlTests {
         return (AddByCameraViewModel(camera: camera, review: review), camera)
     }
 
+    @Test func theCameraKeepsAThumbnailForEachCapture() async {
+        let (sut, camera) = makeSUT()
+        camera.captureResult = .success(jpegFixture())
+        await sut.onAppear()
+
+        sut.capture()
+        await sut.settle()
+        sut.capture()
+        await sut.settle()
+
+        #expect(sut.capturedCount == 2)
+        #expect(sut.capturedThumbnails.count == 2, "the stack shows what was taken, not just how many")
+    }
+
+    @Test func theStackKeepsOnlyTheThreeMostRecentCaptures() async {
+        let (sut, camera) = makeSUT()
+        camera.captureResult = .success(jpegFixture())
+        await sut.onAppear()
+
+        for _ in 0 ..< 4 {
+            sut.capture()
+            await sut.settle()
+        }
+
+        #expect(sut.capturedCount == 4, "the badge counts every photo")
+        #expect(sut.capturedThumbnails.count == 3, "a long bulk scan must not pile up decoded images")
+    }
+
+    @Test func retakingClearsTheCapturedStack() async {
+        let (sut, camera) = makeSUT()
+        camera.captureResult = .success(jpegFixture())
+        await sut.onAppear()
+        sut.capture()
+        await sut.settle()
+
+        sut.resumeCapturing()
+
+        #expect(sut.capturedCount == 0)
+        #expect(sut.capturedThumbnails.isEmpty, "a stale thumbnail would credit the retake with a photo it does not have")
+    }
+
     @Test func theWardrobeCameraForwardsZoomToTheService() async {
         let (sut, camera) = makeSUT()
         await sut.onAppear()

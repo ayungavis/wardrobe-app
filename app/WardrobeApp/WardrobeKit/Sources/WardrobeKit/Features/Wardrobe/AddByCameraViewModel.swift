@@ -13,6 +13,7 @@ public final class AddByCameraViewModel {
     public private(set) var permission: CameraPermission = .notDetermined
     public private(set) var isCapturing = false
     public private(set) var capturedCount = 0
+    public private(set) var capturedThumbnails: [CGImage] = []
     public private(set) var isFlashOn = false
     public private(set) var isUsingFrontCamera = false
     public private(set) var displayZoomFactor: CGFloat = CameraZoom.standard
@@ -104,6 +105,13 @@ public final class AddByCameraViewModel {
                 try Task.checkCancellation()
                 review.scan(photo: photo)
                 capturedCount += 1
+                let thumbnail = await Task.detached(priority: .userInitiated) {
+                    ImageDecoding.downsampledImage(from: photo, maxPixel: 160)
+                }.value
+                try Task.checkCancellation()
+                if let thumbnail {
+                    capturedThumbnails = Array((capturedThumbnails + [thumbnail]).suffix(3))
+                }
             } catch is CancellationError {
             } catch {
                 Log.report(error, logger: Log.ui)
@@ -121,6 +129,7 @@ public final class AddByCameraViewModel {
 
     public func resumeCapturing() {
         capturedCount = 0
+        capturedThumbnails = []
         phase = .capturing
         startSessionIfNeeded()
     }
