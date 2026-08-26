@@ -12,8 +12,9 @@ struct StickerPickerView: View {
     @State private var category: StickerCategory
     @State private var query = ""
 
-    private var results: [StickerCatalogueEntry] {
-        StickerCatalogue.search(query)
+    private var results: [SearchHit] {
+        StickerCatalogue.search(query).map(SearchHit.entry)
+            + StickerSearch.garments(wardrobe, matching: query).map(SearchHit.garment)
     }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.sm), count: 4)
@@ -43,7 +44,7 @@ struct StickerPickerView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.sm)
 
-            searchField
+            StickerSearchFieldView(query: $query)
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.md)
 
@@ -85,38 +86,6 @@ struct StickerPickerView: View {
             .accessibilityLabel(Text("common.close", bundle: .module))
             .accessibilityIdentifier("editor.sticker.close")
         }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: Spacing.sm) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(AppColor.onMedia.opacity(0.64))
-
-            TextField(text: $query) {
-                Text("editor.sticker.search", bundle: .module)
-            }
-            .textFieldStyle(.plain)
-            .autocorrectionDisabled()
-            #if os(iOS)
-                .textInputAutocapitalization(.never)
-            #endif
-                .accessibilityIdentifier("editor.sticker.search")
-
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(AppColor.onMedia.opacity(0.64))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("common.clear", bundle: .module))
-            }
-        }
-        .font(.system(size: 15))
-        .padding(.horizontal, Spacing.md)
-        .frame(height: 38)
-        .background(AppColor.onMedia.opacity(0.10), in: .capsule)
     }
 
     private var categoryRow: some View {
@@ -180,21 +149,7 @@ struct StickerPickerView: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: Spacing.md) {
                     ForEach(wardrobe) { sticker in
-                        Button {
-                            EditorHaptics.commit.play()
-                            onPickItem(sticker)
-                            dismiss()
-                        } label: {
-                            StickerArtworkView(
-                                art: .item(sticker.id), size: 64, image: sticker.image
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 70)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(Text(verbatim: sticker.name))
-                        .accessibilityIdentifier("editor.sticker.item.\(sticker.id.uuidString)")
+                        garmentButton(sticker)
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
@@ -216,8 +171,24 @@ struct StickerPickerView: View {
                 Spacer()
             }
         } else {
-            entryGrid(results)
+            hitGrid(results)
         }
+    }
+
+    private func hitGrid(_ hits: [SearchHit]) -> some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: Spacing.md) {
+                ForEach(hits) { hit in
+                    switch hit {
+                    case let .entry(entry): entryButton(entry)
+                    case let .garment(sticker): garmentButton(sticker)
+                    }
+                }
+            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.lg)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var catalogueGrid: some View {
@@ -228,25 +199,57 @@ struct StickerPickerView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Spacing.md) {
                 ForEach(entries) { entry in
-                    Button {
-                        EditorHaptics.commit.play()
-                        onPick(entry)
-                        dismiss()
-                    } label: {
-                        StickerArtworkView(art: .catalogue(entry.id), size: 64)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 70)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(verbatim: entry.name))
-                    .accessibilityIdentifier("editor.sticker.\(entry.id)")
+                    entryButton(entry)
                 }
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.lg)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func entryButton(_ entry: StickerCatalogueEntry) -> some View {
+        Button {
+            EditorHaptics.commit.play()
+            onPick(entry)
+            dismiss()
+        } label: {
+            StickerArtworkView(art: .catalogue(entry.id), size: 64)
+                .frame(maxWidth: .infinity)
+                .frame(height: 70)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: entry.name))
+        .accessibilityIdentifier("editor.sticker.\(entry.id)")
+    }
+
+    private func garmentButton(_ sticker: WardrobeSticker) -> some View {
+        Button {
+            EditorHaptics.commit.play()
+            onPickItem(sticker)
+            dismiss()
+        } label: {
+            StickerArtworkView(art: .item(sticker.id), size: 64, image: sticker.image)
+                .frame(maxWidth: .infinity)
+                .frame(height: 70)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: sticker.name))
+        .accessibilityIdentifier("editor.sticker.item.\(sticker.id.uuidString)")
+    }
+
+    private enum SearchHit: Identifiable {
+        case entry(StickerCatalogueEntry)
+        case garment(WardrobeSticker)
+
+        var id: String {
+            switch self {
+            case let .entry(entry): entry.id
+            case let .garment(sticker): "item.\(sticker.id.uuidString)"
+            }
+        }
     }
 
     private var availableCategories: [StickerCategory] {
