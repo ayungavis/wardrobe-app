@@ -366,6 +366,74 @@ async fn the_least_recently_worn_pair_leads_the_deck(pool: PgPool) -> sqlx::Resu
     Ok(())
 }
 
+// ------------------------------------------------------------ copy discipline
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn every_prompt_states_the_length_it_wants(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene(&pool).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(five_cards()),
+    )
+    .await;
+    run(&pool, &server, true).await;
+
+    let sent = sent_body(&server).await.to_string();
+    assert!(
+        sent.contains("24 characters") && sent.contains("80 characters"),
+        "a model fills whatever room it is given: the curated cards sit at 13-16 and 43-53 \
+         characters, so the prompt has to name the target rather than leave it to taste"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn every_prompt_forbids_inventing_a_garment(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    scene(&pool).await?;
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(five_cards()),
+    )
+    .await;
+    run(&pool, &server, true).await;
+
+    let sent = sent_body(&server).await.to_string();
+    assert!(
+        sent.contains("never name a specific garment"),
+        "an empty wardrobe makes every slot 'no outfit', and copy that names a red skirt the \
+         wearer does not own claims knowledge of a wardrobe there isn't (FR-008)"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_title_past_the_cap_is_rejected(pool: PgPool) -> sqlx::Result<()> {
+    configure(&pool, None).await?;
+    let scene = scene(&pool).await?;
+    let server = MockServer::start().await;
+    let shouty = json!({ "cards": (0..5)
+        .map(|_| json!({ "title": "x".repeat(50), "sentence": "Wear it." }))
+        .collect::<Vec<Value>>() });
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(reply(&shouty.to_string())),
+    )
+    .await;
+
+    run(&pool, &server, true).await;
+
+    assert!(deck(&pool, scene.account).await.is_empty());
+    assert_eq!(
+        attempts(&pool, scene.job).await.first().expect("a row").2,
+        "invalid_output"
+    );
+    Ok(())
+}
+
 // ------------------------------------------------------------- FR-080 guard
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -494,7 +562,7 @@ async fn an_over_long_sentence_never_reaches_the_table(pool: PgPool) -> sqlx::Re
     let scene = scene(&pool).await?;
     let server = MockServer::start().await;
     let long = json!({ "cards": (0..5)
-        .map(|_| json!({ "title": "Card", "sentence": "x".repeat(600) }))
+        .map(|_| json!({ "title": "Card", "sentence": "x".repeat(150) }))
         .collect::<Vec<Value>>() });
     answer(
         &server,

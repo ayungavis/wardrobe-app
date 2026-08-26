@@ -13,8 +13,12 @@ use scoring::{Garment, Pairing, Wardrobe, Weather, Weights};
 pub const CAPABILITY: &str = "challenge_text";
 pub const DECK_SIZE: usize = 5;
 const QUALITY_ATTEMPTS: i64 = 2;
-const MAX_TITLE: usize = 60;
-const MAX_SENTENCE: usize = 200;
+// ponytail: the prompt asks for 24/80 but validation allows 40/120 on purpose —
+// parse_deck rejects the whole deck, so a cap as tight as the instruction would
+// drop five good cards over one long sentence. Move these into
+// ai_model_config.params if the copy needs a third round of tuning.
+const MAX_TITLE: usize = 40;
+const MAX_SENTENCE: usize = 120;
 // ponytail: 500 accounts a tick drains far past the pilot at a five-second poll.
 // Raise it, or shard the scan by account_id range, when a tick stops emptying
 // the backlog.
@@ -25,12 +29,15 @@ const DORMANT_AFTER_DAYS: i32 = 30;
 
 const SYSTEM_PROMPT: &str = "You write daily outfit-challenge cards for a wardrobe app. Your voice \
      is Gen-Z, warm and playful, never cringe. No emoji, no hashtags, no brand names, no prices, no \
-     shopping advice, no people. For each numbered slot write a title of at most 60 characters and \
-     exactly one sentence of at most 200 characters. A slot that lists two garments dares the \
-     wearer to combine those two today, naming them by type and colour only. A slot marked \"no \
-     outfit\" is about what to wear given the weather and what is in style this month, and must \
-     never pretend to know what the wearer owns. Only call a garment neglected when its unworn \
-     count is genuinely large; never claim rarity otherwise. Reply with JSON only.";
+     shopping advice, no people, and never mention the date.\n\
+     Keep it short. A title is 2 to 4 words and at most 24 characters. A card is exactly one \
+     sentence of at most 80 characters — closer to 50 when it names no garment.\n\
+     A slot listing two garments dares the wearer to combine those two today, naming them by type \
+     and colour only. Call a garment neglected only when its unworn count is genuinely large.\n\
+     A slot marked \"no outfit\" is about the weather, the season, and the mood. In those you must \
+     never name a specific garment and never write \"your\" or \"that\" about clothing: the wearer \
+     owns nothing you know of, so inventing a red skirt for them is a lie.\n\
+     Reply with JSON only.";
 
 /// # Errors
 ///
