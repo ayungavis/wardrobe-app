@@ -6828,6 +6828,40 @@
         }
       }
     },
+    "wardrobe.detail.regenerate.addPhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add photo"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah foto"
+          }
+        }
+      }
+    },
+    "wardrobe.detail.regenerate.chooseGarment": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick the garment to use"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih garmen yang dipakai"
+          }
+        }
+      }
+    },
     "wardrobe.detail.regenerate.cutout": {
       "extractionState": "manual",
       "localizations": {

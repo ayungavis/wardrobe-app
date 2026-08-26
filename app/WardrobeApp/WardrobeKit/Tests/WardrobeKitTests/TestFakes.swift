@@ -96,6 +96,15 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
 
     private(set) var regenerated: [(id: UUID, note: String?)] = []
 
+    private(set) var adoptedCutouts: [(path: String, mediaID: UUID)] = []
+
+    func adoptCutout(itemID: UUID, path: String, mediaID: UUID) throws {
+        if let index = storedItems.firstIndex(where: { $0.id == itemID }) {
+            storedItems[index].cutoutFile = path
+        }
+        adoptedCutouts.append((path, mediaID))
+    }
+
     func regenerateIllustration(itemID: UUID, note: String?) throws {
         regenerated.append((itemID, note))
     }

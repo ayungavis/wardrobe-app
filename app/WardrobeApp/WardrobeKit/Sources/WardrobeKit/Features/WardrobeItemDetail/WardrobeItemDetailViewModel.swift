@@ -23,6 +23,13 @@ public final class WardrobeItemDetailViewModel {
     private let completions: CompletedChallengeRepository?
     private let photos: PhotoRepository?
     private let syncNow: () async -> Void
+    private let scanner: GarmentScanService?
+    private let uploads: (any MediaUploadRepository)?
+
+    private(set) var candidates: [ScannedGarment] = []
+    private(set) var chosenCandidateID: UUID?
+    private(set) var isScanningPhoto = false
+    private(set) var scanTask: Task<Void, Never>?
 
     init(
         itemID: UUID,
@@ -30,7 +37,9 @@ public final class WardrobeItemDetailViewModel {
         thumbnails: GarmentThumbnailRepository,
         completions: CompletedChallengeRepository? = nil,
         photos: PhotoRepository? = nil,
-        syncNow: @escaping () async -> Void = {}
+        syncNow: @escaping () async -> Void = {},
+        scanner: GarmentScanService? = nil,
+        uploads: (any MediaUploadRepository)? = nil
     ) {
         self.itemID = itemID
         self.repository = repository
@@ -38,6 +47,8 @@ public final class WardrobeItemDetailViewModel {
         self.completions = completions
         self.photos = photos
         self.syncNow = syncNow
+        self.scanner = scanner
+        self.uploads = uploads
     }
 
     // MARK: Derived from the wear records
@@ -167,6 +178,10 @@ public final class WardrobeItemDetailViewModel {
         }
     }
 
+    func thumbnailData(forFile file: String) -> Data? {
+        try? thumbnails.data(forFile: file)
+    }
+
     func cutoutData() -> Data? {
         item.flatMap { try? thumbnails.data(forFile: $0.cutoutFile) }
     }
@@ -197,9 +212,44 @@ public final class WardrobeItemDetailViewModel {
         item.map { $0.status == .pending || $0.status == .processing } ?? false
     }
 
+    var chosenCandidate: ScannedGarment? {
+        candidates.first { $0.id == chosenCandidateID }
+    }
+
+    func scanReferencePhoto(_ data: Data) {
+        guard let scanner else { return }
+        discardCandidates()
+        isScanningPhoto = true
+        scanTask = Task {
+            defer { isScanningPhoto = false }
+            do {
+                let found = try await scanner.scan(photo: data)
+                try Task.checkCancellation()
+                candidates = found
+                chosenCandidateID = found.count == 1 ? found[0].id : nil
+            } catch is CancellationError {
+            } catch {
+                Log.report(error, logger: Log.ui)
+            }
+        }
+    }
+
+    func chooseCandidate(_ candidateID: UUID) {
+        chosenCandidateID = candidateID
+    }
+
+    func discardCandidates(keeping kept: String? = nil) {
+        for candidate in candidates where candidate.cutoutFile != kept {
+            try? thumbnails.delete(file: candidate.cutoutFile)
+        }
+        candidates = []
+        chosenCandidateID = nil
+    }
+
     func regenerateIllustration(note: String) {
         guard let item else { return }
         do {
+            try adoptChosenCutout(for: item)
             try repository.regenerateIllustration(itemID: item.id, note: note)
             Log.ui.info("Wardrobe: illustration asked for again")
             push()
@@ -207,6 +257,18 @@ public final class WardrobeItemDetailViewModel {
         } catch {
             Log.report(error)
         }
+    }
+
+    private func adoptChosenCutout(for item: WardrobeItem) throws {
+        guard let chosen = chosenCandidate else { return }
+        let mediaID = UUID.v7()
+        uploads?.stage(MediaUpload(
+            id: mediaID, ownerID: item.id, kind: .cutout, contentType: "image/png",
+            source: .thumbnailFile(chosen.cutoutFile), createdAt: Date()
+        ))
+        try repository.adoptCutout(itemID: item.id, path: chosen.cutoutFile, mediaID: mediaID)
+        try? thumbnails.delete(file: item.cutoutFile)
+        discardCandidates(keeping: chosen.cutoutFile)
     }
 
     public func updateItem(name: String, description: String) {

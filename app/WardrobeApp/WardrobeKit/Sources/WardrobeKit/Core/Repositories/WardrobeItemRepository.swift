@@ -10,6 +10,7 @@ public protocol WardrobeItemRepository: AnyObject {
     func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws
     func merge(winnerID: UUID, loserID: UUID) throws
     func regenerateIllustration(itemID: UUID, note: String?) throws
+    func adoptCutout(itemID: UUID, path: String, mediaID: UUID) throws
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
     func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?)
     func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
@@ -178,7 +179,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         fetchItem(itemID)?.cutoutPath = path
     }
 
-    private func fetchItem(_ itemID: UUID) -> WardrobeItemEntity? {
+    func fetchItem(_ itemID: UUID) -> WardrobeItemEntity? {
         do {
             return try context.fetch(
                 FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })

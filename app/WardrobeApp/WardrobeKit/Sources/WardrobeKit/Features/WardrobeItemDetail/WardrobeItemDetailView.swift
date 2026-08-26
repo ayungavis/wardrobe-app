@@ -135,7 +135,8 @@ public struct WardrobeItemDetailView: View {
             .sheet(isPresented: $isRegeneratePresented) {
                 RegenerateIllustrationView(
                     cutout: viewModel.cutoutData(),
-                    original: viewModel.originalPhotoData()
+                    original: viewModel.originalPhotoData(),
+                    viewModel: viewModel
                 ) { note in
                     viewModel.regenerateIllustration(note: note)
                     isRegeneratePresented = false

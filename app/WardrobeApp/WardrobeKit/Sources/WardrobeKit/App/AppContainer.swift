@@ -154,7 +154,9 @@ public final class AppContainer {
             thumbnails: garmentThumbnailRepository,
             completions: completedChallengeRepository,
             photos: photoRepository,
-            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) },
+            scanner: makeGarmentScanService(allowsMatching: false),
+            uploads: makeMediaUploadRepository()
         )
     }
 
