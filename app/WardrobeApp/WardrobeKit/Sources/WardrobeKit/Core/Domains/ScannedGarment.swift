@@ -2,6 +2,7 @@ import Foundation
 
 public struct ScannedGarment: Identifiable, Equatable, Sendable {
     public let id: UUID
+    public let wearID: UUID
     public let name: String
     public let description: String
     public let category: GarmentCategory
@@ -13,6 +14,7 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
 
     public init(
         id: UUID,
+        wearID: UUID = UUID(),
         name: String? = nil,
         description: String = "",
         category: GarmentCategory,
@@ -23,6 +25,7 @@ public struct ScannedGarment: Identifiable, Equatable, Sendable {
         wornAt: Date? = nil
     ) {
         self.id = id
+        self.wearID = wearID
         self.name = name ?? category.defaultName
         self.description = description
         self.category = category

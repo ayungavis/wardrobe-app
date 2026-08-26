@@ -204,6 +204,12 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
             }
             return
         }
+        if let existing {
+            existing.itemID = wear.itemID
+            existing.completionID = wear.completionID
+            existing.wornAt = wear.wornAt
+            return
+        }
         context.insert(WearRecordEntity(wear))
     }
 

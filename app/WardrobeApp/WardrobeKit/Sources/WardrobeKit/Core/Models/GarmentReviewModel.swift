@@ -155,7 +155,7 @@ public final class GarmentReviewModel {
                 updatedAt: date
             ),
             fingerprint: garment.fingerprint,
-            wear: WearRecord(itemID: garment.id, completionID: completionID, wornAt: date)
+            wear: WearRecord(id: garment.wearID, itemID: garment.id, completionID: completionID, wornAt: date)
         )
     }
 
@@ -163,7 +163,7 @@ public final class GarmentReviewModel {
         _ garment: ScannedGarment, into itemID: UUID, completionID: UUID, at date: Date
     ) {
         wardrobeRepository.stageWear(
-            WearRecord(itemID: itemID, completionID: completionID, wornAt: date),
+            WearRecord(id: garment.wearID, itemID: itemID, completionID: completionID, wornAt: date),
             fingerprint: ItemFingerprint(
                 itemID: itemID,
                 version: garment.fingerprint.version,
@@ -227,7 +227,9 @@ public final class GarmentReviewModel {
         completionID: UUID?,
         at date: Date
     ) throws {
-        let wear = wornAt.map { WearRecord(itemID: garment.id, completionID: completionID, wornAt: $0) }
+        let wear = wornAt.map {
+            WearRecord(id: garment.wearID, itemID: garment.id, completionID: completionID, wornAt: $0)
+        }
         try wardrobeRepository.insert(
             WardrobeItem(
                 id: garment.id,
@@ -250,7 +252,9 @@ public final class GarmentReviewModel {
         completionID: UUID?,
         at date: Date
     ) throws {
-        let wear = wornAt.map { WearRecord(itemID: itemID, completionID: completionID, wornAt: $0) }
+        let wear = wornAt.map {
+            WearRecord(id: garment.wearID, itemID: itemID, completionID: completionID, wornAt: $0)
+        }
         try wardrobeRepository.recordWear(
             wear,
             fingerprint: ItemFingerprint(

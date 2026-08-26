@@ -119,7 +119,7 @@ enum CompletionSyncPlanner {
             return PlannedItem(
                 dto: CompletionItemDTO(
                     id: garment.id,
-                    wearId: UUID(),
+                    wearId: garment.wearID,
                     category: garment.category.rawValue,
                     name: garment.name,
                     description: garment.description,
@@ -133,7 +133,7 @@ enum CompletionSyncPlanner {
             return PlannedItem(
                 dto: CompletionItemDTO(
                     id: existing,
-                    wearId: UUID(),
+                    wearId: garment.wearID,
                     category: garment.category.rawValue,
                     name: garment.name,
                     description: garment.description
