@@ -15,6 +15,17 @@ final class TemplateRequestSpy: @unchecked Sendable {
 }
 
 @MainActor
+final class PullSpy {
+    private(set) var count = 0
+    var onPull: (() -> Void)?
+
+    func pull() {
+        count += 1
+        onPull?()
+    }
+}
+
+@MainActor
 struct OutfitTemplateTests {
     private struct Setup {
         let sut: EditorViewModel
@@ -26,7 +37,8 @@ struct OutfitTemplateTests {
     private func makeSUT(
         consentNeeded: Bool = false,
         scanned: [String] = [],
-        discarded: String? = nil
+        discarded: String? = nil,
+        syncNow: (() async -> Void)? = nil
     ) throws -> Setup {
         let photos = SpyPhotoRepository()
         let photoID = try photos.saveOriginal(Data([0xAA]))
@@ -71,7 +83,8 @@ struct OutfitTemplateTests {
             requestTemplate: { try await spy.send($0) },
             review: review,
             needsUploadConsent: consentNeeded,
-            sleep: { _ in }
+            sleep: { _ in },
+            syncNow: syncNow
         )
         return Setup(sut: sut, spy: spy, photos: photos, review: review)
     }
@@ -181,5 +194,40 @@ struct OutfitTemplateTests {
             setup.sut.document.layers.map(\.id) == before.map(\.id),
             "the page goes underneath; a layer the user placed must not be traded for it"
         )
+    }
+
+    @Test func theWaitPullsTheFeedOnEveryTick() async throws {
+        let pull = PullSpy()
+        let setup = try makeSUT(syncNow: { pull.pull() })
+        let request = setup.spy.answer
+        pull.onPull = { [photos = setup.photos] in
+            guard pull.count == 3 else { return }
+            try? photos.saveOriginal(Data([0xBB, 0xCC]), id: request)
+        }
+
+        setup.sut.chooseTemplate(.lookbook)
+        await setup.sut.templateTask?.value
+
+        #expect(pull.count == 3, "the page only lands because the wait pulls the feed each tick")
+        #expect(setup.sut.templateState == .idle)
+        guard case .photo = setup.sut.document.background else {
+            Issue.record("expected the page as the background, got \(setup.sut.document.background)")
+            return
+        }
+    }
+
+    @Test func retryingAdoptsAPageThatArrivedAfterTheTimeoutInsteadOfAskingAgain() async throws {
+        let setup = try makeSUT()
+        setup.sut.chooseTemplate(.lookbook)
+        await setup.sut.templateTask?.value
+        #expect(setup.sut.templateTimedOut, "this test is about what happens after the wait gives up")
+        try setup.photos.saveOriginal(Data([0xBB, 0xCC]), id: setup.spy.answer)
+
+        setup.sut.retryTemplate()
+        await setup.sut.templateTask?.value
+
+        #expect(setup.spy.requests.count == 1, "the page is already here; asking again burns the quota")
+        #expect(setup.sut.templateState == .idle)
+        #expect(!setup.sut.templateTimedOut)
     }
 }

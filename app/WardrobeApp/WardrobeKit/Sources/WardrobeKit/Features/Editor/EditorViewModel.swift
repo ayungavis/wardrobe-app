@@ -40,7 +40,7 @@ public final class EditorViewModel {
     public internal(set) var templateTimedOut = false
     var templateTask: Task<Void, Never>?
     static let templateGarmentLimit = 6
-    static let templateAttempts = 40
+    static let templateAttempts = 100
     public var isLayerPanelPresented = false
     public var alertError: AppError?
     public internal(set) var saveState: PhotoSaveState = .idle
@@ -65,6 +65,7 @@ public final class EditorViewModel {
     let needsUploadConsent: Bool
     let makeConsent: (() -> ConsentViewModel)?
     let sleep: @Sendable (Duration) async throws -> Void
+    let syncNow: (() async -> Void)?
     internal(set) var wardrobeStickers: [WardrobeSticker] = []
     var loadTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
@@ -83,7 +84,8 @@ public final class EditorViewModel {
         review: GarmentReviewModel? = nil,
         needsUploadConsent: Bool = false,
         makeConsent: (() -> ConsentViewModel)? = nil,
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        syncNow: (() async -> Void)? = nil
     ) {
         self.challenge = challenge
         self.activeRepository = activeRepository
@@ -97,6 +99,7 @@ public final class EditorViewModel {
         self.needsUploadConsent = needsUploadConsent
         self.makeConsent = makeConsent
         self.sleep = sleep
+        self.syncNow = syncNow
         document = challenge.document
     }
 

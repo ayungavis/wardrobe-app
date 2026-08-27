@@ -50,16 +50,20 @@ public extension EditorViewModel {
     }
 
     func retryTemplate() {
-        guard let lastTemplate else { return }
+        guard let lastTemplate, !adoptTemplateIfArrived() else { return }
         chooseTemplate(lastTemplate)
     }
 
-    func adoptTemplateIfArrived() {
-        guard case .loading = templateState, let request = pendingTemplateID else { return }
-        guard let bytes = try? photoRepository.loadOriginal(id: request) else { return }
+    @discardableResult
+    func adoptTemplateIfArrived() -> Bool {
+        guard let request = pendingTemplateID,
+              let bytes = try? photoRepository.loadOriginal(id: request)
+        else { return false }
         setBackgroundPhoto(bytes)
         templateState = .idle
+        templateTimedOut = false
         pendingTemplateID = nil
+        return true
     }
 
     // ponytail: the editor waits by asking rather than being told; a push
@@ -68,8 +72,9 @@ public extension EditorViewModel {
         for _ in 0 ..< Self.templateAttempts {
             try await sleep(.seconds(3))
             try Task.checkCancellation()
-            adoptTemplateIfArrived()
-            guard case .loading = templateState else { return }
+            await syncNow?()
+            try Task.checkCancellation()
+            guard !adoptTemplateIfArrived() else { return }
         }
         templateTimedOut = true
         templateState = .failed(.unavailable)

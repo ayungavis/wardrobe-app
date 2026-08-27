@@ -18,7 +18,8 @@ public extension AppContainer {
             requestTemplate: { [self] request in try await sendTemplateRequest(request) },
             review: review,
             needsUploadConsent: needsUploadConsentPrompt,
-            makeConsent: { [self] in makeConsentViewModel() }
+            makeConsent: { [self] in makeConsentViewModel() },
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }
 
