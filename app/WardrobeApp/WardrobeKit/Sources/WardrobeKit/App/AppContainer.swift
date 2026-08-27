@@ -147,6 +147,11 @@ public final class AppContainer {
         CropViewModel(photoID: photoID, photoRepository: photoRepository)
     }
 
+    public var isAwaitingIllustration: Bool {
+        ((try? makeWardrobeItemRepository().items()) ?? [])
+            .contains { $0.status == .pending || $0.status == .processing }
+    }
+
     public func makeWardrobeItemDetailViewModel(itemID: UUID) -> WardrobeItemDetailViewModel {
         WardrobeItemDetailViewModel(
             itemID: itemID,
@@ -154,7 +159,10 @@ public final class AppContainer {
             thumbnails: garmentThumbnailRepository,
             completions: completedChallengeRepository,
             photos: photoRepository,
-            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) },
+            scanner: makeGarmentScanService(allowsMatching: false),
+            uploads: makeMediaUploadRepository(),
+            revision: contentRevision
         )
     }
 
@@ -276,7 +284,10 @@ public final class AppContainer {
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
             previews: completionPreviewRepository,
-            downloads: makeMediaDownloadRepository()
+            downloads: makeMediaDownloadRepository(),
+            saver: Self.defaultLibrarySaver(),
+            media: makeMediaRepository(),
+            syncNow: { [syncCoordinator] in await syncCoordinator.reconcile(.mutationQueued) }
         )
     }
 }

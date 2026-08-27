@@ -6,19 +6,29 @@ import Observation
 public final class HistoryViewModel {
     public private(set) var state: Loadable<[CompletedChallenge]> = .idle
 
-    private let completedRepository: CompletedChallengeRepository
+    let completedRepository: CompletedChallengeRepository
     private(set) var syncStates: [UUID: SyncState] = [:]
     private(set) var openConflictCount = 0
     private(set) var mediaRestoreRemaining = 0
     private(set) var mediaRestoreFailed = 0
-    private let outbox: any OutboxRepository
+    let outbox: any OutboxRepository
     private let uploads: any MediaUploadRepository
-    private let photoRepository: PhotoRepository
-    private let wardrobeRepository: WardrobeItemRepository
+    let photoRepository: PhotoRepository
+    let wardrobeRepository: WardrobeItemRepository
     private let thumbnails: GarmentThumbnailRepository
-    private let previews: CompletionPreviewRepository
+    let previews: CompletionPreviewRepository
     private let downloads: (any MediaDownloadRepository)?
     private var renderedPreviews: [UUID: Data] = [:]
+
+    public internal(set) var share: Loadable<CompletionShare> = .idle
+    public var isSharePresented = false
+    public var alertError: AppError?
+    public internal(set) var didSave = false
+    var shareTask: Task<Void, Never>?
+    let saver: PhotoLibrarySaveService
+    let media: (any MediaRepository)?
+    let syncNow: () async -> Void
+    public internal(set) var didDelete = false
 
     public init(
         completedRepository: CompletedChallengeRepository,
@@ -28,7 +38,10 @@ public final class HistoryViewModel {
         wardrobeRepository: WardrobeItemRepository,
         thumbnails: GarmentThumbnailRepository,
         previews: CompletionPreviewRepository,
-        downloads: (any MediaDownloadRepository)? = nil
+        downloads: (any MediaDownloadRepository)? = nil,
+        saver: PhotoLibrarySaveService,
+        media: (any MediaRepository)? = nil,
+        syncNow: @escaping () async -> Void = {}
     ) {
         self.completedRepository = completedRepository
         self.outbox = outbox
@@ -38,6 +51,9 @@ public final class HistoryViewModel {
         self.thumbnails = thumbnails
         self.previews = previews
         self.downloads = downloads
+        self.saver = saver
+        self.media = media
+        self.syncNow = syncNow
     }
 
     public func retryFailedRestores() {

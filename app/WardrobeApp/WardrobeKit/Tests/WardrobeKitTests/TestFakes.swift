@@ -43,6 +43,10 @@ final class InMemoryCompletedChallengeRepository: CompletedChallengeRepository, 
         stored.append(completion)
     }
 
+    func remove(id: UUID) {
+        stored.removeAll { $0.id == id }
+    }
+
     func removeCompletions(on date: Date) {
         stored.removeAll { Calendar.current.isDate($0.completedAt, inSameDayAs: date) }
     }
@@ -95,6 +99,22 @@ final class InMemoryWardrobeItemRepository: WardrobeItemRepository {
     }
 
     private(set) var regenerated: [(id: UUID, note: String?)] = []
+
+    private(set) var adoptedCutouts: [(path: String, mediaID: UUID)] = []
+
+    private(set) var deletedWearCompletions: [UUID] = []
+
+    func deleteWears(completionID: UUID) throws {
+        deletedWearCompletions.append(completionID)
+        storedWears.removeAll { $0.completionID == completionID }
+    }
+
+    func adoptCutout(itemID: UUID, path: String, mediaID: UUID) throws {
+        if let index = storedItems.firstIndex(where: { $0.id == itemID }) {
+            storedItems[index].cutoutFile = path
+        }
+        adoptedCutouts.append((path, mediaID))
+    }
 
     func regenerateIllustration(itemID: UUID, note: String?) throws {
         regenerated.append((itemID, note))

@@ -69,6 +69,48 @@ struct WardrobeItemDetailViewModelTests {
 
     private let version = "v1+vision2"
 
+    @Test func theDetailScreenShowsTheIllustrationOnceItExists() {
+        let repository = InMemoryWardrobeItemRepository()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        let illustrationID = UUID()
+        let itemID = UUID()
+        let item = WardrobeItem(
+            id: itemID, category: .top, cutoutFile: "cut.png",
+            currentIllustrationID: illustrationID, createdAt: Date(), updatedAt: Date()
+        )
+        try? repository.insert(item, fingerprint: nil, wear: nil)
+        thumbnails.files["cut.png"] = Data([0x01])
+        let sut = makeSUT(itemID: itemID, repository: repository, thumbnails: thumbnails)
+        sut.load()
+
+        #expect(sut.thumbnailData(for: item) == Data([0x01]),
+                "until the illustration arrives the cut-out stands in for it (FR-081)")
+
+        thumbnails.files["\(illustrationID.uuidString).png"] = Data([0x02])
+
+        #expect(sut.thumbnailData(for: item) == Data([0x02]),
+                "tapping the hero has to open the illustration, not the cut-out it replaced")
+    }
+
+    @Test func theDetailScreenReloadsWhenAPullLands() {
+        let repository = InMemoryWardrobeItemRepository()
+        let item = WardrobeItem(category: .top, cutoutFile: "c.png", createdAt: Date(), updatedAt: Date())
+        try? repository.insert(item, fingerprint: nil, wear: nil)
+        let revision = ContentRevisionModel()
+        let sut = WardrobeItemDetailViewModel(
+            itemID: item.id, repository: repository,
+            thumbnails: InMemoryGarmentThumbnailRepository(), revision: revision
+        )
+        let before = sut.contentRevision
+
+        revision.bump()
+
+        #expect(
+            sut.contentRevision != before,
+            "the detail screen keys its .task on this; without it a landed pull never reaches the screen"
+        )
+    }
+
     private func makeSUT(
         itemID: UUID,
         repository: InMemoryWardrobeItemRepository,

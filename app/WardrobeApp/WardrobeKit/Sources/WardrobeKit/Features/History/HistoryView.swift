@@ -71,6 +71,11 @@ public struct HistoryView: View {
                     )
                 }
             }
+            .onChange(of: viewModel.didDelete) { _, deleted in
+                guard deleted else { return }
+                navigationPath = NavigationPath()
+                viewModel.acknowledgeDelete()
+            }
             .navigationDestination(for: GarmentRoute.self) { route in
                 WardrobeItemDetailView(
                     viewModel: container.makeWardrobeItemDetailViewModel(itemID: route.id)

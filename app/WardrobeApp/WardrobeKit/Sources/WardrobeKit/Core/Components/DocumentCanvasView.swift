@@ -9,6 +9,8 @@ struct DocumentCanvasView: View {
     var body: some View {
         ZStack {
             CanvasBackgroundView(background: document.background, photo: photo)
+                .frame(width: size.width, height: size.height)
+                .clipped()
 
             ForEach(Array(document.layers.enumerated()), id: \.element.id) { index, layer in
                 LayerContentView(content: layer.content, canvasSize: size, image: photo)

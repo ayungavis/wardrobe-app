@@ -9,6 +9,7 @@ public protocol CompletedChallengeRepository: Sendable {
     @discardableResult
     func stageStatus(id: UUID, status: CompletionStatus) -> Bool
     func commitStaged() throws
+    func remove(id: UUID)
     func removeCompletions(on date: Date)
     func removeAll()
 }
@@ -79,6 +80,12 @@ public final class UserDefaultsCompletedChallengeRepository: CompletedChallengeR
     }
 
     public func commitStaged() {}
+
+    public func remove(id: UUID) {
+        var stored = load()
+        stored.removeAll { $0.id == id }
+        save(stored)
+    }
 
     public func removeCompletions(on date: Date) {
         let kept = load().filter { !calendar.isDate($0.completedAt, inSameDayAs: date) }
@@ -193,6 +200,13 @@ public final class SwiftDataCompletedChallengeRepository: CompletedChallengeRepo
 
     func stageDocumentState(id: UUID, _ state: DocumentState) {
         stored().first { $0.id == id }?.documentState = state.rawValue
+    }
+
+    public func remove(id: UUID) {
+        for entity in stored() where entity.id == id {
+            context.delete(entity)
+        }
+        save()
     }
 
     public func removeCompletions(on date: Date) {

@@ -243,6 +243,19 @@ final class StubMediaRepository: MediaRepository {
 
     var downloads: [UUID: Data] = [:]
     var failingIDs: Set<UUID> = []
+    var downloadURLHost = "https://objects.example.test"
+    private(set) var urlRequests: [UUID] = []
+
+    func downloadURL(for id: UUID) async throws -> URL {
+        if let error {
+            throw error
+        }
+        urlRequests.append(id)
+        guard let url = URL(string: "\(downloadURLHost)/\(id.uuidString)?sig=abc") else {
+            throw AppError.serverRejected
+        }
+        return url
+    }
 
     func data(for id: UUID) async throws -> Data {
         if failingIDs.contains(id) {
@@ -272,4 +285,17 @@ func makeGrantedPreferences() -> InMemoryAccountPreferencesRepository {
     let preferences = InMemoryAccountPreferencesRepository()
     preferences.stored = AccountPreferences(uploadConsentAt: Date())
     return preferences
+}
+
+@MainActor
+final class SpyPhotoLibrarySaver: PhotoLibrarySaveService {
+    nonisolated(unsafe) var error: AppError? // Type safety: a test double read only from the main actor.
+    private(set) nonisolated(unsafe) var saved: [Data] = []
+
+    nonisolated func save(_ data: Data) async throws {
+        if let error {
+            throw error
+        }
+        saved.append(data)
+    }
 }

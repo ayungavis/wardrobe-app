@@ -10,6 +10,7 @@ public protocol WardrobeItemRepository: AnyObject {
     func resolveConflict(_ conflict: ItemConflict, choosing choice: ConflictChoice) throws
     func merge(winnerID: UUID, loserID: UUID) throws
     func regenerateIllustration(itemID: UUID, note: String?) throws
+    func adoptCutout(itemID: UUID, path: String, mediaID: UUID) throws
     func insert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?) throws
     func stageInsert(_ item: WardrobeItem, fingerprint: ItemFingerprint?, wear: WearRecord?)
     func recordWear(_ wear: WearRecord?, fingerprint: ItemFingerprint) throws
@@ -18,6 +19,7 @@ public protocol WardrobeItemRepository: AnyObject {
     func discardStaged()
     func update(_ item: WardrobeItem) throws
     func delete(itemID: UUID) throws
+    func deleteWears(completionID: UUID) throws
     func deleteAll() throws
 }
 
@@ -27,10 +29,16 @@ public protocol WardrobeItemRepository: AnyObject {
 public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
     let context: ModelContext
     private let outbox: (any OutboxRepository)?
+    let calendar: Calendar
 
-    public init(context: ModelContext, outbox: (any OutboxRepository)? = nil) {
+    public init(
+        context: ModelContext,
+        outbox: (any OutboxRepository)? = nil,
+        calendar: Calendar = .current
+    ) {
         self.context = context
         self.outbox = outbox
+        self.calendar = calendar
     }
 
     public static var schema: Schema {
@@ -178,7 +186,7 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
         fetchItem(itemID)?.cutoutPath = path
     }
 
-    private func fetchItem(_ itemID: UUID) -> WardrobeItemEntity? {
+    func fetchItem(_ itemID: UUID) -> WardrobeItemEntity? {
         do {
             return try context.fetch(
                 FetchDescriptor<WardrobeItemEntity>(predicate: #Predicate { $0.id == itemID })
@@ -187,30 +195,6 @@ public final class SwiftDataWardrobeItemRepository: WardrobeItemRepository {
             Log.report(error, context: Log.Context(operation: "wardrobe.fetchItem"))
             return nil
         }
-    }
-
-    func stageInsert(wear: WearRecord) {
-        context.insert(WearRecordEntity(wear))
-    }
-
-    func stageApply(wear: WearRecord, deletedAt: Date?) throws {
-        let wearID = wear.id
-        let existing = try context.fetch(
-            FetchDescriptor<WearRecordEntity>(predicate: #Predicate { $0.id == wearID })
-        ).first
-        if deletedAt != nil {
-            if let existing {
-                context.delete(existing)
-            }
-            return
-        }
-        if let existing {
-            existing.itemID = wear.itemID
-            existing.completionID = wear.completionID
-            existing.wornAt = wear.wornAt
-            return
-        }
-        context.insert(WearRecordEntity(wear))
     }
 
     public func commitStaged() throws {

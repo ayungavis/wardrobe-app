@@ -184,7 +184,10 @@ final class LocalRestoreService: RestoreService {
     }
 
     private func applyCompletion(_ record: ChallengeCompletionRecordDTO) -> String? {
-        guard record.deletedAt == nil else { return "completion-tombstone" }
+        guard record.deletedAt == nil else {
+            completions.remove(id: record.id)
+            return "completion-tombstone"
+        }
         guard let status = CompletionStatus(rawValue: record.status) else { return "completion-status" }
         completions.stageRestore(
             RestoredCompletion(

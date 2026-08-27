@@ -7,6 +7,9 @@ public struct WardrobeItemDetailView: View {
     @State private var isDeleteConfirmationPresented = false
     @State private var isRegeneratePresented = false
     @State private var isEditing: Bool = false
+    @State private var isIllustrationPresented = false
+    private static let pinchToOpen: CGFloat = 1.3
+    @Namespace private var illustrationNamespace
 
     @State private var editableName: String = ""
     @State private var editableDescription: String = ""
@@ -20,12 +23,9 @@ public struct WardrobeItemDetailView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     if let item = viewModel.item {
-                        HeroView(
-                            data: viewModel.thumbnailData(for: item),
-                            isEditing: isEditing
-                        )
-                        .padding(.horizontal, Spacing.lg)
-                        .padding(.top, Spacing.xl)
+                        hero(for: item)
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.top, Spacing.xl)
 
                         Text("wardrobe.wearCount.used \(viewModel.wearCount)", bundle: .module)
                             .font(AppFont.title)
@@ -99,7 +99,15 @@ public struct WardrobeItemDetailView: View {
                     }
                 }
             }
-            .task {
+        #if os(iOS)
+            .fullScreenCover(isPresented: $isIllustrationPresented) {
+                if let item = viewModel.item, let data = viewModel.thumbnailData(for: item) {
+                    IllustrationDetailView(data: data)
+                        .navigationTransition(.zoom(sourceID: "illustration", in: illustrationNamespace))
+                }
+            }
+        #endif
+            .task(id: viewModel.contentRevision) {
                 viewModel.load()
             }
             .onChange(of: viewModel.item) { _, newItem in
@@ -127,7 +135,8 @@ public struct WardrobeItemDetailView: View {
             .sheet(isPresented: $isRegeneratePresented) {
                 RegenerateIllustrationView(
                     cutout: viewModel.cutoutData(),
-                    original: viewModel.originalPhotoData()
+                    original: viewModel.originalPhotoData(),
+                    viewModel: viewModel
                 ) { note in
                     viewModel.regenerateIllustration(note: note)
                     isRegeneratePresented = false
@@ -155,6 +164,34 @@ public struct WardrobeItemDetailView: View {
             } message: {
                 Text("wardrobe.detail.merge.message", bundle: .module)
             }
+    }
+
+    @ViewBuilder
+    private func hero(for item: WardrobeItem) -> some View {
+        let data = viewModel.thumbnailData(for: item)
+
+        if let data {
+            Button {
+                isIllustrationPresented = true
+            } label: {
+                HeroView(data: data, isEditing: isEditing)
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture(count: 2).onEnded { isIllustrationPresented = true })
+            .simultaneousGesture(
+                MagnifyGesture().onChanged { value in
+                    if value.magnification > Self.pinchToOpen {
+                        isIllustrationPresented = true
+                    }
+                }
+            )
+            #if os(iOS)
+            .matchedTransitionSource(id: "illustration", in: illustrationNamespace)
+            #endif
+            .accessibilityLabel(Text("wardrobe.detail.illustration.open", bundle: .module))
+        } else {
+            HeroView(data: nil, isEditing: isEditing)
+        }
     }
 
     private func illustrationRow(_ item: WardrobeItem) -> some View {

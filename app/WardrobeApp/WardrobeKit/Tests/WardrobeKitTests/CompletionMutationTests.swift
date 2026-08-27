@@ -299,6 +299,8 @@ private final class RefusingCompletionStore: CompletedChallengeRepository {
 
     func commitStaged() {}
 
+    func remove(id _: UUID) {}
+
     func removeCompletions(on _: Date) {}
 
     func removeAll() {}
