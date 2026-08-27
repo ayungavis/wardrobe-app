@@ -23,6 +23,9 @@ pub async fn apply(
     match name {
         "completeChallenge" => mutations::complete_challenge::apply(pool, account_id, args).await,
         "deleteCompletion" => mutations::delete_completion::apply(pool, account_id, args).await,
+        "generateOutfitTemplate" => {
+            mutations::generate_outfit_template::apply(pool, account_id, args).await
+        }
         "deleteItem" => mutations::delete_item::apply(pool, account_id, args).await,
         "generateChallengeDeck" => {
             mutations::generate_challenge_deck::apply(pool, account_id, args).await

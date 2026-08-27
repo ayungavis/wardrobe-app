@@ -2884,6 +2884,22 @@
         }
       }
     },
+    "editor.layer.page": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halaman"
+          }
+        }
+      }
+    },
     "editor.layer.photo": {
       "localizations": {
         "en": {
@@ -4668,6 +4684,125 @@
           "stringUnit": {
             "state": "translated",
             "value": "Item-mu muncul di sini begitu ilustrasinya siap."
+          }
+        }
+      }
+    },
+    "editor.template.blisterCream": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, cream"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, krem"
+          }
+        }
+      }
+    },
+    "editor.template.blisterGreen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, green"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blister pack, hijau"
+          }
+        }
+      }
+    },
+    "editor.template.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your photo and the garments on the canvas are sent to make the page."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotomu dan garmen yang ada di kanvas dikirim untuk membuat halamannya."
+          }
+        }
+      }
+    },
+    "editor.template.lookbook": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lookbook"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lookbook"
+          }
+        }
+      }
+    },
+    "editor.template.stillWorking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still being made. Try again in a moment."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masih dibuat. Coba lagi sebentar lagi."
+          }
+        }
+      }
+    },
+    "editor.template.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Templates"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Template"
+          }
+        }
+      }
+    },
+    "editor.template.working": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Making your page…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Membuat halamannya…"
           }
         }
       }

@@ -54,7 +54,7 @@ async fn every_synced_kind_reaches_the_feed(pool: PgPool) -> sqlx::Result<()> {
         wardrobe_api::changes::SYNCED_TABLES.len(),
         "a kind missing from the feed is data the client can never learn about; got {seen:?}"
     );
-    assert_eq!(page["nextSince"], 12);
+    assert_eq!(page["nextSince"], 13);
     Ok(())
 }
 
@@ -107,7 +107,7 @@ async fn rows_written_together_all_appear_in_position_order(pool: PgPool) -> sql
     let mut sorted = positions(&page);
     sorted.sort_unstable();
     assert_eq!(positions(&page), sorted, "the feed is ordered by position");
-    assert_eq!(positions(&page), (1..=12).collect::<Vec<_>>());
+    assert_eq!(positions(&page), (1..=13).collect::<Vec<_>>());
     Ok(())
 }
 
@@ -121,7 +121,7 @@ async fn a_tombstone_travels_the_feed_like_any_other_record(pool: PgPool) -> sql
         .execute(&pool)
         .await?;
 
-    let page = pull(&pool, &token, "?since=12").await;
+    let page = pull(&pool, &token, "?since=13").await;
     let changes = page["changes"].as_array().expect("changes");
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0]["kind"], "wardrobeItem");
@@ -151,7 +151,7 @@ async fn walking_the_feed_one_row_at_a_time_skips_nothing(pool: PgPool) -> sqlx:
         cursor = page["nextSince"].as_i64().expect("a cursor");
     }
 
-    assert_eq!(walked, (1..=12).collect::<Vec<_>>());
+    assert_eq!(walked, (1..=13).collect::<Vec<_>>());
     Ok(())
 }
 

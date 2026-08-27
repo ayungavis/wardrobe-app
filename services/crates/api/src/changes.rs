@@ -15,6 +15,7 @@ pub const SYNCED_TABLES: &[&str] = &[
     "active_challenge",
     "canvas_document",
     "challenge_completion",
+    "outfit_template",
     "item_cutout",
     "item_fingerprint",
     "item_illustration",
@@ -41,6 +42,7 @@ pub enum Record {
     ItemFingerprint(records::ItemFingerprint),
     ItemCutout(records::ItemCutout),
     ItemIllustration(records::ItemIllustration),
+    OutfitTemplate(records::OutfitTemplate),
     WardrobeItemConflict(records::WardrobeItemConflict),
     Photo(records::Photo),
     PhotoDerivative(records::PhotoDerivative),
@@ -129,6 +131,15 @@ async fn items(
             .map(|row: records::ItemIllustration| Change {
                 change_seq: row.change_seq,
                 record: Record::ItemIllustration(row),
+            }),
+    );
+    out.extend(
+        records::fetch(pool, records::OUTFIT_TEMPLATE, account, from, limit)
+            .await?
+            .into_iter()
+            .map(|row: records::OutfitTemplate| Change {
+                change_seq: row.change_seq,
+                record: Record::OutfitTemplate(row),
             }),
     );
     out.extend(

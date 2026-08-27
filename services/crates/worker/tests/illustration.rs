@@ -90,7 +90,12 @@ async fn configure(pool: &PgPool, alternate: Option<&str>) -> sqlx::Result<()> {
     sqlx::query(
         "insert into ai_model_config
              (capability, model_class, active_model, alternate_model, prompt_version, updated_by)
-         values ('illustration', 'image', 'primary/model', $1, 'p1', 'the test')",
+         values ('illustration', 'image', 'primary/model', $1, 'p1', 'the test')
+         on conflict (capability) do update
+            set active_model = excluded.active_model,
+                alternate_model = excluded.alternate_model,
+                prompt_version = excluded.prompt_version,
+                updated_by = excluded.updated_by",
     )
     .bind(alternate)
     .execute(pool)
@@ -663,7 +668,11 @@ async fn the_capability_is_not_ready_until_a_provider_is_allowlisted(
     sqlx::query(
         "insert into ai_model_config
              (capability, model_class, active_model, prompt_version, updated_by)
-         values ('illustration', 'image', 'primary/model', 'p1', 'the test')",
+         values ('illustration', 'image', 'primary/model', 'p1', 'the test')
+         on conflict (capability) do update
+            set active_model = excluded.active_model,
+                alternate_model = null,
+                updated_by = excluded.updated_by",
     )
     .execute(&pool)
     .await?;
@@ -897,7 +906,13 @@ async fn a_provider_that_never_answers_gives_up_instead_of_hanging() {
         &client,
         &server.uri(),
         "test-key",
-        &live_ask("a/model", b"cut-out"),
+        &live_ask(
+            "a/model",
+            &[illustration::openrouter::Reference {
+                bytes: b"cut-out",
+                content_type: "image/png",
+            }],
+        ),
     )
     .await;
 
@@ -952,7 +967,11 @@ async fn a_real_cutout_renders_end_to_end() {
         .and_then(|raw| raw.parse().ok())
         .unwrap_or(184_726);
     let prompt = std::env::var("OPENROUTER_TEST_PROMPT").ok();
-    let mut ask = live_ask(&model, &cutout);
+    let references = [illustration::openrouter::Reference {
+        bytes: &cutout,
+        content_type: "image/png",
+    }];
+    let mut ask = live_ask(&model, &references);
     ask.seed = seed;
     if let Some(prompt) = prompt.as_deref() {
         ask.prompt = prompt;
@@ -1003,12 +1022,14 @@ static LIVE_PROMPT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     )
 });
 
-fn live_ask<'a>(model: &'a str, cutout: &'a [u8]) -> illustration::openrouter::Ask<'a> {
+fn live_ask<'a>(
+    model: &'a str,
+    references: &'a [illustration::openrouter::Reference<'a>],
+) -> illustration::openrouter::Ask<'a> {
     illustration::openrouter::Ask {
         model,
         prompt: LIVE_PROMPT.as_str(),
-        cutout,
-        content_type: "image/png",
+        references,
         resolution: illustration::openrouter::DEFAULT_RESOLUTION,
         aspect_ratio: illustration::openrouter::DEFAULT_ASPECT_RATIO,
         seed: 184_726,
@@ -1041,7 +1062,11 @@ async fn the_live_model_advertises_every_parameter_this_client_sends() {
     let cutout = STANDARD
         .decode(FLAT_SQUARE_PNG.replace(char::is_whitespace, ""))
         .expect("a png");
-    let sent = illustration::openrouter::payload(&live_ask(&model, &cutout));
+    let references = [illustration::openrouter::Reference {
+        bytes: &cutout,
+        content_type: "image/png",
+    }];
+    let sent = illustration::openrouter::payload(&live_ask(&model, &references));
     let sent = sent.as_object().expect("an object");
 
     for parameter in sent.keys() {
@@ -1070,7 +1095,11 @@ async fn the_live_provider_answers_in_the_shape_this_client_parses() {
         .post(format!("{base_url}/images"))
         .bearer_auth(&api_key)
         .json(&illustration::openrouter::payload(&live_ask(
-            &model, &cutout,
+            &model,
+            &[illustration::openrouter::Reference {
+                bytes: &cutout,
+                content_type: "image/png",
+            }],
         )))
         .send()
         .await
@@ -1097,7 +1126,13 @@ async fn the_live_provider_answers_in_the_shape_this_client_parses() {
         &reqwest::Client::new(),
         &base_url,
         &api_key,
-        &live_ask(&model, &cutout),
+        &live_ask(
+            &model,
+            &[illustration::openrouter::Reference {
+                bytes: &cutout,
+                content_type: "image/png",
+            }],
+        ),
     )
     .await
     .expect("the live provider answers in the shape this client parses");

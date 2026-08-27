@@ -131,18 +131,6 @@ public final class AppContainer {
         #endif
     }
 
-    public func makeEditorViewModel(challenge: ActiveChallenge) -> EditorViewModel {
-        EditorViewModel(
-            challenge: challenge,
-            activeRepository: activeChallengeRepository,
-            photoRepository: photoRepository,
-            librarySaver: Self.defaultLibrarySaver(),
-            preferencesRepository: preferencesRepository,
-            wardrobeRepository: makeWardrobeItemRepository(),
-            thumbnails: garmentThumbnailRepository
-        )
-    }
-
     public func makeCropViewModel(photoID: UUID) -> CropViewModel {
         CropViewModel(photoID: photoID, photoRepository: photoRepository)
     }
@@ -263,7 +251,7 @@ public final class AppContainer {
         #endif
     }
 
-    private static func defaultLibrarySaver() -> PhotoLibrarySaveService {
+    static func defaultLibrarySaver() -> PhotoLibrarySaveService {
         #if os(iOS)
             PHPhotoLibrarySaveService()
         #else

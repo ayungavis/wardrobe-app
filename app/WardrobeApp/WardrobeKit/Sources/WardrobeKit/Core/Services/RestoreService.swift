@@ -82,6 +82,8 @@ final class LocalRestoreService: RestoreService {
             try applyFingerprint(record)
         case let .wearRecord(record):
             try applyWear(record)
+        case let .outfitTemplate(record):
+            applyTemplate(record)
         case let .accountPreference(record):
             applyPreference(record)
         case let .challengeCompletion(record):
@@ -208,6 +210,14 @@ final class LocalRestoreService: RestoreService {
         )
     }
 
+    private func applyTemplate(_ record: OutfitTemplateRecordDTO) {
+        guard record.deletedAt == nil else { return }
+        downloads.stage(MediaDownload(
+            id: record.mediaObjectId,
+            destination: .outfitTemplate(requestID: record.requestId)
+        ))
+    }
+
     private func applyDocument(_ record: CanvasDocumentRecordDTO) {
         guard record.deletedAt == nil else { return }
         guard record.schemaVersion <= Int32(EditorDocument.currentSchemaVersion) else {
@@ -323,6 +333,8 @@ extension LocalRestoreService {
             try wardrobe.commitStaged()
         case let .itemIllustration(illustrationID):
             try thumbnails.save(bytes, id: illustrationID)
+        case let .outfitTemplate(requestID):
+            try photos.saveOriginal(bytes, id: requestID)
         }
     }
 

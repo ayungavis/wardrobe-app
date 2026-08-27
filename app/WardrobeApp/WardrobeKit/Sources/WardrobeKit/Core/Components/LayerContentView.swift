@@ -9,10 +9,15 @@ struct LayerContentView: View {
     var body: some View {
         switch content {
         case let .photo(content):
-            PolaroidPhotoView(
-                photo: image(content.photoID),
-                width: canvasSize.width * PolaroidPhotoView.widthRatio
-            )
+            switch content.style {
+            case .polaroid:
+                PolaroidPhotoView(
+                    photo: image(content.photoID),
+                    width: canvasSize.width * PolaroidPhotoView.widthRatio
+                )
+            case .page:
+                PagePhotoView(photo: image(content.photoID), size: canvasSize)
+            }
         case let .text(text):
             TextItemLabelView(item: text, fontSize: TextRendering.baseFontSize(in: canvasSize))
         case let .sticker(sticker):

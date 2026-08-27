@@ -32,6 +32,7 @@ enum ChangeRecordDTO: Decodable, Sendable {
     case challengeCompletion(ChallengeCompletionRecordDTO)
     case activeChallenge(ActiveChallengeRecordDTO)
     case wearRecord(WearRecordRecordDTO)
+    case outfitTemplate(OutfitTemplateRecordDTO)
     case accountPreference(AccountPreferenceRecordDTO)
     case unrecognised(kind: String)
 
@@ -59,6 +60,8 @@ enum ChangeRecordDTO: Decodable, Sendable {
         case "wardrobeItemConflict":
             try .wardrobeItemConflict(container.decode(WardrobeItemConflictRecordDTO.self, forKey: .record))
         case "wearRecord": try .wearRecord(container.decode(WearRecordRecordDTO.self, forKey: .record))
+        case "outfitTemplate":
+            try .outfitTemplate(container.decode(OutfitTemplateRecordDTO.self, forKey: .record))
         default: nil
         }
     }
@@ -191,6 +194,15 @@ struct ActiveChallengeRecordDTO: Decodable, Sendable {
     let timeZone: String
     let acceptedAt: Date
     let photoId: UUID?
+    let changeSeq: Int64
+    let deletedAt: Date?
+}
+
+struct OutfitTemplateRecordDTO: Decodable, Sendable {
+    let id: UUID
+    let requestId: UUID
+    let mediaObjectId: UUID
+    let template: String
     let changeSeq: Int64
     let deletedAt: Date?
 }

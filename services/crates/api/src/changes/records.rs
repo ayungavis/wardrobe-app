@@ -129,6 +129,24 @@ pub struct ItemIllustration {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
+pub const OUTFIT_TEMPLATE: &str = feed_query!(
+    "outfit_template",
+    "id, request_id, media_object_id, template, model, prompt_version, change_seq, deleted_at"
+);
+
+#[derive(Debug, Serialize, sqlx::FromRow, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OutfitTemplate {
+    pub id: Uuid,
+    pub request_id: Uuid,
+    pub media_object_id: Uuid,
+    pub template: String,
+    pub model: String,
+    pub prompt_version: String,
+    pub change_seq: i64,
+    pub deleted_at: Option<DateTime<Utc>>,
+}
+
 pub const WARDROBE_ITEM_CONFLICT: &str = feed_query!(
     "wardrobe_item_conflict",
     "id, item_id, field, value, revision, origin_device, change_seq, resolved_at"

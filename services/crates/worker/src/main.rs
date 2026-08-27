@@ -12,6 +12,7 @@ use wardrobe_storage::Storage;
 use wardrobe_worker::challenge;
 use wardrobe_worker::illustration::{self, Provider};
 use wardrobe_worker::inference;
+use wardrobe_worker::template;
 use wardrobe_worker::{SWEEP_GRACE_HOURS, SWEEP_MEDIA, kinds};
 
 fn main() -> ExitCode {
@@ -242,6 +243,17 @@ async fn handle(
                     .await
                     .map_err(|_| "database")?;
             challenge::generate_for(pool, provider, &job, job.attempts >= max_attempts).await
+        }
+        wardrobe_db::OUTFIT_TEMPLATE => {
+            let storage = storage.ok_or("object_store_unconfigured")?;
+            let provider = provider.ok_or("provider_unconfigured")?;
+            let max_attempts: i32 =
+                sqlx::query_scalar("select max_attempts from job where id = $1")
+                    .bind(job.id)
+                    .fetch_one(pool)
+                    .await
+                    .map_err(|_| "database")?;
+            template::render_for(pool, storage, provider, &job, job.attempts >= max_attempts).await
         }
         wardrobe_db::STYLISE_ILLUSTRATION => {
             let storage = storage.ok_or("object_store_unconfigured")?;

@@ -32,6 +32,15 @@ public final class EditorViewModel {
     public var isExportPresented = false
     public var isStickerPickerPresented = false
     public var isBackgroundPickerPresented = false
+    public var isTemplatePickerPresented = false
+    public var isConsentPresented = false
+    public internal(set) var templateState: Loadable<Bool> = .idle
+    var pendingTemplateID: UUID?
+    var lastTemplate: OutfitTemplate?
+    public internal(set) var templateTimedOut = false
+    var templateTask: Task<Void, Never>?
+    static let templateGarmentLimit = 6
+    static let templateAttempts = 100
     public var isLayerPanelPresented = false
     public var alertError: AppError?
     public internal(set) var saveState: PhotoSaveState = .idle
@@ -51,6 +60,12 @@ public final class EditorViewModel {
     let preferencesRepository: AccountPreferencesRepository
     let wardrobeRepository: WardrobeItemRepository?
     let thumbnails: GarmentThumbnailRepository?
+    let requestTemplate: ((TemplateRequest) async throws -> UUID)?
+    let review: GarmentReviewModel?
+    let needsUploadConsent: Bool
+    let makeConsent: (() -> ConsentViewModel)?
+    let sleep: @Sendable (Duration) async throws -> Void
+    let syncNow: (() async -> Void)?
     internal(set) var wardrobeStickers: [WardrobeSticker] = []
     var loadTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
@@ -64,7 +79,13 @@ public final class EditorViewModel {
         librarySaver: PhotoLibrarySaveService,
         preferencesRepository: AccountPreferencesRepository,
         wardrobeRepository: WardrobeItemRepository? = nil,
-        thumbnails: GarmentThumbnailRepository? = nil
+        thumbnails: GarmentThumbnailRepository? = nil,
+        requestTemplate: ((TemplateRequest) async throws -> UUID)? = nil,
+        review: GarmentReviewModel? = nil,
+        needsUploadConsent: Bool = false,
+        makeConsent: (() -> ConsentViewModel)? = nil,
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        syncNow: (() async -> Void)? = nil
     ) {
         self.challenge = challenge
         self.activeRepository = activeRepository
@@ -73,6 +94,12 @@ public final class EditorViewModel {
         self.preferencesRepository = preferencesRepository
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
+        self.requestTemplate = requestTemplate
+        self.review = review
+        self.needsUploadConsent = needsUploadConsent
+        self.makeConsent = makeConsent
+        self.sleep = sleep
+        self.syncNow = syncNow
         document = challenge.document
     }
 
@@ -266,31 +293,5 @@ public final class EditorViewModel {
             selectedLayerID = nil
         }
         persistDocument()
-    }
-
-    public func setBackground(_ background: CanvasBackground) {
-        guard document.background != background else { return }
-        document.background = background
-        persistDocument()
-    }
-
-    public func setBackgroundPhoto(_ data: Data) {
-        do {
-            let photoID = try photoRepository.saveOriginal(data)
-            challenge.importedPhotoIDs.append(photoID)
-
-            if case var .loaded(originals) = originals {
-                originals[photoID] = data
-                self.originals = .loaded(originals)
-            }
-            previewImages[photoID] = ImageDecoding.downsampledImage(from: data, maxPixel: 1600)
-
-            document.background = .photo(id: photoID, crop: nil)
-            updateCroppedPreviews()
-            persistDocument()
-        } catch {
-            Log.report(error)
-            alertError = .photoImportFailed
-        }
     }
 }

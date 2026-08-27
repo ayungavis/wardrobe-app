@@ -64,6 +64,14 @@ public struct EditorView: View {
         .sheet(isPresented: $viewModel.isLayerPanelPresented) {
             LayerPanelView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.isTemplatePickerPresented) {
+            TemplatePickerView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.isConsentPresented) {
+            if let consent = viewModel.makeConsent?() {
+                ConsentView(viewModel: consent) { viewModel.isConsentPresented = false }
+            }
+        }
         .sheet(isPresented: $viewModel.isBackgroundPickerPresented) {
             BackgroundPickerView(
                 selected: viewModel.document.background,
@@ -158,6 +166,24 @@ public struct EditorView: View {
                 .ignoresSafeArea(.keyboard)
 
             if viewModel.activeTool == nil {
+                if viewModel.isMakingTemplate {
+                    VStack {
+                        HStack {
+                            TemplateStatusBannerView(
+                                state: viewModel.templateState,
+                                stillWorking: viewModel.templateTimedOut,
+                                onCancel: viewModel.cancelTemplate,
+                                onRetry: viewModel.retryTemplate
+                            )
+                            .transition(.opacity)
+                            Spacer(minLength: Spacing.lg)
+                        }
+                        .padding(.top, 60)
+                        Spacer()
+                    }
+                    .padding(Spacing.lg)
+                }
+
                 if let banner = draftBannerKind {
                     VStack {
                         HStack {
@@ -183,8 +209,10 @@ public struct EditorView: View {
                     onRedo: viewModel.redo,
                     onText: { viewModel.beginNewText() },
                     onSticker: { viewModel.isStickerPickerPresented = true },
-                    onPickPhoto: viewModel.addPhoto,
+                    onPickPhoto: { viewModel.addPhoto($0) },
                     onBackground: { viewModel.isBackgroundPickerPresented = true },
+                    onTemplate: { viewModel.isTemplatePickerPresented = true },
+                    isTemplateBusy: !viewModel.canAskForTemplate,
                     onDrawing: viewModel.beginDrawing,
                     onLayers: { viewModel.isLayerPanelPresented = true },
                     onSave: viewModel.saveDirectly,

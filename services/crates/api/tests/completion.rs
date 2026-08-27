@@ -191,6 +191,36 @@ async fn buried(pool: &PgPool, table: &str, account: Uuid) -> i64 {
     .expect("buried")
 }
 
+async fn queue_template(pool: &PgPool, stage: &Stage, request: Uuid, template: &str) -> Value {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", stage.token))
+        .body(Body::from(
+            json!({ "mutations": [{
+                "id": Uuid::now_v7(), "name": "generateOutfitTemplate",
+                "args": {
+                    "requestId": request, "template": template,
+                    "personMediaId": stage.media, "garments": []
+                }
+            }]})
+            .to_string(),
+        ))
+        .expect("request");
+    let response = call(pool.clone(), request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["results"][0].clone()
+}
+
+async fn template_jobs(pool: &PgPool, account: Uuid) -> i64 {
+    sqlx::query_scalar("select count(*) from job where account_id = $1 and kind = 'outfitTemplate'")
+        .bind(account)
+        .fetch_one(pool)
+        .await
+        .expect("jobs")
+}
+
 async fn count(pool: &PgPool, table: &str, account: Uuid) -> i64 {
     sqlx::query_scalar(&format!(
         "select count(*) from {table} where account_id = $1"
@@ -901,5 +931,98 @@ async fn a_completion_belonging_to_someone_else_is_not_found(pool: PgPool) -> sq
     let result = delete_completion(&pool, &stage, Uuid::now_v7()).await;
 
     assert_ne!(result["status"], "applied");
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn queueing_a_template_is_idempotent_per_request_and_style(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let request = Uuid::now_v7();
+
+    queue_template(&pool, &stage, request, "blisterGreen").await;
+    queue_template(&pool, &stage, request, "blisterGreen").await;
+    assert_eq!(template_jobs(&pool, stage.account).await, 1);
+
+    queue_template(&pool, &stage, request, "lookbook").await;
+
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        2,
+        "a different style is a different picture, not a replay"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_template_referencing_media_this_account_does_not_own_is_not_found(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let request = Uuid::now_v7();
+
+    let request_body = json!({ "mutations": [{
+        "id": Uuid::now_v7(), "name": "generateOutfitTemplate",
+        "args": {
+            "requestId": request, "template": "lookbook",
+            "personMediaId": Uuid::now_v7(), "garments": []
+        }
+    }]});
+    let http = Request::builder()
+        .method("POST")
+        .uri("/v1/sync")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", stage.token))
+        .body(Body::from(request_body.to_string()))
+        .expect("request");
+    let response = call(pool.clone(), http).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let result = body_json(response).await["results"][0].clone();
+
+    assert_ne!(result["status"], "applied");
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        0,
+        "a job pointing at objects we do not own would hand another account's photo to a model"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_unknown_template_name_is_refused(pool: PgPool) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+
+    let result = queue_template(&pool, &stage, Uuid::now_v7(), "whatever").await;
+
+    assert_ne!(result["status"], "applied");
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        0,
+        "an unknown style would reach the worker with no prompt behind it"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_template_is_queued_for_media_whose_bytes_the_server_has_not_confirmed_yet(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let unconfirmed: Option<chrono::DateTime<chrono::Utc>> =
+        sqlx::query_scalar("select uploaded_at from media_object where id = $1")
+            .bind(stage.media)
+            .fetch_one(&pool)
+            .await?;
+    assert!(
+        unconfirmed.is_none(),
+        "the client reserves and PUTs; nothing tells the server the bytes landed"
+    );
+
+    queue_template(&pool, &stage, Uuid::now_v7(), "lookbook").await;
+
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        1,
+        "uploaded_at is filled lazily by a read path, so requiring it here queues nothing at all"
+    );
     Ok(())
 }

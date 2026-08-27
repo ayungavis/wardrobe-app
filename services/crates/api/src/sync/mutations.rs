@@ -2,6 +2,7 @@ pub mod complete_challenge;
 pub mod delete_completion;
 pub mod delete_item;
 pub mod generate_challenge_deck;
+pub mod generate_outfit_template;
 pub mod merge_items;
 pub mod regenerate_illustration;
 pub mod resolve_completion;
