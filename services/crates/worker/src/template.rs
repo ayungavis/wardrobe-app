@@ -14,6 +14,7 @@ pub const CAPABILITY: &str = "outfit_template";
 const MAX_IMAGE_BYTES: usize = 12 * 1024 * 1024;
 const QUALITY_ATTEMPTS: i64 = 2;
 const MAX_GARMENTS: usize = 6;
+const MAX_REFERENCE_EDGE: u32 = 2048;
 
 struct Settings {
     active_model: String,
@@ -126,7 +127,7 @@ pub async fn render_for(
 ) -> Result<(), &'static str> {
     let payload = payload_of(job)?;
     let Some(account) = owner(pool, payload.person_media_id).await? else {
-        return Ok(());
+        return Err("owner_missing");
     };
     let settings = settings(pool).await?;
     let pinned = inference::pin(
@@ -139,12 +140,12 @@ pub async fn render_for(
     .await?;
 
     let Some(person) = key_of(pool, payload.person_media_id).await? else {
-        return Ok(());
+        return Err("reference_missing");
     };
     let mut keys = vec![person];
     for garment in payload.garments.iter().take(MAX_GARMENTS) {
         let Some(key) = key_of(pool, garment.media_id).await? else {
-            return Ok(());
+            return Err("reference_missing");
         };
         keys.push(key);
     }
@@ -166,7 +167,7 @@ pub async fn render_for(
     let mut bytes = Vec::with_capacity(keys.len());
     for key in &keys {
         let raw = storage.get(key).await.map_err(|_| "object_store")?;
-        match image::prepare(&raw, settings.bounds) {
+        match image::prepare_reference(&raw, settings.bounds, MAX_REFERENCE_EDGE) {
             Ok(prepared) => bytes.push(prepared),
             Err(rejection) => {
                 tracing::warn!(
@@ -174,7 +175,7 @@ pub async fn render_for(
                     rejection = rejection.code(),
                     "a reference cannot be sent, so no render was attempted"
                 );
-                return Ok(());
+                return Err("reference_unusable");
             }
         }
     }

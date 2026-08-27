@@ -20,9 +20,14 @@ struct OutfitTemplateTests {
         let sut: EditorViewModel
         let spy: TemplateRequestSpy
         let photos: SpyPhotoRepository
+        let review: GarmentReviewModel
     }
 
-    private func makeSUT(consentNeeded: Bool = false) throws -> Setup {
+    private func makeSUT(
+        consentNeeded: Bool = false,
+        scanned: [String] = [],
+        discarded: String? = nil
+    ) throws -> Setup {
         let photos = SpyPhotoRepository()
         let photoID = try photos.saveOriginal(Data([0xAA]))
         var challenge = ActiveChallenge(card: ChallengeCard(prompt: "x"), acceptedAt: Date())
@@ -33,6 +38,27 @@ struct OutfitTemplateTests {
             stickers: [StickerItem(emoji: "✨", position: .zero)]
         )
         let spy = TemplateRequestSpy()
+        let thumbnails = InMemoryGarmentThumbnailRepository()
+        let review = GarmentReviewModel(
+            scanner: FakeGarmentScanService(),
+            photoRepository: photos,
+            wardrobeRepository: InMemoryWardrobeItemRepository(),
+            thumbnails: thumbnails
+        )
+        for file in scanned {
+            thumbnails.files[file] = Data([0xEE])
+        }
+        review.stage(scanned.map { file in
+            let id = UUID()
+            return ScannedGarment(
+                id: id, category: .top, cutoutFile: file,
+                fingerprint: ItemFingerprint(
+                    itemID: id, version: "v1", colorLab: [70, 5, 15], aspectRatio: 0.8,
+                    featurePrint: Data([1, 2, 3, 4]), maskQuality: 1, createdAt: Date()
+                ),
+                matches: [], decision: file == discarded ? .discard : .new
+            )
+        })
 
         let sut = EditorViewModel(
             challenge: challenge,
@@ -41,12 +67,13 @@ struct OutfitTemplateTests {
             librarySaver: SpyPhotoLibrarySaver(),
             preferencesRepository: InMemoryAccountPreferencesRepository(),
             wardrobeRepository: InMemoryWardrobeItemRepository(),
-            thumbnails: InMemoryGarmentThumbnailRepository(),
+            thumbnails: thumbnails,
             requestTemplate: { try await spy.send($0) },
+            review: review,
             needsUploadConsent: consentNeeded,
             sleep: { _ in }
         )
-        return Setup(sut: sut, spy: spy, photos: photos)
+        return Setup(sut: sut, spy: spy, photos: photos, review: review)
     }
 
     @Test func choosingATemplateHandsTheContainerThePhoto() async throws {
@@ -68,6 +95,27 @@ struct OutfitTemplateTests {
 
         #expect(setup.sut.isConsentPresented)
         #expect(setup.spy.requests.isEmpty, "nothing may leave the device before consent")
+    }
+
+    @Test func theTemplateCarriesTheGarmentsFromTheReviewNotTheCanvas() async throws {
+        let setup = try makeSUT(scanned: ["a.png", "b.png"])
+
+        setup.sut.chooseTemplate(.lookbook)
+        await setup.sut.templateTask?.value
+
+        #expect(
+            setup.spy.requests.first?.garments.count == 2,
+            "the page lists what was scanned, not what happens to be stuck on the canvas"
+        )
+    }
+
+    @Test func garmentsTheUserDiscardedAreLeftOut() async throws {
+        let setup = try makeSUT(scanned: ["a.png", "b.png"], discarded: "b.png")
+
+        setup.sut.chooseTemplate(.lookbook)
+        await setup.sut.templateTask?.value
+
+        #expect(setup.spy.requests.first?.garments.count == 1)
     }
 
     @Test func theBannerHasSomethingToShowFromTheMomentItIsTapped() throws {

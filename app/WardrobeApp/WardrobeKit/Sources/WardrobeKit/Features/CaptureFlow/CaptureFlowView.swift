@@ -6,12 +6,12 @@ public struct CaptureFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: CaptureFlowViewModel
-    private let makeEditorViewModel: (ActiveChallenge) -> EditorViewModel
+    private let makeEditorViewModel: (ActiveChallenge, GarmentReviewModel) -> EditorViewModel
     private let makeCropViewModel: (UUID) -> CropViewModel
 
     public init(
         viewModel: CaptureFlowViewModel,
-        makeEditorViewModel: @escaping (ActiveChallenge) -> EditorViewModel,
+        makeEditorViewModel: @escaping (ActiveChallenge, GarmentReviewModel) -> EditorViewModel,
         makeCropViewModel: @escaping (UUID) -> CropViewModel
     ) {
         _viewModel = State(wrappedValue: viewModel)
@@ -54,7 +54,7 @@ public struct CaptureFlowView: View {
                 )
             case .editor:
                 EditorView(
-                    viewModel: makeEditorViewModel(viewModel.challenge),
+                    viewModel: makeEditorViewModel(viewModel.challenge, viewModel.review),
                     isCompleting: viewModel.isCompleting,
                     didResumeDraft: viewModel.didResumeDraft,
                     makeCropViewModel: makeCropViewModel,

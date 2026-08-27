@@ -22,9 +22,8 @@ async fn stage(pool: &PgPool) -> sqlx::Result<Stage> {
     let (token, account) = session(pool, Duration::days(1), false).await?;
     let media = Uuid::now_v7();
     sqlx::query(
-        "insert into media_object
-             (id, account_id, kind, storage_key, content_type, uploaded_at)
-         values ($1, $2, 'original', $3, 'image/jpeg', now())",
+        "insert into media_object (id, account_id, kind, storage_key, content_type)
+         values ($1, $2, 'original', $3, 'image/jpeg')",
     )
     .bind(media)
     .bind(account)
@@ -999,6 +998,31 @@ async fn an_unknown_template_name_is_refused(pool: PgPool) -> sqlx::Result<()> {
         template_jobs(&pool, stage.account).await,
         0,
         "an unknown style would reach the worker with no prompt behind it"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_template_is_queued_for_media_whose_bytes_the_server_has_not_confirmed_yet(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let stage = stage(&pool).await?;
+    let unconfirmed: Option<chrono::DateTime<chrono::Utc>> =
+        sqlx::query_scalar("select uploaded_at from media_object where id = $1")
+            .bind(stage.media)
+            .fetch_one(&pool)
+            .await?;
+    assert!(
+        unconfirmed.is_none(),
+        "the client reserves and PUTs; nothing tells the server the bytes landed"
+    );
+
+    queue_template(&pool, &stage, Uuid::now_v7(), "lookbook").await;
+
+    assert_eq!(
+        template_jobs(&pool, stage.account).await,
+        1,
+        "uploaded_at is filled lazily by a read path, so requiring it here queues nothing at all"
     );
     Ok(())
 }

@@ -48,8 +48,7 @@ pub async fn apply(pool: &PgPool, account_id: Uuid, args: Value) -> Result<Value
 
     let mut tx = pool.begin().await?;
     let owned: i64 = sqlx::query_scalar(
-        "select count(*) from media_object
-          where id = any($1) and account_id = $2 and uploaded_at is not null",
+        "select count(*) from media_object where id = any($1) and account_id = $2",
     )
     .bind(&media)
     .bind(account_id)

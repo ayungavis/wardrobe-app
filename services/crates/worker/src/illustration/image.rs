@@ -74,6 +74,42 @@ pub fn prepare(bytes: &[u8], bounds: Bounds) -> Result<Vec<u8>, Rejection> {
 
 /// # Errors
 ///
+/// Returns [`Rejection`] when the reference is larger than the bounds allow or
+/// cannot be decoded. Any aspect is accepted; an oversized edge is shrunk.
+pub fn prepare_reference(
+    bytes: &[u8],
+    bounds: Bounds,
+    max_edge: u32,
+) -> Result<Vec<u8>, Rejection> {
+    if bytes.len() as u64 > bounds.max_bytes {
+        return Err(Rejection::TooManyBytes);
+    }
+
+    let (width, height) = dimensions(bytes)?;
+    if u64::from(width) * u64::from(height) > bounds.max_pixels {
+        return Err(Rejection::TooManyPixels);
+    }
+
+    let mut reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|_| Rejection::Undecodable)?;
+    reader.limits(bounds.limits());
+    let decoded = reader.decode().map_err(|_| Rejection::Undecodable)?;
+    let decoded = if width.max(height) > max_edge {
+        decoded.thumbnail(max_edge, max_edge)
+    } else {
+        decoded
+    };
+
+    let mut png = Cursor::new(Vec::new());
+    decoded
+        .write_to(&mut png, ImageFormat::Png)
+        .map_err(|_| Rejection::Undecodable)?;
+    Ok(png.into_inner())
+}
+
+/// # Errors
+///
 /// Returns [`Rejection`] when the generated image cannot be decoded or does not
 /// land on the canvas the capability was configured for.
 pub fn verify_generation(

@@ -57,10 +57,20 @@ async fn sent_body(server: &MockServer) -> Value {
 }
 
 async fn put_media(pool: &PgPool, account: Uuid, kind: &str) -> sqlx::Result<Uuid> {
+    put_sized_media(pool, account, kind, 320, 320).await
+}
+
+async fn put_sized_media(
+    pool: &PgPool,
+    account: Uuid,
+    kind: &str,
+    width: u32,
+    height: u32,
+) -> sqlx::Result<Uuid> {
     let media = Uuid::now_v7();
     let key = format!("{account}/{kind}/{media}");
     store()
-        .put(&key, flat_png(320, 320), "image/png")
+        .put(&key, flat_png(width, height), "image/png")
         .await
         .expect("the object lands");
     sqlx::query(
@@ -256,6 +266,69 @@ async fn the_request_asks_for_the_canvas_shape(pool: PgPool) -> sqlx::Result<()>
     assert_eq!(
         sent["aspect_ratio"], "9:16",
         "the page is drawn scaledToFill on a 9:16 canvas, so a wider one loses its sides"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_portrait_photo_is_accepted_as_a_reference(pool: PgPool) -> sqlx::Result<()> {
+    let scene = scene(&pool, 0).await?;
+    let portrait = put_sized_media(&pool, scene.account, "original", 900, 1600).await?;
+    sqlx::query(
+        "update job set payload = jsonb_set(payload, '{personMediaId}', to_jsonb($2::text))
+          where account_id = $1",
+    )
+    .bind(scene.account)
+    .bind(portrait.to_string())
+    .execute(&pool)
+    .await?;
+
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered()),
+    )
+    .await;
+    run(&pool, &server).await;
+
+    let stored: i64 =
+        sqlx::query_scalar("select count(*) from outfit_template where request_id = $1")
+            .bind(scene.request)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(
+        stored, 1,
+        "a challenge photo is never square; refusing it leaves the page unmade"
+    );
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_reference_that_cannot_be_prepared_fails_the_job_instead_of_claiming_success(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    let scene = scene(&pool, 0).await?;
+    sqlx::query(
+        "update job set payload = jsonb_set(payload, '{personMediaId}', to_jsonb($2::text))
+          where account_id = $1",
+    )
+    .bind(scene.account)
+    .bind(Uuid::now_v7().to_string())
+    .execute(&pool)
+    .await?;
+
+    let server = MockServer::start().await;
+    answer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(rendered()),
+    )
+    .await;
+    let outcome = run(&pool, &server).await;
+
+    assert_ne!(
+        outcome,
+        Outcome::Succeeded,
+        "a job that produced nothing must not report success; the client can never learn otherwise"
     );
     Ok(())
 }

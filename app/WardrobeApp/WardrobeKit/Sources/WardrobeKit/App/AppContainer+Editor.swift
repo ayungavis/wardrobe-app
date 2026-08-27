@@ -3,7 +3,10 @@ import Foundation
 // MARK: - Editor
 
 public extension AppContainer {
-    func makeEditorViewModel(challenge: ActiveChallenge) -> EditorViewModel {
+    func makeEditorViewModel(
+        challenge: ActiveChallenge,
+        review: GarmentReviewModel
+    ) -> EditorViewModel {
         EditorViewModel(
             challenge: challenge,
             activeRepository: activeChallengeRepository,
@@ -13,6 +16,7 @@ public extension AppContainer {
             wardrobeRepository: makeWardrobeItemRepository(),
             thumbnails: garmentThumbnailRepository,
             requestTemplate: { [self] request in try await sendTemplateRequest(request) },
+            review: review,
             needsUploadConsent: needsUploadConsentPrompt,
             makeConsent: { [self] in makeConsentViewModel() }
         )

@@ -212,7 +212,7 @@ public struct EditorView: View {
                     onPickPhoto: viewModel.addPhoto,
                     onBackground: { viewModel.isBackgroundPickerPresented = true },
                     onTemplate: { viewModel.isTemplatePickerPresented = true },
-                    isTemplateBusy: viewModel.isMakingTemplate,
+                    isTemplateBusy: !viewModel.canAskForTemplate,
                     onDrawing: viewModel.beginDrawing,
                     onLayers: { viewModel.isLayerPanelPresented = true },
                     onSave: viewModel.saveDirectly,

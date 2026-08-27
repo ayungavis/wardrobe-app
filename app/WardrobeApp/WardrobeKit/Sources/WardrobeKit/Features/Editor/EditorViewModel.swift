@@ -61,6 +61,7 @@ public final class EditorViewModel {
     let wardrobeRepository: WardrobeItemRepository?
     let thumbnails: GarmentThumbnailRepository?
     let requestTemplate: ((TemplateRequest) async throws -> UUID)?
+    let review: GarmentReviewModel?
     let needsUploadConsent: Bool
     let makeConsent: (() -> ConsentViewModel)?
     let sleep: @Sendable (Duration) async throws -> Void
@@ -79,6 +80,7 @@ public final class EditorViewModel {
         wardrobeRepository: WardrobeItemRepository? = nil,
         thumbnails: GarmentThumbnailRepository? = nil,
         requestTemplate: ((TemplateRequest) async throws -> UUID)? = nil,
+        review: GarmentReviewModel? = nil,
         needsUploadConsent: Bool = false,
         makeConsent: (() -> ConsentViewModel)? = nil,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
@@ -91,6 +93,7 @@ public final class EditorViewModel {
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
         self.requestTemplate = requestTemplate
+        self.review = review
         self.needsUploadConsent = needsUploadConsent
         self.makeConsent = makeConsent
         self.sleep = sleep

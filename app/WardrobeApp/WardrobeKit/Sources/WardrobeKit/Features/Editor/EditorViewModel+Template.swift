@@ -5,8 +5,13 @@ public extension EditorViewModel {
         templateState != .idle
     }
 
+    var canAskForTemplate: Bool {
+        !isMakingTemplate && review?.isScanning != true
+    }
+
     func chooseTemplate(_ template: OutfitTemplate) {
         guard let requestTemplate else { return }
+        guard review?.isScanning != true else { return }
         guard !needsUploadConsent else {
             isConsentPresented = true
             return
@@ -24,7 +29,7 @@ public extension EditorViewModel {
         templateTask = Task {
             do {
                 let request = TemplateRequest(
-                    template: template, photo: photo, garments: placedGarments()
+                    template: template, photo: photo, garments: scannedGarments()
                 )
                 pendingTemplateID = try await requestTemplate(request)
                 try await waitForTemplate()
@@ -70,20 +75,19 @@ public extension EditorViewModel {
         templateState = .failed(.unavailable)
     }
 
-    private func placedGarments() -> [TemplateRequest.Garment] {
-        let placed = document.layers.compactMap { layer -> UUID? in
-            guard case let .sticker(sticker) = layer.content else { return nil }
-            return sticker.art.wardrobeItemID
+    private func scannedGarments() -> [TemplateRequest.Garment] {
+        guard let review else { return [] }
+        return review.activeGarments.prefix(Self.templateGarmentLimit).compactMap { garment in
+            guard let cutout = try? thumbnails?.data(forFile: garment.cutoutFile) else { return nil }
+            return TemplateRequest.Garment(
+                cutout: cutout, name: garment.name, wears: wearsAfterToday(garment)
+            )
         }
-        let items = ((try? wardrobeRepository?.items()) ?? []) ?? []
-        return placed.prefix(Self.templateGarmentLimit).compactMap { id in
-            guard let item = items.first(where: { $0.id == id }),
-                  let cutout = try? thumbnails?.data(forFile: item.cutoutFile)
-            else {
-                return nil
-            }
-            let wears = ((try? wardrobeRepository?.wears(for: id)) ?? [])?.count ?? 0
-            return TemplateRequest.Garment(cutout: cutout, name: item.name, wears: wears)
-        }
+    }
+
+    private func wearsAfterToday(_ garment: ScannedGarment) -> Int {
+        guard case let .existing(itemID) = garment.decision else { return 1 }
+        let existing = ((try? wardrobeRepository?.wears(for: itemID)) ?? [])?.count ?? 0
+        return existing + 1
     }
 }
