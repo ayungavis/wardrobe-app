@@ -59,7 +59,7 @@ public extension EditorViewModel {
         guard let request = pendingTemplateID,
               let bytes = try? photoRepository.loadOriginal(id: request)
         else { return false }
-        setBackgroundPhoto(bytes)
+        addPhoto(bytes, style: .page, above: challengePhotoLayerID)
         templateState = .idle
         templateTimedOut = false
         pendingTemplateID = nil

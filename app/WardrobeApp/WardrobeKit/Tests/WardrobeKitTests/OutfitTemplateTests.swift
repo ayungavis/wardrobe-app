@@ -175,10 +175,11 @@ struct OutfitTemplateTests {
         #expect(setup.sut.templateTimedOut, "the job may still be running; say so instead of claiming failure")
     }
 
-    @Test func theArrivingTemplateBecomesTheBackgroundAndKeepsEveryLayer() throws {
+    @Test func theArrivingTemplateLandsAsAPageLayerJustAboveTheChallengePhoto() throws {
         let setup = try makeSUT()
         let before = setup.sut.document.layers
-        #expect(before.count >= 2, "an empty document would make the layer assertion below vacuous")
+        #expect(before.count >= 3, "an empty document would make the ordering assertions vacuous")
+        let background = setup.sut.document.background
         let request = UUID.v7()
         setup.sut.pendingTemplateID = request
         setup.sut.templateState = .loading
@@ -186,14 +187,59 @@ struct OutfitTemplateTests {
 
         setup.sut.adoptTemplateIfArrived()
 
-        guard case .photo = setup.sut.document.background else {
-            Issue.record("expected a photo background, got \(setup.sut.document.background)")
+        let layers = setup.sut.document.layers
+        #expect(layers.count == before.count + 1, "the page is a layer of its own, not a replacement")
+        guard let photoIndex = layers.firstIndex(where: { $0.id == setup.sut.challengePhotoLayerID }),
+              layers.indices.contains(photoIndex + 1)
+        else {
+            Issue.record("expected a layer above the challenge photo")
             return
         }
+        guard case let .photo(page) = layers[photoIndex + 1].content else {
+            Issue.record("expected a photo layer, got \(layers[photoIndex + 1].content)")
+            return
+        }
+        #expect(page.style == .page, "a polaroid well is 3:4 and would crop the 9:16 page")
         #expect(
-            setup.sut.document.layers.map(\.id) == before.map(\.id),
-            "the page goes underneath; a layer the user placed must not be traded for it"
+            Set(before.map(\.id)).isSubset(of: Set(layers.map(\.id))),
+            "a layer the user placed must not be traded for the page"
         )
+        #expect(setup.sut.document.background == background, "the page is a layer now, not the ground")
+    }
+
+    @Test func theArrivingPageStaysUnderTheStickersTheUserPlaced() throws {
+        let setup = try makeSUT()
+        let placed = setup.sut.document.layers.filter { layer in
+            if case .photo = layer.content {
+                return false
+            }
+            return true
+        }
+        #expect(!placed.isEmpty, "this test needs something placed on top to be about anything")
+        let request = UUID.v7()
+        setup.sut.pendingTemplateID = request
+        setup.sut.templateState = .loading
+        try setup.photos.saveOriginal(Data([0xBB, 0xCC]), id: request)
+
+        setup.sut.adoptTemplateIfArrived()
+
+        let layers = setup.sut.document.layers
+        guard let pageIndex = layers.firstIndex(where: { layer in
+            if case let .photo(photo) = layer.content {
+                return photo.style == .page
+            }
+            return false
+        }) else {
+            Issue.record("expected a page layer")
+            return
+        }
+        for layer in placed {
+            guard let index = layers.firstIndex(where: { $0.id == layer.id }) else {
+                Issue.record("a placed layer went missing")
+                return
+            }
+            #expect(index > pageIndex, "the page must not bury what the user already stuck down")
+        }
     }
 
     @Test func theWaitPullsTheFeedOnEveryTick() async throws {
@@ -210,10 +256,12 @@ struct OutfitTemplateTests {
 
         #expect(pull.count == 3, "the page only lands because the wait pulls the feed each tick")
         #expect(setup.sut.templateState == .idle)
-        guard case .photo = setup.sut.document.background else {
-            Issue.record("expected the page as the background, got \(setup.sut.document.background)")
-            return
-        }
+        #expect(setup.sut.document.layers.contains { layer in
+            if case let .photo(photo) = layer.content {
+                return photo.style == .page
+            }
+            return false
+        }, "the pull is only worth anything if the page it fetches reaches the canvas")
     }
 
     @Test func retryingAdoptsAPageThatArrivedAfterTheTimeoutInsteadOfAskingAgain() async throws {

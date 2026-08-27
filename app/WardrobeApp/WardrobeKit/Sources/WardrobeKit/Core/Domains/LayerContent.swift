@@ -53,13 +53,38 @@ extension LayerContent: Codable {
     }
 }
 
+public enum PhotoStyle: String, Codable, Sendable {
+    case polaroid, page
+}
+
 public struct PhotoContent: Equatable, Codable, Sendable {
     public let photoID: UUID
     public var crop: CropSpec?
+    public var style: PhotoStyle
 
-    public init(photoID: UUID, crop: CropSpec? = nil) {
+    private enum CodingKeys: String, CodingKey {
+        case photoID, crop, style
+    }
+
+    public init(photoID: UUID, crop: CropSpec? = nil, style: PhotoStyle = .polaroid) {
         self.photoID = photoID
         self.crop = crop
+        self.style = style
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        photoID = try container.decode(UUID.self, forKey: .photoID)
+        crop = try container.decodeIfPresent(CropSpec.self, forKey: .crop)
+        style = try container.decodeIfPresent(PhotoStyle.self, forKey: .style) ?? .polaroid
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(photoID, forKey: .photoID)
+        try container.encodeIfPresent(crop, forKey: .crop)
+        guard style != .polaroid else { return }
+        try container.encode(style, forKey: .style)
     }
 }
 

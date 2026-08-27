@@ -2884,6 +2884,22 @@
         }
       }
     },
+    "editor.layer.page": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halaman"
+          }
+        }
+      }
+    },
     "editor.layer.photo": {
       "localizations": {
         "en": {

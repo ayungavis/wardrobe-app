@@ -36,7 +36,7 @@ public extension EditorViewModel {
         }
     }
 
-    func addPhoto(_ data: Data) {
+    func addPhoto(_ data: Data, style: PhotoStyle = .polaroid, above layerID: UUID? = nil) {
         do {
             let photoID = try photoRepository.saveOriginal(data)
             challenge.importedPhotoIDs.append(photoID)
@@ -47,8 +47,8 @@ public extension EditorViewModel {
             }
             previewImages[photoID] = ImageDecoding.downsampledImage(from: data, maxPixel: 1600)
 
-            document.appendPhoto(photoID)
-            selectedLayerID = document.layers.last?.id
+            document.insertPhoto(photoID, style: style, above: layerID)
+            selectedLayerID = document.photoLayerID(showing: photoID)
             updateCroppedPreviews()
             persistDocument()
         } catch {

@@ -209,7 +209,7 @@ public struct EditorView: View {
                     onRedo: viewModel.redo,
                     onText: { viewModel.beginNewText() },
                     onSticker: { viewModel.isStickerPickerPresented = true },
-                    onPickPhoto: viewModel.addPhoto,
+                    onPickPhoto: { viewModel.addPhoto($0) },
                     onBackground: { viewModel.isBackgroundPickerPresented = true },
                     onTemplate: { viewModel.isTemplatePickerPresented = true },
                     isTemplateBusy: !viewModel.canAskForTemplate,

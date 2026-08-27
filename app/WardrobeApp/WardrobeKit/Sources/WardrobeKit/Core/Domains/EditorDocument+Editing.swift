@@ -81,8 +81,17 @@ public extension EditorDocument {
         return layer.id
     }
 
+    mutating func insertPhoto(_ photoID: UUID, style: PhotoStyle = .polaroid, above id: UUID? = nil) {
+        let layer = EditorLayer(content: .photo(PhotoContent(photoID: photoID, style: style)))
+        guard let id, let index = layers.firstIndex(where: { $0.id == id }) else {
+            layers.append(layer)
+            return
+        }
+        layers.insert(layer, at: layers.index(after: index))
+    }
+
     mutating func appendPhoto(_ photoID: UUID) {
-        layers.append(EditorLayer(content: .photo(PhotoContent(photoID: photoID))))
+        insertPhoto(photoID)
     }
 
     mutating func appendSticker(_ art: StickerArt) {
