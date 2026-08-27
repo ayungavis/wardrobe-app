@@ -32,6 +32,15 @@ public final class EditorViewModel {
     public var isExportPresented = false
     public var isStickerPickerPresented = false
     public var isBackgroundPickerPresented = false
+    public var isTemplatePickerPresented = false
+    public var isConsentPresented = false
+    public internal(set) var templateState: Loadable<Bool> = .idle
+    var pendingTemplateID: UUID?
+    var lastTemplate: OutfitTemplate?
+    public internal(set) var templateTimedOut = false
+    var templateTask: Task<Void, Never>?
+    static let templateGarmentLimit = 6
+    static let templateAttempts = 40
     public var isLayerPanelPresented = false
     public var alertError: AppError?
     public internal(set) var saveState: PhotoSaveState = .idle
@@ -51,6 +60,10 @@ public final class EditorViewModel {
     let preferencesRepository: AccountPreferencesRepository
     let wardrobeRepository: WardrobeItemRepository?
     let thumbnails: GarmentThumbnailRepository?
+    let requestTemplate: ((TemplateRequest) async throws -> UUID)?
+    let needsUploadConsent: Bool
+    let makeConsent: (() -> ConsentViewModel)?
+    let sleep: @Sendable (Duration) async throws -> Void
     internal(set) var wardrobeStickers: [WardrobeSticker] = []
     var loadTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
@@ -64,7 +77,11 @@ public final class EditorViewModel {
         librarySaver: PhotoLibrarySaveService,
         preferencesRepository: AccountPreferencesRepository,
         wardrobeRepository: WardrobeItemRepository? = nil,
-        thumbnails: GarmentThumbnailRepository? = nil
+        thumbnails: GarmentThumbnailRepository? = nil,
+        requestTemplate: ((TemplateRequest) async throws -> UUID)? = nil,
+        needsUploadConsent: Bool = false,
+        makeConsent: (() -> ConsentViewModel)? = nil,
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.challenge = challenge
         self.activeRepository = activeRepository
@@ -73,6 +90,10 @@ public final class EditorViewModel {
         self.preferencesRepository = preferencesRepository
         self.wardrobeRepository = wardrobeRepository
         self.thumbnails = thumbnails
+        self.requestTemplate = requestTemplate
+        self.needsUploadConsent = needsUploadConsent
+        self.makeConsent = makeConsent
+        self.sleep = sleep
         document = challenge.document
     }
 

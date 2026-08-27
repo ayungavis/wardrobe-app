@@ -16,6 +16,8 @@ struct EditorControlsView: View {
     let onSticker: () -> Void
     let onPickPhoto: (Data) -> Void
     let onBackground: () -> Void
+    let onTemplate: () -> Void
+    let isTemplateBusy: Bool
     let onDrawing: () -> Void
     let onLayers: () -> Void
     let onSave: () -> Void
@@ -63,6 +65,10 @@ struct EditorControlsView: View {
                 .accessibilityIdentifier("editor.tool.sticker")
             photoPicker
             MediaCircleButtonView(systemName: "paintpalette", action: onBackground)
+            MediaCircleButtonView(systemName: "sparkles.rectangle.stack", action: onTemplate)
+                .disabled(isTemplateBusy)
+                .opacity(isTemplateBusy ? 0.4 : 1)
+                .accessibilityLabel(Text("editor.template.title", bundle: .module))
                 .accessibilityLabel(Text("editor.tool.background", bundle: .module))
                 .accessibilityIdentifier("editor.tool.background")
             MediaCircleButtonView(systemName: "pencil.tip", action: onDrawing)
