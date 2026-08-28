@@ -4,6 +4,20 @@ An iOS app that helps people in their 20s re-wear clothes they already own throu
 
 Two sides, developed independently: an **iOS app** and a **Rust backend**. You only need the toolchain for the side you are touching.
 
+## Demo
+
+**[Try it on TestFlight](https://testflight.apple.com/join/u5JgUWap)** — iOS 26 or later.
+
+Recorded at the exhibition, August 2026.
+
+**The app**
+
+https://github.com/user-attachments/assets/14fb05bc-1b59-4fa4-ae69-a0ee322cbf06
+
+**The team behind it**
+
+https://github.com/user-attachments/assets/92b76ddc-28a1-41d6-abf4-b10bdc0326bd
+
 ```
 .
 ├── app/WardrobeApp/                   iOS app
