@@ -1,7 +1,6 @@
-// Production environment values. Fill SENTRY_DSN before the first release build.
-// `//` starts a comment in xcconfig, so every URL needs the empty-$() trick
-// between the slashes — without it the value is silently truncated to "https:".
-API_BASE_URL = https:/$()/wardrobe-app-api.up.railway.app
-SENTRY_DSN = https:/$()/20d03438cf41ffe30a30fa9c28f6f19a@o447656.ingest.us.sentry.io/4511867550171136
+// Production environment values. API_BASE_URL and SENTRY_DSN are deliberately
+// absent: the TestFlight workflow passes them to xcodebuild from GitHub Actions
+// secrets, so they never live in the repository. A local release build supplies
+// them the same way — see "Release builds" in the README.
 SENTRY_ENVIRONMENT = production
 CONSENT_AI_PROVIDER = Seedream (ByteDance)

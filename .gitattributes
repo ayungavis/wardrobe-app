@@ -1,3 +1,9 @@
 # Core ML weights only. A blanket `*.json` rule would turn every asset-catalog
 # Contents.json into an LFS pointer and break the catalogs.
 app/WardrobeApp/WardrobeKit/Sources/WardrobeKit/Models/** filter=lfs diff=lfs merge=lfs -text
+
+# The rule above sweeps the whole directory, which would turn the model's own
+# licence and notice into LFS pointers — unreadable on GitHub, which defeats the
+# point of shipping them. Later rules win, so these two stay plain text.
+app/WardrobeApp/WardrobeKit/Sources/WardrobeKit/Models/*.txt -filter -diff -merge text
+app/WardrobeApp/WardrobeKit/Sources/WardrobeKit/Models/*.md -filter -diff -merge text

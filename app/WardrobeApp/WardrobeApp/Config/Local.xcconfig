@@ -1,3 +1,0 @@
-// Per-machine values only. Everything set here is overridden by Debug.xcconfig,
-// which includes this file first — so keep it to settings Debug.xcconfig does
-// not define, such as DEVELOPMENT_TEAM for running on a physical device.

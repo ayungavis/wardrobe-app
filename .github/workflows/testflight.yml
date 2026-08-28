@@ -35,6 +35,8 @@ jobs:
       TEAM_ID: QHL64K2LPL
       PROVISIONING_PROFILE_NAME: WardrobeApp Apple Distribution
       BUILD_NUMBER: ${{ github.run_number }}
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -70,6 +72,11 @@ jobs:
           [ -n "$APPSTORE_ISSUER_ID" ] || { echo "Missing GitHub variable APPSTORE_ISSUER_ID"; exit 1; }
           [ -n "$APPSTORE_API_KEY_ID" ] || { echo "Missing GitHub variable APPSTORE_API_KEY_ID"; exit 1; }
           [ -n "$APPSTORE_API_PRIVATE_KEY" ] || { echo "Missing GitHub secret APPSTORE_API_PRIVATE_KEY"; exit 1; }
+
+      - name: Validate app environment
+        run: |
+          [ -n "$API_BASE_URL" ] || { echo "Missing GitHub secret API_BASE_URL"; exit 1; }
+          [ -n "$SENTRY_DSN" ] || { echo "Missing GitHub secret SENTRY_DSN"; exit 1; }
 
       - name: Import code signing certificates
         uses: Apple-Actions/import-codesign-certs@v7
@@ -125,6 +132,8 @@ jobs:
           -derivedDataPath .build/DerivedData
           -resultBundlePath .build/WardrobeAppArchive.xcresult
           CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+          API_BASE_URL="$API_BASE_URL"
+          SENTRY_DSN="$SENTRY_DSN"
           archive
 
       - name: Export IPA

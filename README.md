@@ -2,8 +2,6 @@
 
 An iOS app that helps people in their 20s re-wear clothes they already own through one creative Outfit-of-the-Day challenge per day. The wardrobe builds itself progressively from completed challenge photos — no upfront cataloguing.
 
-**Product behavior is defined in [`docs/prd.md`](docs/prd.md) — read it before building features.**
-
 Two sides, developed independently: an **iOS app** and a **Rust backend**. You only need the toolchain for the side you are touching.
 
 ```
@@ -19,7 +17,6 @@ Two sides, developed independently: an **iOS app** and a **Rust backend**. You o
 │   ├── compose.yaml                   Postgres 17 + MinIO — same file used on the VPS
 │   ├── migrations/                    sqlx migrations, forward-only
 │   └── crates/db/                     Schema access + the tests that pin its constraints
-├── docs/                              PRD and design documents (see below)
 └── Makefile                           Every dev command, namespaced ios-* / backend-*
 ```
 
@@ -63,7 +60,7 @@ echo 'DEVELOPMENT_TEAM = YOUR_TEAM_ID' > app/WardrobeApp/WardrobeApp/Config/Loca
 make ios-generate
 ```
 
-The Release configuration is signed manually with the CI team (`QHL64K2LPL`) for TestFlight — don't touch it. ⚠️ Never edit the `.xcodeproj` directly — XcodeGen overwrites it; `project.yml` is the only source of truth.
+The Release configuration is signed manually with the maintainer's team for TestFlight — a fork needs its own `DEVELOPMENT_TEAM` in `project.yml` and in the workflow. ⚠️ Never edit the `.xcodeproj` directly — XcodeGen overwrites it; `project.yml` is the only source of truth.
 
 ### Backend
 
@@ -81,7 +78,7 @@ With the API running: <http://localhost:8080/docs> is Swagger UI and
 
 **API documentation is generated from the handlers.** [`services/openapi.json`](services/openapi.json) is committed and a test fails if it drifts from the code, so client generators can read it without running anything. Regenerate with `make backend-openapi`.
 
-The queue worker is not written yet, and the API so far serves health, identity, and its own documentation. See [`docs/backend-schema.md`](docs/backend-schema.md) and [`docs/api-contract.md`](docs/api-contract.md).
+The queue worker is not written yet, and the API so far serves health, identity, and its own documentation. `services/openapi.json` is committed and a test fails when it drifts from the code.
 
 ## Commands
 
@@ -115,15 +112,22 @@ GitHub Actions is split by path, so a change to one side never runs the other's 
 | `.github/workflows/backend.yml`    | `services/**`                                                     |
 | `.github/workflows/testflight.yml` | Same paths as iOS, on push to `main` — auto-deploys to TestFlight |
 
-A docs-only change runs nothing. One-time TestFlight credential setup: [`docs/testflight-setup.md`](docs/testflight-setup.md).
+A docs-only change runs nothing.
 
-## Documents
+**Release builds carry no configuration from this repository.** `Release.xcconfig`
+defines neither `API_BASE_URL` nor `SENTRY_DSN`; the TestFlight workflow passes
+both to `xcodebuild` from GitHub Actions secrets of the same name. To make a
+release build locally, supply them yourself:
 
-| Document                                               | What it covers                                                |
-| ------------------------------------------------------ | ------------------------------------------------------------- |
-| [`docs/prd.md`](docs/prd.md)                           | **The source of truth for product behavior.** Read first      |
-| [`docs/deployment.md`](docs/deployment.md)             | Deploying the API to Railway, and how to read a failed deploy |
-| [`docs/testflight-setup.md`](docs/testflight-setup.md) | One-time App Store Connect credential setup                   |
+```bash
+xcodebuild -project app/WardrobeApp/WardrobeApp.xcodeproj -scheme WardrobeApp \
+  -configuration Release -destination 'generic/platform=iOS' \
+  API_BASE_URL=https://your-api.example.com SENTRY_DSN=https://…  build
+```
+
+Both values end up in the app's `Info.plist`, so keeping them out of the
+repository hides them from readers and scrapers — not from anyone holding a
+build. Rate limits and spending caps belong on the services themselves.
 
 ## Technical notes
 
@@ -155,3 +159,21 @@ A docs-only change runs nothing. One-time TestFlight credential setup: [`docs/te
 | `make backend-up`: "port is already allocated"               | Something else holds 5433 or 9100 — change the port in `services/.env`, then `make backend-down && make backend-up`                                     |
 | `make backend-*`: "Cannot connect to the Docker daemon"      | Docker Desktop is not running                                                                                                                           |
 | `make backend-migrate`: `sqlx: command not found`            | `cargo install sqlx-cli --no-default-features --features postgres,rustls`                                                                               |
+
+## License
+
+The WardrobeApp source code is released under the [MIT License](LICENSE).
+
+**Two exceptions, neither of which MIT can override:**
+
+- **The bundled Core ML model.** `WardrobeKit/Sources/WardrobeKit/Models/` holds
+  a Core ML conversion of the [FASHN Human Parser](https://github.com/fashn-AI/fashn-human-parser),
+  a SegFormer-B4 fine-tune. It carries the **NVIDIA Source Code License for
+  SegFormer**, which permits redistribution but limits **use to non-commercial
+  research or evaluation**. The full licence and attribution sit beside the
+  weights in [`Models/LICENSE-SegFormer.txt`](app/WardrobeApp/WardrobeKit/Sources/WardrobeKit/Models/LICENSE-SegFormer.txt)
+  and [`Models/NOTICE.md`](app/WardrobeApp/WardrobeKit/Sources/WardrobeKit/Models/NOTICE.md).
+  Shipping this app commercially means replacing that model first.
+- **Fonts and artwork.** `DesignSystem/Resources/Fonts/` and the sticker, paper,
+  and template images in `Assets.xcassets/` come from third parties and keep
+  their own terms.
