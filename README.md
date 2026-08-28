@@ -1,4 +1,4 @@
-# Wardrobe Challenge App
+# ReLove: Wardrobe Challenge App
 
 An iOS app that helps people in their 20s re-wear clothes they already own through one creative Outfit-of-the-Day challenge per day. The wardrobe builds itself progressively from completed challenge photos — no upfront cataloguing.
 
